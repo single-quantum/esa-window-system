@@ -103,8 +103,8 @@ def new_method(csm_idxs, peak_locations):
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = True
+simulate_lost_symbols: bool = False
+simulate_darkcounts: bool = False
 simulate_jitter: bool = True
 
 detection_efficiency: float = 0.8
@@ -155,14 +155,14 @@ memory_size: int = 2
 edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 if use_test_file:
-    samples = pd.read_csv('ppm_message_Jupiter_tiny_greyscale_95x100_slice_64_CSM_interleaved.csv', header=None)
+    samples = pd.read_csv('ppm_message_Jupiter_tiny_greyscale_95x100_slice_8_8-PPM_interleaved.csv', header=None)
     samples = samples.to_numpy().flatten()
 
     # Make a time series based on the length of samples and how long one sample is in time
     time_series_end = len(samples) * sample_size_awg * 1E-12
     time_series = np.arange(0, time_series_end, sample_size_awg * 1E-12)
 
-    msg_peaks = find_peaks(samples, height=1, distance=100)[0]
+    msg_peaks = find_peaks(samples, height=1, distance=10)[0]
 else:
     detector_countrate = 12.7E6
     time_tagger_window_size = 50E-3
@@ -231,17 +231,17 @@ for darkcounts_factor in darkcounts_factors:
             ne = estimated_msg_start_idxs[1]
         # ne = len(peak_locations)
         j = 0
-        symbol_distance = np.diff(peak_locations[n0 + j:ne + j] - peak_locations[n0 + j]) / symbol_length
+        symbol_distance = np.diff(peak_locations[n0 + j:ne + j]) / symbol_length
         while np.mean(symbol_distance[0:4]) > 3:
             j += 1
-            symbol_distance = np.diff(peak_locations[n0 + j:ne + j] - peak_locations[n0 + j]) / symbol_length
+            symbol_distance = np.diff(peak_locations[n0 + j:ne + j]) / symbol_length
             if j > 15:
                 raise StopIteration("Could not find msg start")
 
         je = 1
         while np.mean(symbol_distance[-5 - je:-je]) > 1.5:
             je += 1
-            if j > 20000:
+            if je > 20000:
                 raise StopIteration("Could not find msg end")
 
         n0 += j
@@ -258,13 +258,9 @@ for darkcounts_factor in darkcounts_factors:
             csm_idxs = np.sort(csm_idxs)
             print('Zero not found in CSM indexes')
 
-        # all_symbols, timing_corrections, read_idxs = parse_ppm_symbols(
-        #     peak_locations[n0:ne] - t0_msg, bin_length, symbol_length)
 
-        # msg_symbols_2 = old_method(csm_idxs, peak_locations)
         msg_symbols = new_method(csm_idxs, peak_locations)
 
-        # old = np.array(flatten(msg_symbols_2))
         new = np.array(flatten(msg_symbols))
 
         ppm_mapped_message = new
@@ -280,7 +276,7 @@ for darkcounts_factor in darkcounts_factors:
             convoluted_bit_sequence = ppm_symbols_to_bit_array(ppm_mapped_message, m)
 
         # Get the BER before decoding
-        with open('jupiter_greyscale_64_samples_per_bin_interleaved_sent_bit_sequence', 'rb') as f:
+        with open('jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
             sent_bit_sequence: list = pickle.load(f)
 
         if len(convoluted_bit_sequence) > len(sent_bit_sequence):
@@ -346,7 +342,7 @@ for darkcounts_factor in darkcounts_factors:
             IMG_MODE = '1'
 
         # compare to original image
-        file = "JWST_2022-07-27_Jupiter_tiny.png"
+        file = "sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
         img = Image.open(file)
         img = img.convert(IMG_MODE)
         sent_img_array = np.asarray(img).astype(int)
@@ -365,7 +361,12 @@ for darkcounts_factor in darkcounts_factors:
         else:
             BER_after_decoding = np.sum(
                 np.abs(termination_bits_removed[:len(sent_message)] - sent_message)) / len(sent_message)
-        print(f'BER after decoding: {BER_after_decoding }. Number of darkcounts: {num_darkcounts}')
+        
+        if simulate_darkcounts:
+            print(f'BER after decoding: {BER_after_decoding }. Number of darkcounts: {num_darkcounts}')
+        else:
+            print(f'BER after decoding: {BER_after_decoding }. ')
+
 
         BERS_after.append(BER_after_decoding)
 
