@@ -8,8 +8,7 @@ from tqdm import tqdm
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
 from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import (CCSDS_ASM, CSM, ccsds_asm_bit_sequence,
-                            num_bins_per_symbol)
+from ppm_parameters import CSM, num_bins_per_symbol, m
 from trellis import Trellis
 from utils import AWGN, bpsk_encoding, generate_outer_code_edges
 
@@ -31,36 +30,6 @@ def check_csm(symbols):
         check_csm = True
 
     return check_csm
-
-
-def check_asm(symbols, trellis):
-    check_asm = False
-    asm_symbols = np.round(symbols).astype(int)
-    # asm_symbols = np.append(asm_symbols, 0)
-    asm_sequence = ppm_symbols_to_bit_array(np.array(asm_symbols))
-
-    Es = 5
-    N0 = 1
-
-    sigma = np.sqrt(1 / (2 * 3 * Es / N0))
-
-    encoded_sequence = bpsk_encoding(asm_sequence.astype(float))
-    encoded_sequence = AWGN(encoded_sequence, sigma)
-
-    u_hat = predict(trellis, encoded_sequence, Es=Es)
-
-    conv = convolve(ccsds_asm_bit_sequence + 0.1, u_hat + 0.1)
-    diff = np.sum(np.abs(ccsds_asm_bit_sequence - u_hat[:len(ccsds_asm_bit_sequence)]))
-
-    berts_sum = sum([1 if x == ccsds_asm_bit_sequence[i] else 0 for (i, x)
-                    in enumerate(u_hat[:len(ccsds_asm_bit_sequence)])])
-
-    if berts_sum >= 29:
-
-        print(np.max(conv))
-        check_asm = True
-
-    return check_asm
 
 
 def find_msg_indexes(time_stamps, ASM, symbol_length) -> npt.NDArray:
@@ -159,40 +128,13 @@ def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
     i = 0
     darkcounts = 0
     CSM_bin_distances = np.diff([CSM[i] + i * num_bins_per_symbol for i in range(len(CSM))])
-    sr = 2000
-    N = len(CSM_bin_distances)
-    n = np.arange(N)
-    T = N / sr
-    freq = n / T
-    X = fft(CSM_bin_distances)
+
 
     # symbol_bin_distances = np.round(np.diff(time_stamps) / bin_length)
     # corr = correlate(symbol_bin_distances, CSM_bin_distances)
     # possible_csm_idxs = find_peaks(corr, height=6800, distance=3700)[0]
-    plt.figure()
-    plt.stem(freq, np.abs(X), 'b', markerfmt=" ", basefmt="-b")
-    plt.xlabel('Freq (Hz)')
-    plt.ylabel('FFT Amplitude |X(freq)|')
-    plt.show()
-    print('FFT X', np.abs(X)[np.array([2, 5, 6, 9, 10, 13])])
 
     while i < len(time_stamps) - len(CSM):
-        symbol_bin_distances = np.round(np.diff(time_stamps[i:i + len(CSM)]) / bin_length)
-        corr = correlate(CSM_bin_distances, symbol_bin_distances)
-        corr_coeff = np.corrcoef(CSM_bin_distances, symbol_bin_distances)[0, 1]
-
-        if i == 52128:
-            xyz = 1
-            Y = fft(symbol_bin_distances)
-            plt.figure()
-            plt.stem(freq, np.abs(Y), 'b', markerfmt=" ", basefmt="-b")
-            plt.xlabel('Freq (Hz)')
-            plt.ylabel('FFT Amplitude |X(freq)|')
-            plt.show()
-            print('FFT Y', np.abs(Y)[np.array([2, 5, 6, 9, 10, 13])])
-        if corr_coeff > 0.92:
-            csms_found_with_correlation.append(i)
-
         symbols, _, read_idxs = parse_ppm_symbols(
             time_stamps[i:i + len(CSM)] - time_stamps[i], bin_length, symbol_length)
         if len(symbols) > len(CSM):
@@ -205,7 +147,7 @@ def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
             csm_idxs.append(i)
             # symbols, _, read_idxs = parse_ppm_symbols(time_stamps[i:i+2*3780]-time_stamps[i], bin_length, symbol_length)
             # x, y, z = parse_ppm_symbols(time_stamps[i+3779:i+2*3780]-time_stamps[i+3779], bin_length, symbol_length)
-            i += int(0.7 * 15120 // 4)
+            i += int(0.7 * 15120 // m)
 
         i += 1
 

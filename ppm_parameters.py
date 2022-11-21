@@ -3,21 +3,21 @@ from numpy import log2
 from encoder_functions import get_csm
 
 DAC_DATA_RATE: float = 8.84736E9        # DAC data rate in Hz
-num_samples_per_slot: int = 1            # Number of samples per bin
+num_samples_per_slot: int = 8            # Number of samples per bin
 
 PAYLOAD_TYPE: str = 'image'
 GREYSCALE: bool = True
 IMG_SHAPE: tuple[int, int] = (95, 100)
 
 # PPM parameters
-M: int = 4                  # each m = 4 bits are mapped from 0 to M = 16
+M: int = 8                  # each m = 4 bits are mapped from 0 to M = 16
 bin_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slots
 
 
 # Channel interleaver parameters
 # The length of each shift register is B*N, with N going from 0 to N-1
 CHANNEL_INTERLEAVE = True
-B_interleaver = 2520            # The base length of each shift register
+B_interleaver = 1680            # The base length of each shift register
 N_interleaver = 3               # The number of parallel shift registers
 
 BIT_INTERLEAVE = True

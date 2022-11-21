@@ -7,17 +7,17 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
+from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from encoder_functions import (bit_interleave, channel_interleave, convolve,
-                               get_csm, map_PPM_symbols, prepend_asm, slicer,
+                               get_csm, map_PPM_symbols, slicer,
                                zero_terminate)
-from parse_ppm_symbols import rolling_window
-from ppm_parameters import (BIT_INTERLEAVE, CCSDS_ASM, CHANNEL_INTERLEAVE,
+
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE,
                             GREYSCALE, PAYLOAD_TYPE, M, bin_factor, m,
                             num_samples_per_slot, num_symbols_per_slice,
-                            sample_size_awg, symbols_per_codeword)
+                            sample_size_awg, symbols_per_codeword, B_interleaver, N_interleaver)
 from trellis import Trellis
-from utils import AWGN, bpsk_encoding, generate_outer_code_edges, tobits
+from utils import tobits
 
 ADD_ASM: bool = True
 
@@ -37,7 +37,7 @@ match PAYLOAD_TYPE:
     case 'string':
         sent_message = np.array(tobits('Hello World'))
     case 'image':
-        file = "JWST_2022-07-27_Jupiter_tiny.png"
+        file = "sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
         img = Image.open(file)
         img = img.convert(IMG_MODE)
         img_array = np.asarray(img).astype(int)
@@ -76,7 +76,7 @@ if PAYLOAD_TYPE != 'calibration':
 
     encoded_message = convoluted_bit_sequence.flatten()
 
-    with open('jupiter_greyscale_64_samples_per_bin_interleaved_sent_bit_sequence', 'wb') as f:
+    with open(f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence', 'wb') as f:
         pickle.dump(encoded_message, f)
 
 match PAYLOAD_TYPE:
@@ -91,11 +91,9 @@ match PAYLOAD_TYPE:
         num_PPM_symbols_before_interleaving = encoded_message.shape[0] // m
         msg_PPM_symbols = map_PPM_symbols(encoded_message, num_PPM_symbols_before_interleaving, m)
 
-        B: int = 378
-        N: int = 10
-        assert (B * N) % symbols_per_codeword == 0, "The product of B and N should be a multiple of 15120/m"
+        assert (B_interleaver * N_interleaver) % symbols_per_codeword == 0, "The product of B and N should be a multiple of 15120/m"
         if CHANNEL_INTERLEAVE:
-            msg_PPM_symbols = channel_interleave(msg_PPM_symbols, B, N)
+            msg_PPM_symbols = channel_interleave(msg_PPM_symbols, B_interleaver, N_interleaver)
 
         num_PPM_symbols = len(msg_PPM_symbols)
 
@@ -138,7 +136,7 @@ print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microsecon
 # Generate AWG pattern file
 frame_width: int = num_bins_per_symbol * num_samples_per_slot
 num_frames: int = len(msg_PPM_symbols)
-pulse_width: int = 8
+pulse_width: int = 3
 
 pulse = np.zeros(frame_width * num_frames)
 print(f'Multiple of 256? {len(pulse)/256}')
@@ -159,8 +157,8 @@ for i, ppm_symbol_position in enumerate(msg_PPM_symbols):
 
 
 # Add some zeros to more clearly distinguish between repeated messages.
-pulse = np.hstack(([0] * frame_width * len(CCSDS_ASM) * 20, pulse))
-pulse = np.hstack((pulse, [0] * frame_width * len(CCSDS_ASM) * 20))
+pulse = np.hstack(([0] * frame_width * len(CSM) * 20, pulse))
+pulse = np.hstack((pulse, [0] * frame_width * len(CSM) * 20))
 
 # Convert to pandas dataframe for easy write to CSV
 df = pd.DataFrame(pulse)
@@ -168,7 +166,7 @@ df = pd.DataFrame(pulse)
 # %%
 match PAYLOAD_TYPE:
     case 'image' if GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{img_shape[0]}x{img_shape[1]}_slice_{num_samples_per_slot}_CSM_interleaved.csv'
+        filepath = f'ppm_message_Jupiter_tiny_greyscale_{img_shape[0]}x{img_shape[1]}_slice_{num_samples_per_slot}_{M}-PPM_interleaved.csv'
         # filepath = f'test_message_greyscale_{img_shape[0]}x{img_shape[1]}_slice_{num_samples_per_slot}_CSM_not_bit_interleaved.csv'
         # filepath = 'test_message_all_zeros_interleaved.csv'
     case 'image' if not GREYSCALE:

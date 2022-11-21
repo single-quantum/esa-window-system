@@ -40,9 +40,6 @@ for i in x:
     information_blocks = slicer(sent_message, include_crc=False)
     information_blocks = zero_terminate(information_blocks)
 
-    while sent_message.shape[0] * num_output_bits / m != sent_message.shape[0] * num_output_bits // m:
-        sent_message = np.append(sent_message, [0])
-
     # SCPPM encoder
     # The convolutional encoder is a 1/3 code rate encoder, so you end up with 3x more columns.
     convoluted_bit_sequence = np.zeros((information_blocks.shape[0], information_blocks.shape[1] * 3), dtype=int)

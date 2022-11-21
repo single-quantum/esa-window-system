@@ -2,8 +2,7 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from ppm_parameters import CCSDS_ASM
+from ppm_parameters import M, m
 
 
 def plot_symbol(symbol_start, symbol_end, new_symbol_start, new_symbol_end,
@@ -91,14 +90,14 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
         # Determine timing correction
         timing_correction = bin_times[i] - symbol_idx * symbol_length - round(symbol) * bin_length
 
-        if (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= 16):
+        if (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
             symbol = (bin_times[i + 1] - symbol_start) / bin_length
             symbols.append(symbol)
             i += 1
             symbol_idx += 1
             continue
 
-        if bin_times[i] < symbol_start - 0.5 * bin_length or bin_times[i] > symbol_end - 4 * bin_length:
+        if bin_times[i] < symbol_start - 0.5 * bin_length or bin_times[i] > symbol_end - m * bin_length:
             # This is most likely a dark count
             i += 1
             continue
