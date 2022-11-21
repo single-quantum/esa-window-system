@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.ndimage import shift
 
-from shift_register import CRC, ShiftRegister
+from shift_register import CRC
 
 
 def get_asm_bit_arr(asm_hex: str = '1ACFFC1D') -> npt.NDArray:
