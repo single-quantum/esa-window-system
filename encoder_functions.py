@@ -127,8 +127,10 @@ def convolve(arr, initial_state=[0, 0]):
     return convolutional_codeword, terminal_state
 
 
-def map_PPM_symbols(arr, S: int, m: int):
+def map_PPM_symbols(arr, m: int):
+    S = arr.shape[0]//m
     output_arr = np.zeros(S, dtype=int)
+
     for s in range(S):
         q = np.zeros(m)
         for a in range(m):
@@ -243,8 +245,20 @@ def get_csm(M=16):
         case 4:
             w = np.array([0, 3, 1, 2, 1, 3, 2, 0, 0, 3, 2, 1, 0, 2, 1, 3, 1, 0, 3, 2, 3, 2, 1, 0])
         case 8:
-            w = np.array([0, 3, 1, 2, 5, 4, 7, 6, 6, 7, 4, 5, 2, 1, 3, 0])
+            w = np.array([0,3,1,2,5,4,7,6,6,7,4,5,2,1,3,0])
         case _:
             w = np.array([0, 2, 7, 14, 1, 2, 15, 5, 8, 4, 10, 2, 14, 3, 14, 11])
 
     return w
+
+def slot_map(ppm_symbols, M, insert_guardslots=True):
+    slot_mapped = np.zeros((len(ppm_symbols), M))
+    for j in range(len(ppm_symbols)):
+        slot_mapped[j, ppm_symbols[j]] = 1
+
+    # Insert guard slot (M / 4 zeros) for each slot map, if applicable
+    if insert_guardslots:
+        guard_slot_inserted = np.hstack(
+            (slot_mapped, np.zeros((M // 4, slot_mapped.shape[0])).T))
+
+    return guard_slot_inserted

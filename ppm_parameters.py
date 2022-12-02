@@ -11,7 +11,7 @@ IMG_SHAPE: tuple[int, int] = (95, 100)
 
 # PPM parameters
 M: int = 8                  # each m = 4 bits are mapped from 0 to M = 16
-bin_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slots
+slot_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slots
 
 
 # Channel interleaver parameters
@@ -24,7 +24,7 @@ BIT_INTERLEAVE = True
 
 
 m: int = int(log2(M))
-num_bins_per_symbol: int = int(bin_factor * M)
+num_bins_per_symbol: int = int(slot_factor * M)
 
 CSM = get_csm(M)
 
@@ -33,3 +33,5 @@ bin_length: float = sample_size_awg * 1E-12 * num_samples_per_slot  # Length of 
 symbol_length: float = bin_length * num_bins_per_symbol          # Length of 1 symbol in time
 num_symbols_per_slice: int = 15120
 symbols_per_codeword = num_symbols_per_slice // m
+
+assert (B_interleaver * N_interleaver) % symbols_per_codeword == 0, "The product of B and N should be a multiple of 15120/m"
