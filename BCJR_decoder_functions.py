@@ -8,7 +8,7 @@ from numpy import dot
 from tqdm import tqdm
 
 from utils import flatten
-
+from functools import lru_cache
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
 def log_gamma(r, v, Es, N0): return Es / N0 * 2 * dot(r, v)
@@ -19,7 +19,7 @@ max_log_lookup = {}
 for key in keys:
     max_log_lookup[key] = np.log(1 + np.exp(-abs(key[0] - key[1])))
 
-
+@lru_cache(maxsize=256)
 def max_star(a, b):
     if abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
         return max(a, b)
