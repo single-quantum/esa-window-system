@@ -2,6 +2,7 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
+
 from ppm_parameters import M, m
 
 
@@ -64,12 +65,10 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
 
     symbol_idx = 0
     i = 0
-    timing_correction = 0
-    timing_corrections = []
 
     while i < len(bin_times) - 1:
-        symbol_start = symbol_idx * symbol_length + timing_correction
-        symbol_end = (symbol_idx + 1) * symbol_length + timing_correction
+        symbol_start = symbol_idx * symbol_length
+        symbol_end = (symbol_idx + 1) * symbol_length
 
         # If this is the case, a symbol did not get properly sent, received or parsed.
         # Assume a 0 and continue to the next symbol, while keeping i the same.
@@ -81,7 +80,6 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
         # First estimate
         symbol = (bin_times[i] - symbol_start) / bin_length
 
-
         if (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
             symbol = (bin_times[i + 1] - symbol_start) / bin_length
             symbols.append(symbol)
@@ -89,11 +87,10 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
             symbol_idx += 1
             continue
 
-        if bin_times[i] < symbol_start - 0.5 * bin_length or bin_times[i] > symbol_end - (M//4) * bin_length:
+        if bin_times[i] < symbol_start - 0.5 * bin_length or bin_times[i] > symbol_end - (M // 4) * bin_length:
             # This is most likely a dark count
             i += 1
             continue
-
 
         if symbol <= -1:
             print('symbol in guard slot?')
@@ -110,19 +107,3 @@ def rolling_window(a, size):
     shape = a.shape[:-1] + (a.shape[-1] - size + 1, size)
     strides = a.strides + (a. strides[-1],)
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
-
-
-def find_ASM_from_peak_distances(ASM, inter_peak_bin_distances, num_bins_per_symbol):
-    ASM_bin_distances = []
-    for n, symbol in enumerate(ASM):
-        ASM_bin_distances.append(n * num_bins_per_symbol + symbol)
-
-    ASM_distances = np.diff(ASM_bin_distances)
-    ASM_idxs = np.where(
-        np.all(
-            rolling_window(
-                inter_peak_bin_distances,
-                len(ASM_distances)) == ASM_distances,
-            axis=1))[0]
-
-    return ASM_idxs
