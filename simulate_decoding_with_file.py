@@ -19,10 +19,11 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
                             IMG_SHAPE, B_interleaver, M, N_interleaver,
                             bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg,
-                            symbol_length)
+                            symbol_length, symbols_per_codeword)
 from trellis import Trellis
 from utils import bpsk_encoding, flatten, generate_outer_code_edges
-
+from time import time
+from datetime import datetime
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
     print(f'{parameter_str:<{spacing}} {parameter}')
@@ -61,8 +62,9 @@ def simulate_symbol_loss(
 
 
 def new_method(csm_idxs, peak_locations):
-    len_codeword = 3796
-    len_codeword_no_CSM = 3780
+    len_codeword = symbols_per_codeword + len(CSM)
+    len_codeword_no_CSM = symbols_per_codeword
+
     msg_symbols = []
 
     # Method 1
@@ -76,27 +78,25 @@ def new_method(csm_idxs, peak_locations):
         start = n0 + csm_idxs[i]
         stop = n0 + csm_idxs[i + 1]
 
-        symbols, _, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
+        symbols, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
 
         if len(symbols) < len_codeword:
             diff = len_codeword - len(symbols)
             symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
 
         if num_codewords_lost >= 1:
-            # csm_estimates_to_delete = [
-            #     range(i * len_codeword, i * len_codeword + len(CSM)) for i in range(1, num_codewords + 1)]
-            # csm_estimates_to_delete = flatten(csm_estimates_to_delete)
             csm_estimates_to_delete = flatten(
                 [range(i * len_codeword, i * len_codeword + len(CSM)) for i in range(1, num_codewords_lost + 1)])
             symbols = np.delete(symbols, csm_estimates_to_delete)
 
             diff = (num_codewords_lost + 1) * len_codeword_no_CSM - (len(symbols) - len(CSM))
-            symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
+            if diff > 1:
+                symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
 
         msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     t0_codeword = peak_locations[n0 + csm_idxs[-1]]
-    symbols, _, _ = parse_ppm_symbols(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
+    symbols, _ = parse_ppm_symbols(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
     msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     return msg_symbols
@@ -104,12 +104,12 @@ def new_method(csm_idxs, peak_locations):
 
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = False
-simulate_darkcounts: bool = False
-simulate_jitter: bool = True
+simulate_darkcounts: bool = True
+simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 10
-darkcounts_factor: float = 0.01
+darkcounts_factor: float = 0.05
 detector_jitter = 50E-12
 
 use_test_file: bool = True
@@ -142,6 +142,9 @@ print_header("-")
 bit_error_ratios_before = []
 bit_error_ratios_after = []
 
+bit_error_ratios_after_std = []
+bit_error_ratios_before_std = []
+
 # The simulation is repeated a couple of times, so take the mean SNR for each set of simulations.
 mean_SNRs = []
 
@@ -155,7 +158,7 @@ memory_size: int = 2
 edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 if use_test_file:
-    samples = pd.read_csv('ppm_message_Jupiter_tiny_greyscale_95x100_slice_8_8-PPM_interleaved.csv', header=None)
+    samples = pd.read_csv('ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c0b0.csv', header=None)
     samples = samples.to_numpy().flatten()
 
     # Make a time series based on the length of samples and how long one sample is in time
@@ -175,13 +178,14 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-darkcounts_factors = np.logspace(-2, -0.3, num=25)
+darkcounts_factors = np.logspace(-2, -0.3, num=15)
+
 for darkcounts_factor in darkcounts_factors:
     BERS_after = []
     BERS_before = []
     SNRs = []
 
-    for z in range(0, 2):
+    for z in range(0, 15):
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)
         rng = default_rng(SEED)
@@ -312,8 +316,12 @@ for darkcounts_factor in darkcounts_factors:
 
         num_states = 2**memory_size
         time_steps = deinterleaved_received_sequence_2.shape[0] // num_output_bits
+        
+        start = time()
         tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
         tr.set_edges(edges)
+        end = time()
+        print('Set edges run time', end-start)
 
         Es = 5
         N0 = 1
@@ -329,7 +337,7 @@ for darkcounts_factor in darkcounts_factors:
         termination_bits_removed = predicted_msg.reshape((-1, 5040))[:, :-2].flatten()
 
         if GREYSCALE:
-            pixel_values = map_PPM_symbols(termination_bits_removed, termination_bits_removed.shape[0] // 8, 8)
+            pixel_values = map_PPM_symbols(termination_bits_removed, 8)
             # img_arr = pixel_values[:IMG_SHAPE[0]*IMG_SHAPE[1]].reshape(IMG_SHAPE)
             img_arr = pixel_values[:9400].reshape((94, 100))
             CMAP = 'Greys'
@@ -410,17 +418,57 @@ for darkcounts_factor in darkcounts_factors:
         plt.show()
 
     bit_error_ratios_after.append(np.mean(BERS_after))
+    bit_error_ratios_after_std.append(np.std(BERS_after))
+
     bit_error_ratios_before.append(np.mean(BERS_before))
+    bit_error_ratios_before_std.append(np.std(BERS_before))
     mean_SNRs.append(np.mean(SNRs))
 
-plt.figure()
-plt.semilogy(mean_SNRs, bit_error_ratios_before, label='Before decoding')
-plt.semilogy(mean_SNRs, bit_error_ratios_after, label='After decoding')
+fig, axs = plt.subplots(1)
+axs.errorbar(
+    mean_SNRs, bit_error_ratios_before,
+    bit_error_ratios_after_std, 0, 
+    capsize=2, 
+    label='Before decoding', 
+    marker='o',
+    markersize=5)
 
+axs.errorbar(
+    mean_SNRs, bit_error_ratios_after, 
+    bit_error_ratios_before_std, 0, 
+    capsize=2, 
+    label='After decoding', 
+    marker='o',
+    markersize=5)
+
+axs.set_yscale('log')
+axs.set_ylabel('Bit Error Ratio (-)')
+axs.set_xlabel('Signal to Noise Ratio (-)')
 plt.title('BER as function of SNR')
-plt.ylabel('Bit Error Ratio (-)')
-plt.xlabel('Signal to Noise Ratio (-)')
+plt.legend()
 plt.show()
 
 print('done')
 print()
+
+log = {
+    'simulate_noise_peaks': simulate_noise_peaks,
+    'simulate_lost_symbols': simulate_lost_symbols,
+    'simulate_darkcounts': simulate_darkcounts,
+    'simulate_jitter': simulate_jitter,
+    'detection_efficiency': detection_efficiency,
+    'num_photons_per_pulse': num_photons_per_pulse,
+    'darkcounts_factor':  darkcounts_factor,
+    'detector_jitter': detector_jitter,
+    'darkcounts_factors': darkcounts_factors,
+    'data': {
+        'bit_error_ratios_after': bit_error_ratios_after,
+        'bit_error_ratios_before': bit_error_ratios_before,
+        'bit_error_ratios_after_std': bit_error_ratios_after_std,
+        'bit_error_ratios_before_std': bit_error_ratios_before_std
+    }
+}
+
+now = datetime.now().strftime('%d-%m-%Y')
+with open(f'var_dump_simulate_decoding_with_file_{now}', 'wb') as f:
+    pickle.dump(log, f)
