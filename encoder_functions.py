@@ -128,7 +128,7 @@ def convolve(arr, initial_state=[0, 0]):
 
 
 def map_PPM_symbols(arr, m: int):
-    S = arr.shape[0]//m
+    S = arr.shape[0] // m
     output_arr = np.zeros(S, dtype=int)
 
     for s in range(S):
@@ -240,16 +240,18 @@ def channel_deinterleave(arr: npt.ArrayLike, B: int, N: int) -> list[int]:
 
     return output
 
+
 def get_csm(M=16):
     match M:
         case 4:
             w = np.array([0, 3, 1, 2, 1, 3, 2, 0, 0, 3, 2, 1, 0, 2, 1, 3, 1, 0, 3, 2, 3, 2, 1, 0])
         case 8:
-            w = np.array([0,3,1,2,5,4,7,6,6,7,4,5,2,1,3,0])
+            w = np.array([0, 3, 1, 2, 5, 4, 7, 6, 6, 7, 4, 5, 2, 1, 3, 0])
         case _:
             w = np.array([0, 2, 7, 14, 1, 2, 15, 5, 8, 4, 10, 2, 14, 3, 14, 11])
 
     return w
+
 
 def slot_map(ppm_symbols, M, insert_guardslots=True):
     slot_mapped = np.zeros((len(ppm_symbols), M))
