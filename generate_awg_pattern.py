@@ -7,7 +7,7 @@ import pandas as pd
 
 from ppm_parameters import (GREYSCALE, PAYLOAD_TYPE, M, slot_factor, m,
                             num_samples_per_slot, num_symbols_per_slice,
-                            sample_size_awg, symbols_per_codeword, B_interleaver, N_interleaver, bin_length, IMG_SHAPE, CSM)
+                            sample_size_awg, symbols_per_codeword, bin_length, IMG_SHAPE, CSM, CHANNEL_INTERLEAVE, BIT_INTERLEAVE)
 
 from pathlib import Path
 
@@ -116,16 +116,13 @@ pulse = np.hstack((pulse, [0] * num_samples_per_symbol * len(CSM) * 20))
 df = pd.DataFrame(pulse)
 
 # %%
+interleave_code = f'c{int(CHANNEL_INTERLEAVE)}b{int(BIT_INTERLEAVE)}'
+
 match PAYLOAD_TYPE:
     case 'image' if GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_slice_{num_samples_per_slot}_{M}-PPM_interleaved.csv'
-        # filepath = f'test_message_greyscale_{img_shape[0]}x{img_shape[1]}_slice_{num_samples_per_slot}_CSM_not_bit_interleaved.csv'
-        # filepath = 'test_message_all_zeros_interleaved.csv'
+        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}.csv'
     case 'image' if not GREYSCALE:
-        # filepath = f'ppm_message_Jupiter_tiny_{img_shape[0]}x{img_shape[1]}_slice_{num_samples_per_slot}_CSM_not_interleaved.csv'
-        # filepath = f'test_message_{img_shape[0]}x{img_shape[1]}_slice_{num_samples_per_slot}_CSM_interleaved.csv'
-        filepath = 'test_message_all_zeros.csv'
-
+        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1.csv'
     case 'string':
         filepath = f'ppm_message_Hello_World_no_ASM.csv'
     case 'calibration':
