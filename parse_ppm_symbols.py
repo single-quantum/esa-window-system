@@ -68,12 +68,6 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
     timing_corrections = []
 
     while i < len(bin_times) - 1:
-        timing_correction = 0
-        if np.isnan(timing_correction):
-            timing_correction = 0
-
-        symbol_start_without_correction = symbol_idx * symbol_length
-        symbol_end_without_correction = (symbol_idx + 1) * symbol_length
         symbol_start = symbol_idx * symbol_length + timing_correction
         symbol_end = (symbol_idx + 1) * symbol_length + timing_correction
 
@@ -87,8 +81,6 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
         # First estimate
         symbol = (bin_times[i] - symbol_start) / bin_length
 
-        # Determine timing correction
-        timing_correction = bin_times[i] - symbol_idx * symbol_length - round(symbol) * bin_length
 
         if (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
             symbol = (bin_times[i + 1] - symbol_start) / bin_length
@@ -97,39 +89,21 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
             symbol_idx += 1
             continue
 
-        if bin_times[i] < symbol_start - 0.5 * bin_length or bin_times[i] > symbol_end - m * bin_length:
+        if bin_times[i] < symbol_start - 0.5 * bin_length or bin_times[i] > symbol_end - (M//4) * bin_length:
             # This is most likely a dark count
             i += 1
             continue
 
-        timing_correction = 0
-        timing_corrections.append(timing_correction)
 
-        # Redetermine symbol start
-        new_symbol_start = symbol_idx * symbol_length + timing_correction
-        new_symbol_end = (symbol_idx + 1) * symbol_length + timing_correction
-
-        # Update symbol value with the new symbol start
-        symbol = (bin_times[i] - new_symbol_start) / bin_length
         if symbol <= -1:
             print('symbol in guard slot?')
 
         symbols.append(symbol)
-        if kwargs.get('plot_symbol') and round(symbol) == 0 and i >= 5000:
-            plot_symbol(
-                symbol_start_without_correction,
-                symbol_end_without_correction,
-                new_symbol_start,
-                new_symbol_end,
-                bin_length,
-                i,
-                len(bin_times),
-                **kwargs)
 
         i += 1
         symbol_idx += 1
 
-    return symbols, timing_corrections, (i, symbol_idx)
+    return symbols, (i, symbol_idx)
 
 
 def rolling_window(a, size):
