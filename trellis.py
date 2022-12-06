@@ -1,7 +1,10 @@
-from copy import deepcopy
+from copy import deepcopy, copy
 
 
 class Edge:
+    
+    __slots__ = ('from_state', 'to_state', 'edge_input', 'edge_output', 'gamma', 'lmbda', 'hamming_distance')
+
     def __init__(self):
 
         self.from_state = None
@@ -37,6 +40,7 @@ class Edge:
 
 
 class State:
+    __slots__ = ('label', 'edges', 'alpha', 'beta')
     def __init__(self, label: int, num_edges: int):
         self.label = label
         # self.edges = [Edge() for _ in range(num_edges)]
@@ -101,10 +105,10 @@ class Trellis:
 
         for stage in self.stages[start:end]:
             for label, state in enumerate(stage.states):
-                state.edges = deepcopy(edges[label])
+                state.edges = [copy(e) for e in edges[label]]
 
                 # See Edge __lt__ method comment
-                state.edges.sort()
+                # state.edges.sort()
 
         if not zero_terminated:
             return
