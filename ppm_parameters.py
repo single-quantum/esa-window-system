@@ -11,19 +11,19 @@ IMG_SHAPE: tuple[int, int] = (95, 100)
 
 # PPM parameters
 M: int = 8                  # each m = 4 bits are mapped from 0 to M = 16
+m: int = int(log2(M))
 slot_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slots
 
 
 # Channel interleaver parameters
 # The length of each shift register is B*N, with N going from 0 to N-1
-CHANNEL_INTERLEAVE = True
+CHANNEL_INTERLEAVE = False
 B_interleaver = 1680            # The base length of each shift register
 N_interleaver = 3               # The number of parallel shift registers
 
-BIT_INTERLEAVE = True
+BIT_INTERLEAVE = False
 
 
-m: int = int(log2(M))
 num_bins_per_symbol: int = int(slot_factor * M)
 
 CSM = get_csm(M)
@@ -34,4 +34,5 @@ symbol_length: float = bin_length * num_bins_per_symbol          # Length of 1 s
 num_symbols_per_slice: int = 15120
 symbols_per_codeword = num_symbols_per_slice // m
 
-assert (B_interleaver * N_interleaver) % symbols_per_codeword == 0, "The product of B and N should be a multiple of 15120/m"
+if CHANNEL_INTERLEAVE:
+    assert (B_interleaver * N_interleaver) % symbols_per_codeword == 0, "The product of B and N should be a multiple of 15120/m"
