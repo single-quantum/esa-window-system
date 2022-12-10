@@ -60,6 +60,22 @@ def plot_symbol(symbol_start, symbol_end, new_symbol_start, new_symbol_end,
     plt.show()
 
 
+def check_darkcount(bin_time, symbol_start, symbol_end, bin_length, symbol):
+    darkcount = False
+    # First, check if the symbol was present in a guard slot
+    if bin_time < symbol_start - 0.5 * bin_length or bin_time > symbol_end - (M // 4) * bin_length:
+        darkcount = True
+        return darkcount
+
+    # Then, check if the bin time falls within the 10% RMS slot width requirement
+    time_offset = (symbol - round(symbol)) * bin_length
+    sigma = 0.1 * bin_length
+    if abs(time_offset) > 2 * sigma:
+        darkcount = True
+
+    return darkcount
+
+
 def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
     symbols = []
 
@@ -87,8 +103,8 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
             symbol_idx += 1
             continue
 
-        if bin_times[i] < symbol_start - 0.5 * bin_length or bin_times[i] > symbol_end - (M // 4) * bin_length:
-            # This is most likely a dark count
+        darkcount = check_darkcount(bin_times[i], symbol_start, symbol_end, bin_length, symbol)
+        if darkcount:
             i += 1
             continue
 
