@@ -1,5 +1,7 @@
 # %%
 import pickle
+from datetime import datetime
+from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +15,7 @@ from scipy.signal import find_peaks
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
 from demodulation_functions import find_csm_idxs, find_msg_indexes
 from encoder_functions import (bit_deinterleave, channel_deinterleave,
-                               map_PPM_symbols)
+                               map_PPM_symbols, randomize)
 from parse_ppm_symbols import parse_ppm_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
                             IMG_SHAPE, B_interleaver, M, N_interleaver,
@@ -22,8 +24,7 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
                             symbol_length, symbols_per_codeword)
 from trellis import Trellis
 from utils import bpsk_encoding, flatten, generate_outer_code_edges
-from time import time
-from datetime import datetime
+
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
     print(f'{parameter_str:<{spacing}} {parameter}')
@@ -105,7 +106,7 @@ def new_method(csm_idxs, peak_locations):
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = False
 simulate_darkcounts: bool = True
-simulate_jitter: bool = False
+simulate_jitter: bool = True
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 10
@@ -158,7 +159,7 @@ memory_size: int = 2
 edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 if use_test_file:
-    samples = pd.read_csv('ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c0b0.csv', header=None)
+    samples = pd.read_csv('ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1.csv', header=None)
     samples = samples.to_numpy().flatten()
 
     # Make a time series based on the length of samples and how long one sample is in time
@@ -178,14 +179,15 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-darkcounts_factors = np.logspace(-2, -0.3, num=15)
+# darkcounts_factors = np.logspace(-2, -0.3, num=15)
+darkcounts_factors = np.logspace(-1, -0.8, num=2)
 
 for darkcounts_factor in darkcounts_factors:
     BERS_after = []
     BERS_before = []
     SNRs = []
 
-    for z in range(0, 15):
+    for z in range(16, 50):
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)
         rng = default_rng(SEED)
@@ -262,7 +264,6 @@ for darkcounts_factor in darkcounts_factors:
             csm_idxs = np.sort(csm_idxs)
             print('Zero not found in CSM indexes')
 
-
         msg_symbols = new_method(csm_idxs, peak_locations)
 
         new = np.array(flatten(msg_symbols))
@@ -293,7 +294,7 @@ for darkcounts_factor in darkcounts_factors:
         print(f'BER before decoding: {BER_before_decoding}')
         if BER_before_decoding > 0.25:
             print(f'Something went wrong. Seed: {SEED} (z={z})')
-            continue
+            raise ValueError("Something went wrong here. ")
 
         BERS_before.append(BER_before_decoding)
         num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
@@ -316,12 +317,12 @@ for darkcounts_factor in darkcounts_factors:
 
         num_states = 2**memory_size
         time_steps = deinterleaved_received_sequence_2.shape[0] // num_output_bits
-        
+
         start = time()
         tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
         tr.set_edges(edges)
         end = time()
-        print('Set edges run time', end-start)
+        print('Set edges run time', end - start)
 
         Es = 5
         N0 = 1
@@ -335,9 +336,10 @@ for darkcounts_factor in darkcounts_factors:
 
         predicted_msg = predict(tr, encoded_sequence_2, Es=Es)
         termination_bits_removed = predicted_msg.reshape((-1, 5040))[:, :-2].flatten()
+        information_blocks = randomize(termination_bits_removed)
 
         if GREYSCALE:
-            pixel_values = map_PPM_symbols(termination_bits_removed, 8)
+            pixel_values = map_PPM_symbols(information_blocks, 8)
             # img_arr = pixel_values[:IMG_SHAPE[0]*IMG_SHAPE[1]].reshape(IMG_SHAPE)
             img_arr = pixel_values[:9400].reshape((94, 100))
             CMAP = 'Greys'
@@ -369,12 +371,11 @@ for darkcounts_factor in darkcounts_factors:
         else:
             BER_after_decoding = np.sum(
                 np.abs(termination_bits_removed[:len(sent_message)] - sent_message)) / len(sent_message)
-        
+
         if simulate_darkcounts:
             print(f'BER after decoding: {BER_after_decoding }. Number of darkcounts: {num_darkcounts}')
         else:
             print(f'BER after decoding: {BER_after_decoding }. ')
-
 
         BERS_after.append(BER_after_decoding)
 
@@ -427,17 +428,17 @@ for darkcounts_factor in darkcounts_factors:
 fig, axs = plt.subplots(1)
 axs.errorbar(
     mean_SNRs, bit_error_ratios_before,
-    bit_error_ratios_after_std, 0, 
-    capsize=2, 
-    label='Before decoding', 
+    bit_error_ratios_after_std, 0,
+    capsize=2,
+    label='Before decoding',
     marker='o',
     markersize=5)
 
 axs.errorbar(
-    mean_SNRs, bit_error_ratios_after, 
-    bit_error_ratios_before_std, 0, 
-    capsize=2, 
-    label='After decoding', 
+    mean_SNRs, bit_error_ratios_after,
+    bit_error_ratios_before_std, 0,
+    capsize=2,
+    label='After decoding',
     marker='o',
     markersize=5)
 
@@ -458,7 +459,7 @@ log = {
     'simulate_jitter': simulate_jitter,
     'detection_efficiency': detection_efficiency,
     'num_photons_per_pulse': num_photons_per_pulse,
-    'darkcounts_factor':  darkcounts_factor,
+    'darkcounts_factor': darkcounts_factor,
     'detector_jitter': detector_jitter,
     'darkcounts_factors': darkcounts_factors,
     'data': {
