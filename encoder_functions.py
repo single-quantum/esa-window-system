@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import numpy.typing as npt
 from scipy.ndimage import shift
@@ -52,6 +54,26 @@ def generate_pseudo_randomized_sequence(seed: list = [1] * 8):
         i += 1
 
     return sequence
+
+
+def randomize(information_blocks: npt.NDArray) -> npt.NDArray:
+    """Pseudo randomize the information blocks, using the shift register defined by the CCSDS.
+
+    Note that performing the randomize function twice gives back the de-randomized sequence. """
+    initial_shape = information_blocks.shape
+    pseudo_randomized_sequence = generate_pseudo_randomized_sequence()
+
+    information_blocks = information_blocks.flatten()
+
+    # Tile the randomized sequence, so that it is long enough to XOR with the information blocks
+    copies = math.ceil(len(information_blocks) / len(pseudo_randomized_sequence))
+    pseudo_randomized_sequence = np.tile(pseudo_randomized_sequence, copies)
+
+    # XOR addition of both sequences.
+    randomized_information_blocks = information_blocks ^ pseudo_randomized_sequence[:len(information_blocks)]
+    randomized_information_blocks = randomized_information_blocks.reshape(initial_shape)
+
+    return randomized_information_blocks
 
 
 def append_CRC(arr: npt.NDArray):

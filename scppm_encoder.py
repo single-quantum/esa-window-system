@@ -3,8 +3,8 @@ import pickle
 import numpy as np
 
 from encoder_functions import (bit_interleave, channel_interleave, convolve,
-                               get_csm, map_PPM_symbols, slicer, slot_map,
-                               zero_terminate)
+                               get_csm, map_PPM_symbols, randomize, slicer,
+                               slot_map, zero_terminate)
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
                             M, N_interleaver, m, num_samples_per_slot,
                             symbols_per_codeword)
@@ -16,6 +16,7 @@ def preprocess_bit_stream(bit_stream):
     # CRC attachment is still to be implemented
     information_blocks = slicer(bit_stream, include_crc=False)
     information_blocks = zero_terminate(information_blocks)
+    information_blocks = randomize(information_blocks)
 
     return information_blocks
 
