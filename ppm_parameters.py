@@ -17,11 +17,11 @@ slot_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slot
 
 # Channel interleaver parameters
 # The length of each shift register is B*N, with N going from 0 to N-1
-CHANNEL_INTERLEAVE = False
+CHANNEL_INTERLEAVE = True
 B_interleaver = 1680            # The base length of each shift register
 N_interleaver = 3               # The number of parallel shift registers
 
-BIT_INTERLEAVE = False
+BIT_INTERLEAVE = True
 
 
 num_bins_per_symbol: int = int(slot_factor * M)
