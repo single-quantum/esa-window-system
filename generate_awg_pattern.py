@@ -1,18 +1,16 @@
 # %%
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-
-from ppm_parameters import (GREYSCALE, PAYLOAD_TYPE, M, slot_factor, m,
-                            num_samples_per_slot, num_symbols_per_slice,
-                            sample_size_awg, symbols_per_codeword, bin_length, IMG_SHAPE, CSM, CHANNEL_INTERLEAVE, BIT_INTERLEAVE)
-
-from pathlib import Path
-
-from scppm_encoder import encoder
 from data_converter import DataConverter
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
+                            IMG_SHAPE, PAYLOAD_TYPE, M, bin_length, m,
+                            num_samples_per_slot, num_symbols_per_slice,
+                            sample_size_awg, slot_factor, symbols_per_codeword)
+from scppm_encoder import encoder
 
 ADD_ASM: bool = True
 
@@ -31,7 +29,7 @@ match PAYLOAD_TYPE:
         file = Path("sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
         d = DataConverter(file)
         sent_message = d.bit_array
-        
+
 
 num_bits_sent = len(sent_message)
 
@@ -52,10 +50,10 @@ match PAYLOAD_TYPE:
             ppm_mapped_message_with_csm = np.zeros(len(msg_PPM_symbols) + len(CSM) * num_codewords, dtype=int)
             for i in range(num_codewords):
                 prepended_codeword = np.hstack((CSM, msg_PPM_symbols[i * len_codeword:(i + 1) * len_codeword]))
-                ppm_mapped_message_with_csm[i * len(prepended_codeword):(i + 1) * len(prepended_codeword)] = prepended_codeword
+                ppm_mapped_message_with_csm[i * len(prepended_codeword):(i + 1) *
+                                            len(prepended_codeword)] = prepended_codeword
 
             msg_PPM_symbols = ppm_mapped_message_with_csm
-
 
         if len(msg_PPM_symbols) % 2 != 0:
             msg_PPM_symbols = np.append(msg_PPM_symbols, 0)
@@ -69,9 +67,7 @@ match PAYLOAD_TYPE:
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
         num_codewords = math.ceil(num_PPM_symbols / symbols_per_codeword)
         num_slots = slot_mapped_sequence.flatten().shape[0]
-        message_time_microseconds = num_slots*bin_length*1E6
-
-
+        message_time_microseconds = num_slots * bin_length * 1E6
 
 
 if PAYLOAD_TYPE == 'image':
@@ -95,16 +91,19 @@ print(f'Multiple of 256? {len(pulse)/256}')
 for i, slot_mapped_symbol in enumerate(slot_mapped_sequence):
     ppm_symbol_position = slot_mapped_symbol.nonzero()[0][0]
     if ADD_ASM:
-        idx = i * num_samples_per_symbol + ppm_symbol_position * num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
+        idx = i * num_samples_per_symbol + ppm_symbol_position * \
+            num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
         pulse[idx:idx + pulse_width] = 30000
         continue
 
     # If no ASM is used, make the first peak a synchronisation peak
     if not ADD_ASM and i == 0 and ppm_symbol_position == 0:
-        idx = i * num_samples_per_symbol + ppm_symbol_position * num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
+        idx = i * num_samples_per_symbol + ppm_symbol_position * \
+            num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
         pulse[idx:idx + pulse_width] = 30000
     else:
-        idx = i * num_samples_per_symbol + ppm_symbol_position * num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
+        idx = i * num_samples_per_symbol + ppm_symbol_position * \
+            num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
         pulse[idx:idx + pulse_width] = 15000
 
 
