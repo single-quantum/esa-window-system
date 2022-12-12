@@ -16,8 +16,8 @@ def preprocess_bit_stream(bit_stream):
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
     information_blocks = slicer(bit_stream, CODE_RATE, include_crc=False)
-    information_blocks = zero_terminate(information_blocks)
     information_blocks = randomize(information_blocks)
+    information_blocks = zero_terminate(information_blocks)
 
     return information_blocks
 
