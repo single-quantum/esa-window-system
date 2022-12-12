@@ -5,7 +5,7 @@ from numpy import log2
 from encoder_functions import get_csm
 
 DAC_DATA_RATE: float = 8.84736E9        # DAC data rate in Hz
-num_samples_per_slot: int = 1            # Number of samples per bin
+num_samples_per_slot: int = 8            # Number of samples per bin
 
 # Note: The fraction type is needed for proper match casing
 CODE_RATE = Fraction(1, 3)
@@ -14,7 +14,7 @@ GREYSCALE: bool = True
 IMG_SHAPE: tuple[int, int] = (95, 100)
 
 # PPM parameters
-M: int = 4                  # each m = 4 bits are mapped from 0 to M = 16
+M: int = 8                  # each m = 4 bits are mapped from 0 to M = 16
 m: int = int(log2(M))
 slot_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slots
 
@@ -22,7 +22,7 @@ slot_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slot
 # Channel interleaver parameters
 # The length of each shift register is B*N, with N going from 0 to N-1
 CHANNEL_INTERLEAVE = True
-B_interleaver = 3780            # The base length of each shift register
+B_interleaver = 2520            # The base length of each shift register
 N_interleaver = 2               # The number of parallel shift registers
 
 BIT_INTERLEAVE = True

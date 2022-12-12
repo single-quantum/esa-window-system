@@ -61,19 +61,21 @@ def plot_symbol(symbol_start, symbol_end, new_symbol_start, new_symbol_end,
 
 
 def check_darkcount(bin_time, symbol_start, symbol_end, bin_length, symbol):
-    darkcount = False
-    # First, check if the symbol was present in a guard slot
-    if bin_time < symbol_start - 0.5 * bin_length or bin_time > symbol_end - (M // 4) * bin_length:
-        darkcount = True
-        return darkcount
-
+    guard_slot_darkcount = False
+    jitter_darkcount = False
     # Then, check if the bin time falls within the 10% RMS slot width requirement
     time_offset = (symbol - round(symbol)) * bin_length
     sigma = 0.1 * bin_length
-    if abs(time_offset) > 2 * sigma:
-        darkcount = True
+    if abs(time_offset) > sigma:
+        jitter_darkcount = True
+        return guard_slot_darkcount, jitter_darkcount
 
-    return darkcount
+    # First, check if the symbol was present in a guard slot
+    if bin_time < symbol_start - 0.5 * bin_length or bin_time > symbol_end - (M // 4) * bin_length:
+        guard_slot_darkcount = True
+        return guard_slot_darkcount, jitter_darkcount
+
+    return guard_slot_darkcount, jitter_darkcount
 
 
 def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
@@ -81,8 +83,10 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
 
     symbol_idx = 0
     i = 0
+    guard_slot_darkcounts = 0
+    jitter_darkcounts = 0
 
-    while i < len(bin_times) - 1:
+    while i < len(bin_times):
         symbol_start = symbol_idx * symbol_length
         symbol_end = (symbol_idx + 1) * symbol_length
 
@@ -96,16 +100,24 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
         # First estimate
         symbol = (bin_times[i] - symbol_start) / bin_length
 
-        if (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
+        guard_slot_darkcount, jitter_darkcount = check_darkcount(
+            bin_times[i], symbol_start, symbol_end, bin_length, symbol)
+
+        if guard_slot_darkcount:
+            guard_slot_darkcounts += 1
+            i += 1
+            continue
+
+        if jitter_darkcount:
+            jitter_darkcounts += 1
+            i += 1
+            continue
+
+        if i < len(bin_times) - 1 and (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
             symbol = (bin_times[i + 1] - symbol_start) / bin_length
             symbols.append(symbol)
             i += 1
             symbol_idx += 1
-            continue
-
-        darkcount = check_darkcount(bin_times[i], symbol_start, symbol_end, bin_length, symbol)
-        if darkcount:
-            i += 1
             continue
 
         if symbol <= -1:
@@ -115,6 +127,9 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
 
         i += 1
         symbol_idx += 1
+
+    # if len(bin_times) > 100:
+    #     print('guard slot darkcounts', guard_slot_darkcounts, 'jitter darkcounts', jitter_darkcounts)
 
     return symbols, (i, symbol_idx)
 
