@@ -1,20 +1,21 @@
 import pickle
+from fractions import Fraction
 
 import numpy as np
 
 from encoder_functions import (bit_interleave, channel_interleave, convolve,
-                               get_csm, map_PPM_symbols, randomize, slicer,
-                               slot_map, zero_terminate)
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
-                            M, N_interleaver, m, num_samples_per_slot,
-                            symbols_per_codeword)
+                               get_csm, map_PPM_symbols, puncture, randomize,
+                               slicer, slot_map, zero_terminate)
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
+                            B_interleaver, M, N_interleaver, m,
+                            num_samples_per_slot, symbols_per_codeword)
 
 
 def preprocess_bit_stream(bit_stream):
     """This preprocessing function slices the bit stream in information blocks and attaches the CRC. """
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
-    information_blocks = slicer(bit_stream, include_crc=False)
+    information_blocks = slicer(bit_stream, CODE_RATE, include_crc=False)
     information_blocks = zero_terminate(information_blocks)
     information_blocks = randomize(information_blocks)
 
@@ -28,16 +29,23 @@ def SCPPM_encoder(information_blocks, save_encoded_sequence_to_file=True):
     """
     # The convolutional encoder is a 1/3 code rate encoder, so you end up with
     # 3x more columns.
+
     convoluted_bit_sequence = np.zeros(
         (information_blocks.shape[0], information_blocks.shape[1] * 3), dtype=int)
 
     for i, row in enumerate(information_blocks):
         convoluted_bit_sequence[i], _ = convolve(row)
-        if BIT_INTERLEAVE:
-            convoluted_bit_sequence[i] = bit_interleave(
-                convoluted_bit_sequence[i])
 
-    encoded_message = convoluted_bit_sequence.flatten()
+    if CODE_RATE != Fraction(1, 3):
+        convolutional_codewords = puncture(convoluted_bit_sequence, CODE_RATE)
+    else:
+        convolutional_codewords = convoluted_bit_sequence
+
+    if BIT_INTERLEAVE:
+        for i, row in enumerate(convolutional_codewords):
+            convolutional_codewords[i] = bit_interleave(convolutional_codewords[i])
+
+    encoded_message = convolutional_codewords.flatten()
 
     # The encoded message can be saved to a file, to compare the BER before
     # and after decoding

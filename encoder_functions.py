@@ -1,4 +1,5 @@
 import math
+from fractions import Fraction
 
 import numpy as np
 import numpy.typing as npt
@@ -95,11 +96,17 @@ def append_CRC(arr: npt.NDArray):
     return np.pad(arr, (0, 2))
 
 
-def slicer(arr: npt.NDArray, include_crc=False) -> npt.NDArray:
-    if include_crc:
-        information_block_size = 5006
-    else:
-        information_block_size = 5038
+def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
+           len_CRC: int = 32, num_termination_bits: int = 2) -> npt.NDArray:
+    """Slice the input array into information blocks, based on the code rate. """
+
+    # For a code rate of 1/3, the information block size is 5006.
+    # Including CRC and 2 termination bits, the number of bits going into the encoder is 5040
+    information_block_size: int = int(15120 * float(code_rate) - len_CRC - num_termination_bits)
+
+    # If the CRC is not used, add 32 more bits to the information block.
+    if not include_crc:
+        information_block_size += 32
 
     if arr.shape[0] % information_block_size != 0:
         # Number of bits that need to be added such that the array is a multiple of the information block size
@@ -110,8 +117,32 @@ def slicer(arr: npt.NDArray, include_crc=False) -> npt.NDArray:
     return arr
 
 
-def zero_terminate(arr: npt.NDArray) -> npt.NDArray:
-    zero_bits = np.zeros((arr.shape[0], 2), dtype=int)
+def puncture(convoluted_bit_sequence: npt.NDArray, code_rate: Fraction) -> npt.NDArray:
+    """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """
+    puncture_scheme: dict[Fraction, list[int]] = {
+        Fraction(1, 3): [1, 1, 1, 1, 1, 1],
+        Fraction(1, 2): [1, 1, 0, 1, 1, 0],
+        Fraction(2, 3): [1, 1, 0, 0, 1, 0]
+    }
+
+    # THE CCSDS HATH SPOKEN:
+    # "3.8.2.3.2 The puncturing shall be accomplished using the following procedure:"
+    # (See page 3-12 of the CCSDS 142.0-B-1 blue book, August 2019 edition)
+
+    convolutional_codewords = np.zeros((convoluted_bit_sequence.shape[0], 15120))
+    P = puncture_scheme[code_rate]
+    for i, row in enumerate(convoluted_bit_sequence):
+        j = 0
+        for m in range(row.shape[0]):
+            if P[m % 6] == 1:
+                convolutional_codewords[i, j] = convoluted_bit_sequence[i, m]
+                j += 1
+
+    return convolutional_codewords
+
+
+def zero_terminate(arr: npt.NDArray, num_termination_bits: int = 2) -> npt.NDArray:
+    zero_bits = np.zeros((arr.shape[0], num_termination_bits), dtype=int)
     return np.hstack((arr, zero_bits))
 
 
