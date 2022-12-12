@@ -1,27 +1,22 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-
-
 from tqdm import tqdm
 
 from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import CSM, num_bins_per_symbol, m
+from ppm_parameters import CSM, m, num_bins_per_symbol
 
 
 def check_csm(symbols):
     check_csm = False
     csm_symbols = np.round(symbols).astype(int)
 
-    Es = 10
-    N0 = 1
-
     try:
         berts_sum = sum([1 if x == CSM[i] else 0 for (i, x) in enumerate(csm_symbols)])
     except IndexError as e:
         print(e)
 
-    if berts_sum >= 10:
+    if berts_sum >= 12:
         check_csm = True
 
     return check_csm
@@ -45,6 +40,12 @@ def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
     while i < len(time_stamps) - len(CSM):
         symbols, _ = parse_ppm_symbols(
             time_stamps[i:i + len(CSM)] - time_stamps[i], bin_length, symbol_length)
+        j = 0
+        while len(symbols) < len(CSM) and j < 1000:
+            j += 1
+            symbols, _ = parse_ppm_symbols(
+                time_stamps[i:i + len(CSM) + j] - time_stamps[i], bin_length, symbol_length)
+
         if len(symbols) > len(CSM):
             symbols = symbols[:len(CSM)]
 
@@ -53,7 +54,8 @@ def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
         if csm_found:
             print('Found CSM at idx', i)
             csm_idxs.append(i)
-            i += int(0.7 * 15120 // m)
+            i = np.where(time_stamps >= time_stamps[i] + symbol_length * 15120 / m)[0][0] - 5
+            # i += int(0.7 * 15120 // m)
 
         i += 1
 
