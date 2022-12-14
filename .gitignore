@@ -184,3 +184,4 @@ pickle files
 jupiter_greyscale_64_samples_per_bin_interleaved_sent_bit_sequence
 jupiter_tiny_sent_ppm_symbols
 sent_message_encoded
+var_dumps/
