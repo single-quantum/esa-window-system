@@ -26,7 +26,7 @@ def find_msg_indexes(time_stamps, ASM, symbol_length) -> npt.NDArray:
     """Find out where the message starts, given that there is some space between messages, where only noise is received.
 
     Timestamps should be in seconds. """
-    noise_peaks = np.where(np.diff(time_stamps) / symbol_length > 40)[0]
+    noise_peaks = np.where(np.diff(time_stamps) / symbol_length > 30)[0]
     msg_start_idxs = noise_peaks[np.where(np.diff(noise_peaks) > 3780)[0]]
 
     return msg_start_idxs
