@@ -103,12 +103,12 @@ def new_method(csm_idxs, peak_locations):
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = False
+simulate_lost_symbols: bool = True
 simulate_darkcounts: bool = True
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
-num_photons_per_pulse = 10
+num_photons_per_pulse = 5
 darkcounts_factor: float = 0.05
 detector_jitter = 50E-12
 
@@ -180,15 +180,14 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-darkcounts_factors = np.logspace(-2, -0.3, num=15)
-# darkcounts_factors = np.logspace(-1, -0.8, num=2)
+detection_efficiencies = np.arange(0.5, 1.0, 0.05)
 
 path = Path('cached_trellis_80640_timesteps')
 if path.is_file():
     with open('cached_trellis_80640_timesteps', 'rb') as f:
         cached_trellis = pickle.load(f)
 
-for df, darkcounts_factor in enumerate(darkcounts_factors):
+for df, detection_efficiency in enumerate(detection_efficiencies):
     irrecoverable: int = 0
     BERS_after = []
     BERS_before = []
@@ -484,7 +483,7 @@ log = {
     'num_photons_per_pulse': num_photons_per_pulse,
     'darkcounts_factor': darkcounts_factor,
     'detector_jitter': detector_jitter,
-    'darkcounts_factors': darkcounts_factors,
+    'detection_efficiencies': detection_efficiencies,
     'data': {
         'bit_error_ratios_after': bit_error_ratios_after,
         'bit_error_ratios_before': bit_error_ratios_before,
