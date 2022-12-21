@@ -65,7 +65,7 @@ match PAYLOAD_TYPE:
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
-        num_codewords = math.ceil(num_PPM_symbols / symbols_per_codeword)
+        num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword+len(CSM)))
         num_slots = slot_mapped_sequence.flatten().shape[0]
         message_time_microseconds = num_slots * bin_length * 1E6
 
