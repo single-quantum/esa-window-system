@@ -5,10 +5,10 @@ from numpy import log2
 from encoder_functions import get_csm
 
 DAC_DATA_RATE: float = 8.84736E9        # DAC data rate in Hz
-num_samples_per_slot: int = 8            # Number of samples per bin
+num_samples_per_slot: int = 1            # Number of samples per bin
 
 # Note: The fraction type is needed for proper match casing
-CODE_RATE = Fraction(1, 3)
+CODE_RATE = Fraction(2, 3)
 PAYLOAD_TYPE: str = 'image'
 GREYSCALE: bool = True
 IMG_SHAPE: tuple[int, int] = (95, 100)

@@ -103,8 +103,8 @@ def new_method(csm_idxs, peak_locations):
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = True
+simulate_lost_symbols: bool = False
+simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
@@ -158,7 +158,7 @@ memory_size: int = 2
 edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 if use_test_file:
-    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1.csv'
+    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_1_1_c1b1.csv'
     print(f'Decoding file: {filename}')
     samples = pd.read_csv(filename, header=None)
     samples = samples.to_numpy().flatten()
@@ -167,7 +167,7 @@ if use_test_file:
     time_series_end = len(samples) * sample_size_awg * 1E-12
     time_series = np.arange(0, time_series_end, sample_size_awg * 1E-12)
 
-    msg_peaks = find_peaks(samples, height=1, distance=10)[0]
+    msg_peaks = find_peaks(samples, height=1, distance=2)[0]
 else:
     detector_countrate = 12.7E6
     time_tagger_window_size = 50E-3
