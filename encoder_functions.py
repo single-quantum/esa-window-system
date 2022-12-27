@@ -129,7 +129,9 @@ def puncture(convoluted_bit_sequence: npt.NDArray, code_rate: Fraction) -> npt.N
     # "3.8.2.3.2 The puncturing shall be accomplished using the following procedure:"
     # (See page 3-12 of the CCSDS 142.0-B-1 blue book, August 2019 edition)
 
-    convolutional_codewords = np.zeros((convoluted_bit_sequence.shape[0], 15120))
+    convolutional_codewords = np.zeros(
+        (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1]/(3*float(code_rate))))
+    )
     P = puncture_scheme[code_rate]
     for i, row in enumerate(convoluted_bit_sequence):
         j = 0

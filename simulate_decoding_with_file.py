@@ -22,7 +22,7 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
                             IMG_SHAPE, B_interleaver, M, N_interleaver,
                             bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg,
-                            symbol_length, symbols_per_codeword)
+                            symbol_length, symbols_per_codeword, CODE_RATE)
 from trellis import Trellis
 from utils import bpsk_encoding, flatten, generate_outer_code_edges
 
@@ -158,7 +158,7 @@ memory_size: int = 2
 edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 if use_test_file:
-    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_1_1_c1b1.csv'
+    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_1_1_c1b1_1-3-code-rate.csv'
     print(f'Decoding file: {filename}')
     samples = pd.read_csv(filename, header=None)
     samples = samples.to_numpy().flatten()
@@ -182,8 +182,8 @@ else:
 
 detection_efficiencies = np.arange(0.5, 1.0, 0.05)
 
-path = Path('cached_trellis_80640_timesteps')
-if path.is_file():
+cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
+if cached_trellis_file_path.is_file():
     with open('cached_trellis_80640_timesteps', 'rb') as f:
         cached_trellis = pickle.load(f)
 
@@ -292,7 +292,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             convoluted_bit_sequence = ppm_symbols_to_bit_array(ppm_mapped_message, m)
 
         # Get the BER before decoding
-        with open('jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
+        with open('jupiter_greyscale_1_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
             sent_bit_sequence: list = pickle.load(f)
 
         if len(convoluted_bit_sequence) > len(sent_bit_sequence):
@@ -329,19 +329,19 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
         print('Setting up trellis')
 
         num_states = 2**memory_size
-        time_steps = deinterleaved_received_sequence_2.shape[0] // num_output_bits
+        time_steps = int(deinterleaved_received_sequence_2.shape[0] * float(CODE_RATE))
 
         start = time()
 
-        if time_steps == 80640:
+        if time_steps == 80640 and cached_trellis_file_path.is_file():
             tr = cached_trellis
         else:
             tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
             tr.set_edges(edges)
 
-        if df == 0 and z == 0:
-            with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
-                pickle.dump(tr, f)
+            if df == 0 and z == 0:
+                with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
+                    pickle.dump(tr, f)
 
         end = time()
         print('Set edges run time', end - start)
@@ -351,13 +351,13 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
         sigma = np.sqrt(1 / (2 * 3 * Es / N0))
 
         encoded_sequence_2 = bpsk_encoding(deinterleaved_received_sequence_2.astype(float))
-        # encoded_sequence_2 = AWGN(encoded_sequence_2, sigma)
 
         alpha = np.zeros((num_states, time_steps + 1))
         beta = np.zeros((num_states, time_steps + 1))
 
         predicted_msg = predict(tr, encoded_sequence_2, Es=Es)
         termination_bits_removed = predicted_msg.reshape((-1, 5040))[:, :-2].flatten()
+        # Derandomize
         information_blocks = randomize(termination_bits_removed)
 
         if GREYSCALE:

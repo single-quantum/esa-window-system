@@ -205,6 +205,9 @@ def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bc
     if verbose:
         print('Calculating gammas')
 
+    from fractions import Fraction
+    from encoder_functions import puncture
+
     # Gamma values are a certain weight coupled to each edge.
     for k, stage in tqdm(enumerate(trellis.stages[:-1]), leave=False):
         for state in stage.states:

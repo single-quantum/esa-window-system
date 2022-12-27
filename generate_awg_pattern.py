@@ -9,7 +9,7 @@ from data_converter import DataConverter
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
                             IMG_SHAPE, PAYLOAD_TYPE, M, bin_length, m,
                             num_samples_per_slot, num_symbols_per_slice,
-                            sample_size_awg, slot_factor, symbols_per_codeword)
+                            sample_size_awg, slot_factor, symbols_per_codeword, CODE_RATE)
 from scppm_encoder import encoder
 
 ADD_ASM: bool = True
@@ -117,11 +117,14 @@ df = pd.DataFrame(pulse)
 # %%
 interleave_code = f'c{int(CHANNEL_INTERLEAVE)}b{int(BIT_INTERLEAVE)}'
 
+# '/' is not allowed in filenames. 
+cr = str(CODE_RATE).replace('/', '-')
+
 match PAYLOAD_TYPE:
     case 'image' if GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}.csv'
+        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv'
     case 'image' if not GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1.csv'
+        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1_{cr}-code-rate.csv'
     case 'string':
         filepath = f'ppm_message_Hello_World_no_ASM.csv'
     case 'calibration':
