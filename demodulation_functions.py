@@ -42,57 +42,11 @@ def find_msg_indexes(time_stamps, symbol_length) -> npt.NDArray:
 
 
 def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
-    # print('argmax', np.argmax(corr), 'max', np.max(corr), 'shift', 'none', 'corrcoef', corrcoef)
-    # plt.plot(corr, label=f'shift=none')
-
-    # csm_slot_idxs = [i*num_bins_per_symbol + CSM[i] for i in range(len(CSM))]
-    # csm_symbol_distances = np.diff(csm_slot_idxs)
-    # symbol_distances = np.random.randint(3, 23, len(CSM)-1)
-
-    # corr = np.correlate(symbol_distances[:len(CSM)-1], symbol_distances[:len(CSM)-1], mode='full')
-    # corrcoef = np.corrcoef(csm_symbol_distances, symbol_distances[:len(CSM)-1])
-    # r = linregress(range(len(corr[:np.argmax(corr)])), corr[:np.argmax(corr)])
-    # slope = r.slope
-    # print('argmax', np.argmax(corr), 'shift', shift, 'slope', slope)
-    # plt.plot(corr, label=f'shift={shift}')
-    
-    # plt.legend()
-    # plt.show()
-
-    # for shift in range(6):
-    #     csm_slot_idxs = [i*num_bins_per_symbol + CSM[i] for i in range(len(CSM))]
-    #     csm_symbol_distances = np.diff(csm_slot_idxs)
-    #     time_stamps_2 = deepcopy(time_stamps)
-    #     time_stamps_2 = np.delete(time_stamps_2, shift)
-
-    #     symbol_distances = np.round(np.diff(time_stamps_2)/bin_length).astype(int)
-
-    #     corr = np.correlate(symbol_distances[:len(CSM)], symbol_distances[:len(CSM)], mode='full')
-    #     corrcoef = np.corrcoef(csm_symbol_distances, symbol_distances[:len(CSM)-1])
-    #     print('argmax', np.argmax(corr), 'max', np.max(corr), 'shift', shift, 'corrcoef', corrcoef)
-    #     # print('argmax', np.argmax(corr), 'max', np.max(corr), 'shift', shift, 'corrcoef', corrcoef)
-    #     plt.plot(corr, label=f'shift={shift}')
-    #     plt.legend()
-    
-    # plt.show()
-
     csm_idxs = []
 
     i = 0
 
     while i < len(time_stamps) - len(CSM):
-        csm_slot_idxs = [i*num_bins_per_symbol + CSM[i] for i in range(len(CSM))]
-        csm_symbol_distances = np.diff(csm_slot_idxs)
-        time_stamps_2 = deepcopy(time_stamps)
-
-        symbol_distances = np.round(np.diff(time_stamps_2)/bin_length).astype(int)
-
-        corr = np.correlate(symbol_distances[i:i+len(CSM)-1], symbol_distances[i:i+len(CSM)-1], mode='full')
-        r = linregress(range(len(corr[:np.argmax(corr)])), corr[:np.argmax(corr)])
-        slope_1 = r.slope
-        r = linregress(range(len(corr[np.argmax(corr):])), corr[np.argmax(corr):])
-        slope_2 = r.slope
-
         symbols, _ = parse_ppm_symbols(
             time_stamps[i:i + len(CSM)] - time_stamps[i], bin_length, symbol_length)
         j = 0
@@ -108,7 +62,6 @@ def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
 
         if csm_found:
             print('Found CSM at idx', i)
-            print('slope', slope_1, 'slope 2', slope_2)
             csm_idxs.append(i)
             i = np.where(time_stamps >= time_stamps[i] + symbol_length * 15120 / m)[0][0] - 5
             # i += int(0.7 * 15120 // m)
