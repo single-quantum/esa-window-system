@@ -76,8 +76,6 @@ def new_method(csm_idxs, peak_locations, n0, ne):
 
     msg_symbols = []
 
-    # Method 1
-
     for i in range(len(csm_idxs) - 1):
         start = n0 + csm_idxs[i]
         stop = n0 + csm_idxs[i + 1]
@@ -87,10 +85,12 @@ def new_method(csm_idxs, peak_locations, n0, ne):
 
         symbols, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
 
+        # If `parse_ppm_symbols` did not manage to parse enough symbols from the peak locations, add random PPM symbols at the end of the codeword. 
         if len(symbols) < len_codeword:
             diff = len_codeword - len(symbols)
             symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
 
+        # If there are lost CSMs, estimate where it should have been and remove these PPM symbols. 
         if num_codewords_lost >= 1:
             csm_estimates_to_delete = flatten(
                 [range(i * len_codeword, i * len_codeword + len(CSM)) for i in range(1, num_codewords_lost + 1)])
@@ -102,6 +102,7 @@ def new_method(csm_idxs, peak_locations, n0, ne):
 
         msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
+    # Take the last CSM and parse until the end of the message. 
     t0_codeword = peak_locations[n0 + csm_idxs[-1]]
     symbols, _ = parse_ppm_symbols(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
     msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
