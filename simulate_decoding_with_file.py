@@ -25,6 +25,7 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
                             symbol_length, symbols_per_codeword, CODE_RATE)
 from trellis import Trellis
 from utils import bpsk_encoding, flatten, generate_outer_code_edges
+from demodulation_functions import demodulate
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
@@ -63,47 +64,9 @@ def simulate_symbol_loss(
     return peaks
 
 
-def new_method(csm_idxs, peak_locations):
-    len_codeword = symbols_per_codeword + len(CSM)
-    len_codeword_no_CSM = symbols_per_codeword
-
-    msg_symbols = []
-
-    # Method 1
-
-    for i in range(len(csm_idxs) - 1):
-        start = n0 + csm_idxs[i]
-        stop = n0 + csm_idxs[i + 1]
-        t0_codeword = peak_locations[start]
-        fraction_lost = (peak_locations[stop] - peak_locations[start]) / (symbol_length * len_codeword) - 1
-        num_codewords_lost = round(fraction_lost)
-
-        symbols, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
-
-        if len(symbols) < len_codeword:
-            diff = len_codeword - len(symbols)
-            symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
-
-        if num_codewords_lost >= 1:
-            csm_estimates_to_delete = flatten(
-                [range(i * len_codeword, i * len_codeword + len(CSM)) for i in range(1, num_codewords_lost + 1)])
-            symbols = np.delete(symbols, csm_estimates_to_delete)
-
-            diff = (num_codewords_lost + 1) * len_codeword_no_CSM - (len(symbols) - len(CSM))
-            if diff > 1:
-                symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
-
-        msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
-
-    t0_codeword = peak_locations[n0 + csm_idxs[-1]]
-    symbols, _ = parse_ppm_symbols(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
-    msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
-
-    return msg_symbols
-
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = False
+simulate_lost_symbols: bool = True
 simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
@@ -237,49 +200,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             shifted_time_stamps = np.array(timestamps - t0) + CSM[0] * bin_length
             peak_locations = timestamps + 0.1 * bin_length
 
-        estimated_msg_start_idxs = find_msg_indexes(peak_locations, CSM, symbol_length)
-        n0 = estimated_msg_start_idxs[0]
-        if use_test_file:
-            ne = len(peaks)
-        else:
-            ne = estimated_msg_start_idxs[1]
-        # ne = len(peak_locations)
-        j = 0
-        symbol_distance = np.diff(peak_locations[n0 + j:ne + j]) / symbol_length
-        while np.mean(symbol_distance[0:4]) > 3:
-            j += 1
-            symbol_distance = np.diff(peak_locations[n0 + j:ne + j]) / symbol_length
-            if j > 15:
-                raise StopIteration("Could not find msg start")
-
-        je = 1
-        while np.mean(symbol_distance[-5 - je:-je]) > 1.5:
-            je += 1
-            if je > 20000:
-                raise StopIteration("Could not find msg end")
-
-        n0 += j
-        ne -= je
-
-        print(f'Number of detection events in message frame: {len(peak_locations[n0:ne])}')
-
-        t0_msg = peak_locations[n0] + CSM[0] * bin_length
-        t_end = peak_locations[-n0 - 1]
-
-        csm_idxs = find_csm_idxs(peak_locations[n0:ne] - t0_msg, CSM, bin_length, symbol_length)
-        if csm_idxs[0] > 5:
-            csm_idxs.append(0)
-            csm_idxs = np.sort(csm_idxs)
-            print('Zero not found in CSM indexes')
-
-        print(f'Found {len(csm_idxs)} codewords. ')
-        print()
-
-        msg_symbols = new_method(csm_idxs, peak_locations)
-
-        new = np.array(flatten(msg_symbols))
-
-        ppm_mapped_message = new
+        ppm_mapped_message = demodulate(peak_locations)
 
         # Deinterleave
         if CHANNEL_INTERLEAVE:
