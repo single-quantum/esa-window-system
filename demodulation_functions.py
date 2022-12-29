@@ -97,7 +97,7 @@ def new_method(csm_idxs, peak_locations, n0, ne):
             symbols = np.delete(symbols, csm_estimates_to_delete)
 
             diff = (num_codewords_lost + 1) * len_codeword_no_CSM - (len(symbols) - len(CSM))
-            if diff > 1:
+            if diff > 0:
                 symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
 
         msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
