@@ -156,7 +156,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(0, 15):
+    for z in range(1, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)
@@ -227,8 +227,8 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
         if BER_before_decoding > 0.25:
             print(f'Something went wrong. Seed: {SEED} (z={z})')
             irrecoverable += 1
-            continue
-            # raise ValueError("Something went wrong here. ")
+            raise ValueError("Something went wrong here. ")
+            # continue
 
         BERS_before.append(BER_before_decoding)
         num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
@@ -370,7 +370,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
 fig, axs = plt.subplots(1)
 axs.errorbar(
-    mean_SNRs, bit_error_ratios_before,
+    detection_efficiencies, bit_error_ratios_before,
     bit_error_ratios_after_std, 0,
     capsize=2,
     label='Before decoding',
@@ -378,7 +378,7 @@ axs.errorbar(
     markersize=5)
 
 axs.errorbar(
-    mean_SNRs, bit_error_ratios_after,
+    detection_efficiencies, bit_error_ratios_after,
     bit_error_ratios_before_std, 0,
     capsize=2,
     label='After decoding',
