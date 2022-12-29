@@ -8,6 +8,11 @@ from scipy.ndimage import shift
 from shift_register import CRC
 
 
+def validate_PPM_order(M: int):
+    if M not in (4, 8, 16, 32, 64, 128, 256):
+        raise ValueError("M should be one of 4, 8, 16, 32, 64, 128 or 256")
+
+
 def get_asm_bit_arr(asm_hex: str = '1ACFFC1D') -> npt.NDArray:
     """Returns the binary representation of the Attached Synchronisation Markerk, as defined by the CCSDS. """
     ASM_binary = np.binary_repr(int(asm_hex, base=16), width=32)
@@ -183,7 +188,25 @@ def convolve(arr, initial_state=[0, 0]):
 
 
 def map_PPM_symbols(arr, m: int):
+    # Input validation
+    validate_PPM_order(2**m)
+
+    if not isinstance(arr, np.ndarray):
+        arr = np.array(arr, dtype=int)
+
+    # Check if PPM symbols are consistent with the PPM order
+    if not np.all(arr < 2**m):
+        raise ValueError(f"All PPM symbols should be smaller than 2^{m}")
+    
+    # Check if array is a bit array
+    if not np.all(np.logical_or(arr == 0, arr == 1)):
+        raise ValueError("Array is not a bit array. All inputs should be 1 or 0. ")
+    
+    if arr.shape[0] // m != arr.shape[0] / m:
+        raise ValueError(f"Input array is not a multiple of m={m}")
+    
     S = arr.shape[0] // m
+    
     output_arr = np.zeros(S, dtype=int)
 
     for s in range(S):
@@ -297,6 +320,8 @@ def channel_deinterleave(arr: npt.ArrayLike, B: int, N: int) -> list[int]:
 
 
 def get_csm(M=16):
+    validate_PPM_order(M)
+
     match M:
         case 4:
             w = np.array([0, 3, 1, 2, 1, 3, 2, 0, 0, 3, 2, 1, 0, 2, 1, 3, 1, 0, 3, 2, 3, 2, 1, 0])
@@ -308,14 +333,27 @@ def get_csm(M=16):
     return w
 
 
-def slot_map(ppm_symbols, M, insert_guardslots=True):
+def slot_map(ppm_symbols, M: int, insert_guardslots: bool=True):
+    """Convert each PPM symbol to a list of ones and zeros, where the one indicates the position of the PPM pulse.
+    
+    For example, with a PPM order of 4, and a PPM symbol 3, the slot mapped vector would be [0, 0, 0, 1, 0]"""
+    # Input validation
+    validate_PPM_order(M)
+    
+    if not isinstance(ppm_symbols, np.ndarray):
+        ppm_symbols = np.array(ppm_symbols, dtype=int)
+
+    # Check if PPM symbols are consistent with the PPM order
+    if not np.all(ppm_symbols < M):
+        raise ValueError(f"All PPM symbols should be smaller than {M}")
+
     slot_mapped = np.zeros((len(ppm_symbols), M))
     for j in range(len(ppm_symbols)):
         slot_mapped[j, ppm_symbols[j]] = 1
 
     # Insert guard slot (M / 4 zeros) for each slot map, if applicable
     if insert_guardslots:
-        guard_slot_inserted = np.hstack(
+        slot_mapped = np.hstack(
             (slot_mapped, np.zeros((M // 4, slot_mapped.shape[0])).T))
 
-    return guard_slot_inserted
+    return slot_mapped
