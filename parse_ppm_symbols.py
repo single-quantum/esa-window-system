@@ -9,7 +9,7 @@ def check_darkcount(bin_time, symbol_start, symbol_end, bin_length, symbol):
     # Then, check if the bin time falls within the 10% RMS slot width requirement
     time_offset = (symbol - round(symbol)) * bin_length
     sigma = 0.1 * bin_length
-    if abs(time_offset) > sigma:
+    if abs(time_offset) > 3*sigma:
         jitter_darkcount = True
         return guard_slot_darkcount, jitter_darkcount
 
@@ -71,6 +71,8 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
         i += 1
         symbol_idx += 1
 
+    if len(bin_times) > 100:
+        print('jitter darkcounts', jitter_darkcounts, i, symbol_idx)
     return symbols, (i, symbol_idx)
 
 

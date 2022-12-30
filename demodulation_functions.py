@@ -25,7 +25,7 @@ def check_csm(symbols):
     return check_csm
 
 
-def find_msg_indexes(time_stamps, symbol_length) -> npt.NDArray:
+def estimate_msg_start_indexes(time_stamps, symbol_length) -> npt.NDArray:
     """Find out where the message starts, given that there is some space between messages, where only noise is received.
 
     Timestamps should be in seconds. """
@@ -109,10 +109,7 @@ def new_method(csm_idxs, peak_locations, n0, ne):
 
     return msg_symbols
 
-def demodulate(peak_locations: npt.NDArray):
-
-    estimated_msg_start_idxs = find_msg_indexes(peak_locations, symbol_length)
-    
+def find_msg_indexes(peak_locations, estimated_msg_start_idxs):
     n0 = estimated_msg_start_idxs[0]
     ne = estimated_msg_start_idxs[1]
 
@@ -137,6 +134,14 @@ def demodulate(peak_locations: npt.NDArray):
     n0 += j
     ne -= je
 
+    return n0, ne
+
+def demodulate(peak_locations: npt.NDArray):
+
+    estimated_msg_start_idxs = estimate_msg_start_indexes(peak_locations, symbol_length)
+
+    n0, ne = find_msg_indexes(peak_locations, estimated_msg_start_idxs)
+
     print(f'Number of detection events in message frame: {len(peak_locations[n0:ne])}')
 
     t0_msg = peak_locations[n0] + CSM[0] * bin_length
@@ -150,7 +155,7 @@ def demodulate(peak_locations: npt.NDArray):
     if csm_idxs[0] > 5:
         csm_idxs.append(0)
         csm_idxs = np.sort(csm_idxs)
-        print('Zero not found in CSM indexes')
+        raise ValueError("Zero not found in CSM indexes")
 
     print(f'Found {len(csm_idxs)} codewords. ')
     print()

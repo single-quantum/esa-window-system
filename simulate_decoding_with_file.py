@@ -14,7 +14,7 @@ from PIL import Image
 from scipy.signal import find_peaks
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
-from demodulation_functions import find_csm_idxs, find_msg_indexes
+
 from encoder_functions import (bit_deinterleave, channel_deinterleave,
                                map_PPM_symbols, randomize)
 from parse_ppm_symbols import parse_ppm_symbols
@@ -67,13 +67,13 @@ def simulate_symbol_loss(
 
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = False
-simulate_jitter: bool = False
+simulate_darkcounts: bool = True
+simulate_jitter: bool = True
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
 darkcounts_factor: float = 0.05
-detector_jitter = 50E-12
+detector_jitter = 5*25E-12
 
 use_test_file: bool = True
 compare_with_original: bool = False
@@ -121,7 +121,7 @@ memory_size: int = 2
 edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 if use_test_file:
-    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_1_1_c1b1_1-3-code-rate.csv'
+    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_1_c1b1_1-3-code-rate.csv'
     print(f'Decoding file: {filename}')
     samples = pd.read_csv(filename, header=None)
     samples = samples.to_numpy().flatten()
@@ -156,7 +156,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(1, 15):
+    for z in range(3, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)
@@ -200,7 +200,12 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             shifted_time_stamps = np.array(timestamps - t0) + CSM[0] * bin_length
             peak_locations = timestamps + 0.1 * bin_length
 
-        ppm_mapped_message = demodulate(peak_locations)
+        try:
+            ppm_mapped_message = demodulate(peak_locations)
+        except ValueError:
+            irrecoverable += 1
+            print('Zero not found in CSM indexes')
+            continue
 
         # Deinterleave
         if CHANNEL_INTERLEAVE:
@@ -213,7 +218,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             convoluted_bit_sequence = ppm_symbols_to_bit_array(ppm_mapped_message, m)
 
         # Get the BER before decoding
-        with open('jupiter_greyscale_1_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
+        with open('jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
             sent_bit_sequence: list = pickle.load(f)
 
         if len(convoluted_bit_sequence) > len(sent_bit_sequence):
@@ -280,6 +285,9 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
         termination_bits_removed = predicted_msg.reshape((-1, 5040))[:, :-2].flatten()
         # Derandomize
         information_blocks = randomize(termination_bits_removed)
+
+        while information_blocks.shape[0]/8 != information_blocks.shape[0]//8:
+            information_blocks = np.hstack((information_blocks, 0))
 
         if GREYSCALE:
             pixel_values = map_PPM_symbols(information_blocks, 8)
