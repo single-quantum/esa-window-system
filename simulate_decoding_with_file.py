@@ -14,18 +14,17 @@ from PIL import Image
 from scipy.signal import find_peaks
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
-
+from demodulation_functions import demodulate
 from encoder_functions import (bit_deinterleave, channel_deinterleave,
                                map_PPM_symbols, randomize)
 from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
-                            IMG_SHAPE, B_interleaver, M, N_interleaver,
-                            bin_length, m, num_bins_per_symbol,
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
+                            GREYSCALE, IMG_SHAPE, B_interleaver, M,
+                            N_interleaver, bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg,
-                            symbol_length, symbols_per_codeword, CODE_RATE)
+                            symbol_length, symbols_per_codeword)
 from trellis import Trellis
 from utils import bpsk_encoding, flatten, generate_outer_code_edges
-from demodulation_functions import demodulate
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
@@ -64,16 +63,15 @@ def simulate_symbol_loss(
     return peaks
 
 
-
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = True
+simulate_lost_symbols: bool = False
+simulate_darkcounts: bool = False
 simulate_jitter: bool = True
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
 darkcounts_factor: float = 0.05
-detector_jitter = 5*25E-12
+detector_jitter = 5 * 25E-12
 
 use_test_file: bool = True
 compare_with_original: bool = False
@@ -198,7 +196,8 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
 
             shifted_time_stamps = np.array(timestamps - t0) + CSM[0] * bin_length
-            peak_locations = timestamps + 0.1 * bin_length
+            peak_locations = timestamps
+            # peak_locations[1:] += 0.1 * bin_length
 
         try:
             ppm_mapped_message = demodulate(peak_locations)
@@ -286,7 +285,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
         # Derandomize
         information_blocks = randomize(termination_bits_removed)
 
-        while information_blocks.shape[0]/8 != information_blocks.shape[0]//8:
+        while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
             information_blocks = np.hstack((information_blocks, 0))
 
         if GREYSCALE:

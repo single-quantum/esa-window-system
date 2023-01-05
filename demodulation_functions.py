@@ -1,12 +1,14 @@
+from copy import deepcopy
+
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-from tqdm import tqdm
-from copy import deepcopy
 from scipy.stats import linregress
+from tqdm import tqdm
 
-from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import CSM, m, symbols_per_codeword, symbol_length, bin_length, M, num_bins_per_symbol
+from parse_ppm_symbols import parse_ppm_symbols, parse_ppm_symbols_new
+from ppm_parameters import (CSM, M, bin_length, m, num_bins_per_symbol,
+                            symbol_length, symbols_per_codeword)
 from utils import flatten
 
 
@@ -31,11 +33,11 @@ def estimate_msg_start_indexes(time_stamps, symbol_length) -> npt.NDArray:
     Timestamps should be in seconds. """
     noise_peaks = np.where(np.diff(time_stamps) / symbol_length > 30)[0]
     where_start = np.where(np.diff(noise_peaks) > 3780)[0]
-    
-    # If only one starting index was found, use the next index as ending index. 
+
+    # If only one starting index was found, use the next index as ending index.
     if where_start.shape[0] == 1:
-        where_start = np.hstack((where_start, where_start[0]+1))
-    
+        where_start = np.hstack((where_start, where_start[0] + 1))
+
     msg_start_idxs = noise_peaks[where_start]
 
     return msg_start_idxs
@@ -70,6 +72,7 @@ def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
 
     return csm_idxs
 
+
 def new_method(csm_idxs, peak_locations, n0, ne):
     len_codeword = symbols_per_codeword + len(CSM)
     len_codeword_no_CSM = symbols_per_codeword
@@ -83,14 +86,17 @@ def new_method(csm_idxs, peak_locations, n0, ne):
         fraction_lost = (peak_locations[stop] - peak_locations[start]) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
+        symbols, _ = parse_ppm_symbols_new(
+            peak_locations[start:stop] - t0_codeword + 0.01 * bin_length, bin_length, symbol_length)
+        # symbols_2, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
 
-        # If `parse_ppm_symbols` did not manage to parse enough symbols from the peak locations, add random PPM symbols at the end of the codeword. 
+        # If `parse_ppm_symbols` did not manage to parse enough symbols from the
+        # peak locations, add random PPM symbols at the end of the codeword.
         if len(symbols) < len_codeword:
             diff = len_codeword - len(symbols)
             symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
 
-        # If there are lost CSMs, estimate where it should have been and remove these PPM symbols. 
+        # If there are lost CSMs, estimate where it should have been and remove these PPM symbols.
         if num_codewords_lost >= 1:
             csm_estimates_to_delete = flatten(
                 [range(i * len_codeword, i * len_codeword + len(CSM)) for i in range(1, num_codewords_lost + 1)])
@@ -102,20 +108,21 @@ def new_method(csm_idxs, peak_locations, n0, ne):
 
         msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
-    # Take the last CSM and parse until the end of the message. 
+    # Take the last CSM and parse until the end of the message.
     t0_codeword = peak_locations[n0 + csm_idxs[-1]]
     symbols, _ = parse_ppm_symbols(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
     msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     return msg_symbols
 
+
 def find_msg_indexes(peak_locations, estimated_msg_start_idxs):
     n0 = estimated_msg_start_idxs[0]
     ne = estimated_msg_start_idxs[1]
 
-    # ne is now the start of the next message, so the exact ending position needs to be found. 
-    # This can be done by looking at the average symbol distance, which should be around one 
-    # for a message. 
+    # ne is now the start of the next message, so the exact ending position needs to be found.
+    # This can be done by looking at the average symbol distance, which should be around one
+    # for a message.
 
     j = 0
     symbol_distance = np.diff(peak_locations[n0 + j:ne + j]) / symbol_length
@@ -136,6 +143,7 @@ def find_msg_indexes(peak_locations, estimated_msg_start_idxs):
 
     return n0, ne
 
+
 def demodulate(peak_locations: npt.NDArray):
 
     estimated_msg_start_idxs = estimate_msg_start_indexes(peak_locations, symbol_length)
@@ -148,9 +156,9 @@ def demodulate(peak_locations: npt.NDArray):
     t_end = peak_locations[-n0 - 1]
 
     csm_idxs = find_csm_idxs(peak_locations[n0:ne] - t0_msg, CSM, bin_length, symbol_length)
-    
+
     # If 0 is not found in the CSM indexes, add it to the list of CSM indexes.
-    # It should however be noted that this is not an ideal assumption, as it can be straight up wrong. 
+    # It should however be noted that this is not an ideal assumption, as it can be straight up wrong.
 
     if csm_idxs[0] > 5:
         csm_idxs.append(0)

@@ -9,7 +9,7 @@ def check_darkcount(bin_time, symbol_start, symbol_end, bin_length, symbol):
     # Then, check if the bin time falls within the 10% RMS slot width requirement
     time_offset = (symbol - round(symbol)) * bin_length
     sigma = 0.1 * bin_length
-    if abs(time_offset) > 3*sigma:
+    if abs(time_offset) > 3 * sigma:
         jitter_darkcount = True
         return guard_slot_darkcount, jitter_darkcount
 
@@ -33,7 +33,63 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
         symbol_start = symbol_idx * symbol_length
         symbol_end = (symbol_idx + 1) * symbol_length
 
-        symbol_frame_pulses = bin_times[np.logical_and(bin_times>=symbol_start, bin_times<=symbol_end)]
+        # If this is the case, a symbol did not get properly sent, received or parsed.
+        # Assume a 0 and continue to the next symbol, while keeping i the same.
+        if bin_times[i] > symbol_end:
+            symbols.append(0)
+            symbol_idx += 1
+            continue
+
+        # First estimate
+        symbol = (bin_times[i] - symbol_start) / bin_length
+
+        guard_slot_darkcount, jitter_darkcount = check_darkcount(
+            bin_times[i], symbol_start, symbol_end, bin_length, symbol)
+
+        if guard_slot_darkcount:
+            guard_slot_darkcounts += 1
+            i += 1
+            continue
+
+        if jitter_darkcount:
+            jitter_darkcounts += 1
+            i += 1
+            continue
+
+        if i < len(bin_times) - 1 and (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
+            symbol = (bin_times[i + 1] - symbol_start) / bin_length
+            symbols.append(symbol)
+            i += 1
+            symbol_idx += 1
+            continue
+
+        if symbol <= -1:
+            print('symbol in guard slot?')
+
+        symbols.append(symbol)
+
+        i += 1
+        symbol_idx += 1
+
+    if len(bin_times) > 100:
+        print('jitter darkcounts', jitter_darkcounts, i, symbol_idx)
+    return symbols, (i, symbol_idx)
+
+
+def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
+    symbols = []
+
+    symbol_idx = 0
+    i = 0
+
+    while i < len(bin_times):
+        if i != symbol_idx:
+            xyz = 1
+        symbol_start = symbol_idx * symbol_length
+        symbol_end = (symbol_idx + 1) * symbol_length
+
+        symbol_frame_pulses = bin_times[np.logical_and(
+            bin_times >= symbol_start, bin_times <= symbol_end)]
 
         # No symbol detected in this symbol frame
         if symbol_frame_pulses.size == 0:
@@ -43,65 +99,24 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
 
         for pulse in symbol_frame_pulses:
             symbol = (pulse - symbol_start) / bin_length
-            
+
             # Symbols cannot be in guard slots
             if round(symbol) > M:
                 i += 1
                 continue
-            
+
             # If the symbol is too far off the bin center, it is most likely a darkcount
             time_offset = (symbol - round(symbol)) * bin_length
             sigma = 0.1 * bin_length
-            if abs(time_offset) > 3*sigma:
+            if abs(time_offset) > 3 * sigma:
                 i += 1
                 continue
 
             symbols.append(symbol)
-            break
-        
-        i += symbol_frame_pulses.shape[0]
+            i += 1
+
         symbol_idx += 1
 
-        # If this is the case, a symbol did not get properly sent, received or parsed.
-        # Assume a 0 and continue to the next symbol, while keeping i the same.
-    #     if bin_times[i] > symbol_end:
-    #         symbols.append(0)
-    #         symbol_idx += 1
-    #         continue
-
-    #     # First estimate
-    #     symbol = (bin_times[i] - symbol_start) / bin_length
-
-    #     guard_slot_darkcount, jitter_darkcount = check_darkcount(
-    #         bin_times[i], symbol_start, symbol_end, bin_length, symbol)
-
-    #     if guard_slot_darkcount:
-    #         guard_slot_darkcounts += 1
-    #         i += 1
-    #         continue
-
-    #     if jitter_darkcount:
-    #         jitter_darkcounts += 1
-    #         i += 1
-    #         continue
-
-    #     if i < len(bin_times) - 1 and (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
-    #         symbol = (bin_times[i + 1] - symbol_start) / bin_length
-    #         symbols.append(symbol)
-    #         i += 1
-    #         symbol_idx += 1
-    #         continue
-
-    #     if symbol <= -1:
-    #         print('symbol in guard slot?')
-
-    #     symbols.append(symbol)
-
-    #     i += 1
-    #     symbol_idx += 1
-
-    # if len(bin_times) > 100:
-    #     print('jitter darkcounts', jitter_darkcounts, i, symbol_idx)
     return symbols, (i, symbol_idx)
 
 
