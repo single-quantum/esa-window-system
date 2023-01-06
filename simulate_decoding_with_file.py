@@ -13,19 +13,17 @@ from numpy.random import default_rng
 from PIL import Image
 from scipy.signal import find_peaks
 
-from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
+from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from demodulation_functions import demodulate
-from encoder_functions import (bit_deinterleave, channel_deinterleave,
-                               map_PPM_symbols, randomize)
+from encoder_functions import map_PPM_symbols
 from parse_ppm_symbols import parse_ppm_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             GREYSCALE, IMG_SHAPE, B_interleaver, M,
                             N_interleaver, bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg,
                             symbol_length, symbols_per_codeword)
-from trellis import Trellis
-from utils import bpsk_encoding, flatten, generate_outer_code_edges
 
+from scppm_decoder import decode
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
     print(f'{parameter_str:<{spacing}} {parameter}')
@@ -64,8 +62,8 @@ def simulate_symbol_loss(
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = False
-simulate_darkcounts: bool = False
+simulate_lost_symbols: bool = True
+simulate_darkcounts: bool = True
 simulate_jitter: bool = True
 
 detection_efficiency: float = 0.8
@@ -111,12 +109,6 @@ mean_SNRs = []
 
 symbols_lost_lower_bound = 5000
 symbols_lost_upper_bound = 8000
-
-# Trellis paramters (can be defined outside of for loop for optimisation)
-num_output_bits: int = 3
-num_input_bits: int = 1
-memory_size: int = 2
-edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 if use_test_file:
     filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_1_c1b1_1-3-code-rate.csv'
@@ -206,87 +198,8 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             print('Zero not found in CSM indexes')
             continue
 
-        # Deinterleave
-        if CHANNEL_INTERLEAVE:
-            print('Deinterleaving PPM symbols')
-            ppm_mapped_message = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
-            num_zeros_interleaver = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
-            convoluted_bit_sequence = ppm_symbols_to_bit_array(
-                ppm_mapped_message[:(len(ppm_mapped_message) - num_zeros_interleaver)], m)
-        else:
-            convoluted_bit_sequence = ppm_symbols_to_bit_array(ppm_mapped_message, m)
-
-        # Get the BER before decoding
-        with open('jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
-            sent_bit_sequence: list = pickle.load(f)
-
-        if len(convoluted_bit_sequence) > len(sent_bit_sequence):
-            BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence[:len(
-                sent_bit_sequence)] - sent_bit_sequence)) / len(sent_bit_sequence)
-        else:
-            BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence -
-                                         sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
-
-        print(f'BER before decoding: {BER_before_decoding}')
-        if BER_before_decoding > 0.25:
-            print(f'Something went wrong. Seed: {SEED} (z={z})')
-            irrecoverable += 1
-            raise ValueError("Something went wrong here. ")
-            # continue
-
+        information_blocks, BER_before_decoding = decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE)
         BERS_before.append(BER_before_decoding)
-        num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
-        symbols_to_deinterleave = convoluted_bit_sequence.shape[0] - num_leftover_symbols
-
-        received_sequence_interleaved = convoluted_bit_sequence[:symbols_to_deinterleave].reshape((-1, 15120))
-
-        if BIT_INTERLEAVE:
-            print('Bit deinterleaving')
-            received_sequence = np.zeros_like(received_sequence_interleaved)
-            for i, row in enumerate(received_sequence_interleaved):
-                received_sequence[i] = bit_deinterleave(row)
-        else:
-            received_sequence = received_sequence_interleaved
-
-        deinterleaved_received_sequence_2 = received_sequence.flatten()
-        # deinterleaved_received_sequence = np.hstack((deinterleaved_received_sequence, [0, 0]))
-
-        print('Setting up trellis')
-
-        num_states = 2**memory_size
-        time_steps = int(deinterleaved_received_sequence_2.shape[0] * float(CODE_RATE))
-
-        start = time()
-
-        if time_steps == 80640 and cached_trellis_file_path.is_file():
-            tr = cached_trellis
-        else:
-            tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
-            tr.set_edges(edges)
-
-            if df == 0 and z == 0:
-                with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
-                    pickle.dump(tr, f)
-
-        end = time()
-        print('Set edges run time', end - start)
-
-        Es = 5
-        N0 = 1
-        sigma = np.sqrt(1 / (2 * 3 * Es / N0))
-
-        encoded_sequence_2 = bpsk_encoding(deinterleaved_received_sequence_2.astype(float))
-
-        alpha = np.zeros((num_states, time_steps + 1))
-        beta = np.zeros((num_states, time_steps + 1))
-
-        predicted_msg = predict(tr, encoded_sequence_2, Es=Es)
-        termination_bits_removed = predicted_msg.reshape((-1, 5040))[:, :-2].flatten()
-        # Derandomize
-        information_blocks = randomize(termination_bits_removed)
-
-        while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
-            information_blocks = np.hstack((information_blocks, 0))
 
         if GREYSCALE:
             pixel_values = map_PPM_symbols(information_blocks, 8)
@@ -296,7 +209,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             MODE = "L"
             IMG_MODE = 'L'
         else:
-            img_arr = predicted_msg[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+            img_arr = information_blocks.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
             CMAP = 'binary'
             MODE = "1"
             IMG_MODE = '1'
