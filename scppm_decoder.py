@@ -1,12 +1,16 @@
-from encoder_functions import channel_deinterleave, bit_deinterleave, randomize
 import pickle
-from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
-import numpy as np
-from utils import bpsk_encoding, generate_outer_code_edges
-from trellis import Trellis
 from fractions import Fraction
 
-def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE=True, BIT_INTERLEAVE = True, CODE_RATE=Fraction(1, 3), **kwargs):
+import numpy as np
+
+from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
+from encoder_functions import bit_deinterleave, channel_deinterleave, randomize
+from trellis import Trellis
+from utils import bpsk_encoding, generate_outer_code_edges
+
+
+def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE=True,
+           BIT_INTERLEAVE=True, CODE_RATE=Fraction(1, 3), **kwargs):
     # Deinterleave
     if CHANNEL_INTERLEAVE:
         print('Deinterleaving PPM symbols')
@@ -21,9 +25,8 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
     with open('jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
         sent_bit_sequence: list = pickle.load(f)
 
-
     BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence -
-                                    sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
+                                        sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
 
     print(f'BER before decoding: {BER_before_decoding}')
     if (SEED := kwargs.get('SEED')) and (z := kwargs.get('z')):
@@ -32,7 +35,6 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
             irrecoverable += 1
             raise ValueError("Something went wrong here. ")
             # continue
-
 
     num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
     symbols_to_deinterleave = convoluted_bit_sequence.shape[0] - num_leftover_symbols
@@ -74,7 +76,6 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
         if df == 0 and z == 0:
             with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
                 pickle.dump(tr, f)
-
 
     Es = 5
     N0 = 1
