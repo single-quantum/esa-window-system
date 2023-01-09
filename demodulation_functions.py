@@ -86,7 +86,7 @@ def new_method(csm_idxs, peak_locations, n0, ne):
         fraction_lost = (peak_locations[stop] - peak_locations[start]) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
+        symbols, _ = parse_ppm_symbols_new(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
         # symbols_2, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
 
         # If `parse_ppm_symbols` did not manage to parse enough symbols from the
@@ -109,7 +109,7 @@ def new_method(csm_idxs, peak_locations, n0, ne):
 
     # Take the last CSM and parse until the end of the message.
     t0_codeword = peak_locations[n0 + csm_idxs[-1]] - 0.5 * bin_length
-    symbols, _ = parse_ppm_symbols(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
+    symbols, _ = parse_ppm_symbols_new(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
     msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     return msg_symbols
@@ -124,21 +124,38 @@ def find_msg_indexes(peak_locations, estimated_msg_start_idxs):
     # for a message.
 
     j = 0
-    symbol_distance = np.diff(peak_locations[n0 + j:ne + j]) / symbol_length
+    symbol_distance = np.diff(peak_locations[n0 + j:]) / symbol_length
     while np.mean(symbol_distance[0:4]) > 3:
         j += 1
-        symbol_distance = np.diff(peak_locations[n0 + j:ne + j]) / symbol_length
+        symbol_distance = np.diff(peak_locations[n0 + j:]) / symbol_length
         if j > 15:
             raise StopIteration("Could not find msg start")
 
+    n0 += j
+
+    # No trimming needed
+    symbol_distance = np.diff(peak_locations[n0:ne]) / symbol_length
+    if np.mean(symbol_distance[-5:]) < 2:
+        je = 0
+
+        while np.mean(symbol_distance[-5:]) < 2:
+            ne += 1
+            symbol_distance = np.diff(peak_locations[n0:ne]) / symbol_length
+
+            je += 1
+            if je > 20000:
+                raise StopIteration("Could not find msg end")
+
+        ne -= 1
+        return n0, ne
+
     je = 1
-    while np.mean(symbol_distance[-5 - je:-je]) > 2:
+    while np.mean(symbol_distance[-5:]) > 2:
+        ne -= 1
+        symbol_distance = np.diff(peak_locations[n0:ne]) / symbol_length
         je += 1
         if je > 20000:
             raise StopIteration("Could not find msg end")
-
-    n0 += j
-    ne += je
 
     return n0, ne
 

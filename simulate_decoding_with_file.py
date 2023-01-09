@@ -62,7 +62,7 @@ def simulate_symbol_loss(
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = False
+simulate_lost_symbols: bool = True
 simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
@@ -133,7 +133,7 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-detection_efficiencies = np.arange(0.5, 1.0, 0.05)
+detection_efficiencies = np.arange(0.55, 1.0, 0.05)
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
 if cached_trellis_file_path.is_file():
@@ -146,7 +146,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(0, 15):
+    for z in range(7, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)

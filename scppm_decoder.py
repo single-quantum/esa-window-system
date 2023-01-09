@@ -29,8 +29,12 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
     with open('jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
         sent_bit_sequence: list = pickle.load(f)
 
-    BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence -
-                                        sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
+    if len(convoluted_bit_sequence) > len(sent_bit_sequence):
+        BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence[:len(sent_bit_sequence)] -
+                                            sent_bit_sequence)) / len(sent_bit_sequence)
+    else:
+        BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence -
+                                            sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
 
     print(f'BER before decoding: {BER_before_decoding}')
     if BER_before_decoding > 0.25:
