@@ -22,8 +22,8 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             N_interleaver, bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg,
                             symbol_length, symbols_per_codeword)
+from scppm_decoder import DecoderError, decode
 
-from scppm_decoder import decode
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
     print(f'{parameter_str:<{spacing}} {parameter}')
@@ -62,9 +62,9 @@ def simulate_symbol_loss(
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = True
-simulate_jitter: bool = True
+simulate_lost_symbols: bool = False
+simulate_darkcounts: bool = False
+simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
@@ -146,7 +146,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(3, 15):
+    for z in range(0, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)
@@ -189,7 +189,6 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
             shifted_time_stamps = np.array(timestamps - t0) + CSM[0] * bin_length
             peak_locations = timestamps
-            # peak_locations[1:] += 0.1 * bin_length
 
         try:
             ppm_mapped_message = demodulate(peak_locations)
@@ -198,13 +197,25 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             print('Zero not found in CSM indexes')
             continue
 
-        information_blocks, BER_before_decoding = decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE)
+        try:
+            information_blocks, BER_before_decoding = decode(
+                ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
+                **{
+                    'use_cached_trellis': True,
+                    'cached_trellis_file_path': cached_trellis_file_path,
+                    'cached_trellis': cached_trellis
+                })
+        except DecoderError as e:
+            print(e)
+            print(f'Something went wrong. Seed: {SEED} (z={z})')
+            irrecoverable += 1
+
         BERS_before.append(BER_before_decoding)
 
         if GREYSCALE:
             pixel_values = map_PPM_symbols(information_blocks, 8)
-            # img_arr = pixel_values[:IMG_SHAPE[0]*IMG_SHAPE[1]].reshape(IMG_SHAPE)
-            img_arr = pixel_values[:9400].reshape((94, 100))
+            img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+            # img_arr = pixel_values[:9400].reshape((94, 100))
             CMAP = 'Greys'
             MODE = "L"
             IMG_MODE = 'L'

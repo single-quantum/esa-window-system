@@ -83,8 +83,6 @@ def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
     i = 0
 
     while i < len(bin_times):
-        if i != symbol_idx:
-            xyz = 1
         symbol_start = symbol_idx * symbol_length
         symbol_end = (symbol_idx + 1) * symbol_length
 
@@ -97,8 +95,9 @@ def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
             symbol_idx += 1
             continue
 
+        j = 0
         for pulse in symbol_frame_pulses:
-            symbol = (pulse - symbol_start) / bin_length
+            symbol = (pulse - symbol_start - 0.5 * bin_length) / bin_length
 
             # Symbols cannot be in guard slots
             if round(symbol) > M:
@@ -106,14 +105,23 @@ def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
                 continue
 
             # If the symbol is too far off the bin center, it is most likely a darkcount
-            time_offset = (symbol - round(symbol)) * bin_length
+            A = int((pulse - symbol_start) / bin_length)
+            slot_start = A * bin_length
+            slot_end = (A + 1) * bin_length
+            center = slot_start + (slot_end - slot_start) / 2
             sigma = 0.1 * bin_length
-            if abs(time_offset) > 3 * sigma:
+            if abs(center - (pulse - symbol_start)) > 3 * sigma:
                 i += 1
                 continue
 
             symbols.append(symbol)
+            j += 1
             i += 1
+
+        # If there were pulses detected in the symbol frame, but none of them were valid symbols, use a 0 instead.
+        # This makes sure that there will always be a symbol in each symbol frame.
+        if j == 0:
+            symbols.append(0)
 
         symbol_idx += 1
 

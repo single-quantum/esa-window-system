@@ -82,12 +82,11 @@ def new_method(csm_idxs, peak_locations, n0, ne):
     for i in range(len(csm_idxs) - 1):
         start = n0 + csm_idxs[i]
         stop = n0 + csm_idxs[i + 1]
-        t0_codeword = peak_locations[start]
+        t0_codeword = peak_locations[start] - 0.5 * bin_length
         fraction_lost = (peak_locations[stop] - peak_locations[start]) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, _ = parse_ppm_symbols(
-            peak_locations[start:stop] - t0_codeword + 0.01 * bin_length, bin_length, symbol_length)
+        symbols, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
         # symbols_2, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
 
         # If `parse_ppm_symbols` did not manage to parse enough symbols from the
@@ -109,7 +108,7 @@ def new_method(csm_idxs, peak_locations, n0, ne):
         msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     # Take the last CSM and parse until the end of the message.
-    t0_codeword = peak_locations[n0 + csm_idxs[-1]]
+    t0_codeword = peak_locations[n0 + csm_idxs[-1]] - 0.5 * bin_length
     symbols, _ = parse_ppm_symbols(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
     msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
@@ -133,13 +132,13 @@ def find_msg_indexes(peak_locations, estimated_msg_start_idxs):
             raise StopIteration("Could not find msg start")
 
     je = 1
-    while np.mean(symbol_distance[-5 - je:-je]) > 1.5:
+    while np.mean(symbol_distance[-5 - je:-je]) > 2:
         je += 1
         if je > 20000:
             raise StopIteration("Could not find msg end")
 
     n0 += j
-    ne -= je
+    ne += je
 
     return n0, ne
 

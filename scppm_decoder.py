@@ -9,6 +9,10 @@ from trellis import Trellis
 from utils import bpsk_encoding, generate_outer_code_edges
 
 
+class DecoderError(Exception):
+    pass
+
+
 def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE=True,
            BIT_INTERLEAVE=True, CODE_RATE=Fraction(1, 3), **kwargs):
     # Deinterleave
@@ -29,12 +33,9 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
                                         sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
 
     print(f'BER before decoding: {BER_before_decoding}')
-    if (SEED := kwargs.get('SEED')) and (z := kwargs.get('z')):
-        if BER_before_decoding > 0.25:
-            print(f'Something went wrong. Seed: {SEED} (z={z})')
-            irrecoverable += 1
-            raise ValueError("Something went wrong here. ")
-            # continue
+    if BER_before_decoding > 0.25:
+        raise DecoderError("Could not properly decode message. ")
+        # continue
 
     num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
     symbols_to_deinterleave = convoluted_bit_sequence.shape[0] - num_leftover_symbols
@@ -60,22 +61,24 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
     memory_size: int = 2
     edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
-    num_states = 2**memory_size
     time_steps = int(deinterleaved_received_sequence_2.shape[0] * float(CODE_RATE))
 
     if kwargs.get('use_cached_trellis'):
-        cached_trellis_file_path = kwargs.get('cached_trellis_file_path')
-        cached_trellis = kwargs.get('cached_trellis')
-    if time_steps == 80640 and cached_trellis_file_path.is_file():
-        tr = cached_trellis
+        cached_trellis_file_path = kwargs['cached_trellis_file_path']
+        cached_trellis = kwargs['cached_trellis']
+        if time_steps == 80640 and cached_trellis_file_path.is_file():
+            tr = cached_trellis
+        else:
+            tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
+            tr.set_edges(edges)
     else:
         tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
         tr.set_edges(edges)
-        df = 0
+        # df = 0
 
-        if df == 0 and z == 0:
-            with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
-                pickle.dump(tr, f)
+        # if df == 0 and z == 0:
+        #     with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
+        #         pickle.dump(tr, f)
 
     Es = 5
     N0 = 1
