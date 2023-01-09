@@ -146,7 +146,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(7, 15):
+    for z in range(0, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)
@@ -214,8 +214,8 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
         if GREYSCALE:
             pixel_values = map_PPM_symbols(information_blocks, 8)
-            img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
-            # img_arr = pixel_values[:9400].reshape((94, 100))
+            # img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+            img_arr = pixel_values[:9400].reshape((94, 100))
             CMAP = 'Greys'
             MODE = "L"
             IMG_MODE = 'L'
