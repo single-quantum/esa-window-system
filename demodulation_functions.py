@@ -73,7 +73,7 @@ def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
     return csm_idxs
 
 
-def new_method(csm_idxs, peak_locations, n0, ne):
+def find_and_parse_codewords(csm_idxs, peak_locations, n0, ne):
     len_codeword = symbols_per_codeword + len(CSM)
     len_codeword_no_CSM = symbols_per_codeword
 
@@ -184,8 +184,8 @@ def demodulate(peak_locations: npt.NDArray):
     print(f'Found {len(csm_idxs)} codewords. ')
     print()
 
-    msg_symbols = new_method(csm_idxs, peak_locations, n0, ne)
+    msg_symbols = find_and_parse_codewords(csm_idxs, peak_locations, n0, ne)
 
-    new = np.array(flatten(msg_symbols))
+    msg_symbols = np.array(flatten(msg_symbols))
 
-    return new
+    return msg_symbols
