@@ -4,7 +4,8 @@ from fractions import Fraction
 import numpy as np
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
-from encoder_functions import bit_deinterleave, channel_deinterleave, randomize, unpuncture
+from encoder_functions import (bit_deinterleave, channel_deinterleave,
+                               randomize, unpuncture)
 from trellis import Trellis
 from utils import bpsk_encoding, generate_outer_code_edges
 
@@ -41,8 +42,11 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
         raise DecoderError("Could not properly decode message. ")
         # continue
 
-    # num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
-    num_leftover_symbols = 0
+    num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
+    if (diff := 15120 - num_leftover_symbols) < 100:
+        convoluted_bit_sequence = np.hstack((convoluted_bit_sequence, np.zeros(diff)))
+        num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
+    # num_leftover_symbols = 0
     symbols_to_deinterleave = convoluted_bit_sequence.shape[0] - num_leftover_symbols
 
     received_sequence_interleaved = convoluted_bit_sequence[:symbols_to_deinterleave].reshape((-1, 15120))

@@ -63,12 +63,12 @@ def simulate_symbol_loss(
 
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = False
+simulate_darkcounts: bool = True
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
-darkcounts_factor: float = 0.05
+darkcounts_factor: float = 0.005
 detector_jitter = 5 * 25E-12
 
 use_test_file: bool = True
