@@ -185,7 +185,7 @@ def demodulate(peak_locations: npt.NDArray):
     print()
 
     msg_symbols = find_and_parse_codewords(csm_idxs, peak_locations, n0, ne)
+    # msg_symbols.append([0])
 
     msg_symbols = np.array(flatten(msg_symbols))
-
     return msg_symbols

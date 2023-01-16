@@ -206,6 +206,11 @@ def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bc
         print('Calculating gammas')
 
     from fractions import Fraction
+    puncture_scheme: dict[Fraction, list[int]] = {
+        Fraction(1, 3): [1, 1, 1, 1, 1, 1],
+        Fraction(1, 2): [1, 1, 0, 1, 1, 0],
+        Fraction(2, 3): [1, 1, 0, 0, 1, 0]
+    }
     from encoder_functions import puncture
 
     # Gamma values are a certain weight coupled to each edge.

@@ -121,6 +121,29 @@ def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
     arr = arr.reshape((-1, information_block_size))
     return arr
 
+def unpuncture(encoded_sequence, code_rate):
+    puncture_scheme: dict[Fraction, list[int]] = {
+        Fraction(1, 3): [1, 1, 1, 1, 1, 1],
+        Fraction(1, 2): [1, 1, 0, 1, 1, 0],
+        Fraction(2, 3): [1, 1, 0, 0, 1, 0]
+    }
+
+    P = puncture_scheme[code_rate]
+
+    factor = code_rate/Fraction(1, 3)
+    unpunctured_sequence = np.zeros(int(factor*len(encoded_sequence)))
+
+    j = 0
+    for i in range(len(unpunctured_sequence)-1):
+        if P[i%6] == 1:
+            unpunctured_sequence[i] = encoded_sequence[j]
+            j += 1
+        if (i+1)%(15120/6) == 0:
+            unpunctured_sequence[i] = encoded_sequence[j]
+            # j += 1
+
+    return unpunctured_sequence
+
 
 def puncture(convoluted_bit_sequence: npt.NDArray, code_rate: Fraction) -> npt.NDArray:
     """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """

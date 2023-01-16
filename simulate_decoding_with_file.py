@@ -111,7 +111,7 @@ symbols_lost_lower_bound = 5000
 symbols_lost_upper_bound = 8000
 
 if use_test_file:
-    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_1_c1b1_1-3-code-rate.csv'
+    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_1_c1b1_2-3-code-rate.csv'
     print(f'Decoding file: {filename}')
     samples = pd.read_csv(filename, header=None)
     samples = samples.to_numpy().flatten()
@@ -146,8 +146,10 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(0, 15):
+    for z in range(2, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
+        if irrecoverable > 3:
+            raise StopIteration("Too many irrecoverable messages. ")
         SEED = 21189 + z**2
         print('Seed', SEED, 'z', z)
         rng = default_rng(SEED)

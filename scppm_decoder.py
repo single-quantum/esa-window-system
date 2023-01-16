@@ -4,7 +4,7 @@ from fractions import Fraction
 import numpy as np
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
-from encoder_functions import bit_deinterleave, channel_deinterleave, randomize
+from encoder_functions import bit_deinterleave, channel_deinterleave, randomize, unpuncture
 from trellis import Trellis
 from utils import bpsk_encoding, generate_outer_code_edges
 
@@ -41,7 +41,8 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
         raise DecoderError("Could not properly decode message. ")
         # continue
 
-    num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
+    # num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
+    num_leftover_symbols = 0
     symbols_to_deinterleave = convoluted_bit_sequence.shape[0] - num_leftover_symbols
 
     received_sequence_interleaved = convoluted_bit_sequence[:symbols_to_deinterleave].reshape((-1, 15120))
@@ -54,7 +55,7 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
     else:
         received_sequence = received_sequence_interleaved
 
-    deinterleaved_received_sequence_2 = received_sequence.flatten()
+    deinterleaved_received_sequence = received_sequence.flatten()
     # deinterleaved_received_sequence = np.hstack((deinterleaved_received_sequence, [0, 0]))
 
     print('Setting up trellis')
@@ -65,7 +66,7 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
     memory_size: int = 2
     edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
-    time_steps = int(deinterleaved_received_sequence_2.shape[0] * float(CODE_RATE))
+    time_steps = int(deinterleaved_received_sequence.shape[0] * float(CODE_RATE))
 
     if kwargs.get('use_cached_trellis'):
         cached_trellis_file_path = kwargs['cached_trellis_file_path']
@@ -87,12 +88,23 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
     Es = 5
     N0 = 1
 
-    encoded_sequence_2 = bpsk_encoding(deinterleaved_received_sequence_2.astype(float))
+    encoded_sequence = bpsk_encoding(deinterleaved_received_sequence.astype(float))
 
-    predicted_msg = predict(tr, encoded_sequence_2, Es=Es)
-    termination_bits_removed = predicted_msg.reshape((-1, 5040))[:, :-2].flatten()
+    encoded_sequence = unpuncture(encoded_sequence, CODE_RATE)
+
+    predicted_msg = predict(tr, encoded_sequence, Es=Es)
+    information_block_sizes = {
+        Fraction(1, 3): 5040,
+        Fraction(1, 2): 7560,
+        Fraction(2, 3): 10080
+    }
+
+    num_bits = information_block_sizes[CODE_RATE]
+    information_blocks = predicted_msg.reshape((-1, num_bits))[:, :-2].flatten()
+
+    # information_blocks = predicted_msg.reshape((-1, 5040)).flatten()
     # Derandomize
-    information_blocks = randomize(termination_bits_removed)
+    # information_blocks = randomize(termination_bits_removed)
 
     while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
         information_blocks = np.hstack((information_blocks, 0))
