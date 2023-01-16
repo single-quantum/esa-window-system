@@ -86,7 +86,7 @@ def find_and_parse_codewords(csm_idxs, peak_locations, n0, ne):
         fraction_lost = (peak_locations[stop] - peak_locations[start]) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, _ = parse_ppm_symbols_new(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
+        symbols, _ = parse_ppm_symbols_new(peak_locations[start:stop+1] - t0_codeword, bin_length, symbol_length)
         # symbols_2, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
 
         # If `parse_ppm_symbols` did not manage to parse enough symbols from the

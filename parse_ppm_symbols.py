@@ -78,13 +78,11 @@ def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
 
 def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
     symbols = []
-
-    symbol_idx = 0
-    i = 0
-
-    while i < len(bin_times):
-        symbol_start = symbol_idx * symbol_length
-        symbol_end = (symbol_idx + 1) * symbol_length
+    num_symbol_frames = int(round((bin_times[-1]-bin_times[0])/symbol_length))
+    
+    for i in range(num_symbol_frames):
+        symbol_start = i * symbol_length
+        symbol_end = (i + 1) * symbol_length
 
         symbol_frame_pulses = bin_times[np.logical_and(
             bin_times >= symbol_start, bin_times <= symbol_end)]
@@ -92,7 +90,6 @@ def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
         # No symbol detected in this symbol frame
         if symbol_frame_pulses.size == 0:
             symbols.append(0)
-            symbol_idx += 1
             continue
 
         j = 0
@@ -101,7 +98,6 @@ def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
 
             # Symbols cannot be in guard slots
             if round(symbol) > M:
-                i += 1
                 continue
 
             # If the symbol is too far off the bin center, it is most likely a darkcount
@@ -111,21 +107,18 @@ def parse_ppm_symbols_new(bin_times, bin_length, symbol_length, **kwargs):
             center = slot_start + (slot_end - slot_start) / 2
             sigma = 0.1 * bin_length
             if abs(center - (pulse - symbol_start)) > 3 * sigma:
-                i += 1
                 continue
 
             symbols.append(symbol)
             j += 1
-            i += 1
+            break
 
         # If there were pulses detected in the symbol frame, but none of them were valid symbols, use a 0 instead.
         # This makes sure that there will always be a symbol in each symbol frame.
         if j == 0:
             symbols.append(0)
 
-        symbol_idx += 1
-
-    return symbols, (i, symbol_idx)
+    return symbols
 
 
 def rolling_window(a, size):
