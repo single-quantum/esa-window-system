@@ -83,7 +83,7 @@ print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microsecon
 # Generate AWG pattern file
 num_samples_per_symbol: int = num_bins_per_symbol * num_samples_per_slot
 
-pulse_width: int = 1
+pulse_width: int = 3
 
 pulse = np.zeros(num_samples_per_symbol * num_PPM_symbols)
 print(f'Multiple of 256? {len(pulse)/256}')
