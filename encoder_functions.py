@@ -260,14 +260,14 @@ def bit_interleave(arr: npt.ArrayLike) -> npt.NDArray[np.int_]:
     return interleaved_output
 
 
-def bit_deinterleave(arr: npt.ArrayLike) -> npt.NDArray[np.int_]:
+def bit_deinterleave(arr: np.ndarray | list[float]) -> npt.NDArray[np.int_]:
     """De-interleave the interleaved array `arr`.
 
     Note: works only with 15120 element arrays. """
 
     assert len(arr) == 15120, "Input array should have length 15120"
 
-    deinterleaved_array = np.zeros_like(arr).astype(int)
+    deinterleaved_array: np.ndarray = np.zeros_like(arr).astype(int)
 
     # pi_j is the new index for the interleaved array
     for j in range(deinterleaved_array.shape[0]):
