@@ -16,13 +16,14 @@ from scipy.signal import find_peaks
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
-from parse_ppm_symbols import parse_ppm_symbols
+
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             GREYSCALE, IMG_SHAPE, B_interleaver, M,
                             N_interleaver, bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg,
                             symbol_length, symbols_per_codeword)
 from scppm_decoder import DecoderError, decode
+from scipy.signal import correlate
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
@@ -63,7 +64,7 @@ def simulate_symbol_loss(
 
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = True
+simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
@@ -111,7 +112,7 @@ symbols_lost_lower_bound = 5000
 symbols_lost_upper_bound = 8000
 
 if use_test_file:
-    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_1_c1b1_2-3-code-rate.csv'
+    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1_2-3-code-rate.csv'
     print(f'Decoding file: {filename}')
     samples = pd.read_csv(filename, header=None)
     samples = samples.to_numpy().flatten()
@@ -146,7 +147,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(2, 15):
+    for z in range(0, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
         if irrecoverable > 3:
             raise StopIteration("Too many irrecoverable messages. ")
@@ -159,6 +160,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             # Simulate noise peaks before start and after end of message
             if simulate_noise_peaks:
                 noise_peaks = np.sort(rng.integers(0, msg_peaks[0], 15))
+                noise_peaks[0] += 1
                 noise_peaks_end = np.sort(rng.integers(msg_peaks[-1], len(time_series), 15))
                 peaks = np.hstack((noise_peaks, msg_peaks, noise_peaks_end))
             else:
@@ -176,6 +178,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 darkcount_indexes = np.random.choice(msg_idx_range, num_darkcounts)
                 peaks = np.sort(np.hstack((peaks, darkcount_indexes)))
             timestamps = time_series[peaks]
+            xyz = ((time_series[noise_peaks[0]]-0.0*bin_length)/bin_length)/num_bins_per_symbol
 
             n0 = 0
             t0 = timestamps[n0]
@@ -191,11 +194,17 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
             shifted_time_stamps = np.array(timestamps - t0) + CSM[0] * bin_length
             peak_locations = timestamps
+            # time_stamps = np.array([bin_length*CSM[i] + i*symbol_length for i in range(len(CSM))]) + 0.5*bin_length
+            # corr = correlate(np.diff(peak_locations), np.diff(time_stamps))
+            # plt.figure()
+            # plt.plot(corr)
 
         try:
+            peak_locations = np.sort(np.hstack((peak_locations, 0)))
             ppm_mapped_message = demodulate(peak_locations)
-        except ValueError:
+        except ValueError as e:
             irrecoverable += 1
+            print(e)
             print('Zero not found in CSM indexes')
             continue
 
@@ -349,3 +358,5 @@ log = {
 now = datetime.now().strftime('%d-%m-%Y')
 with open(f'var_dump_simulate_decoding_with_file_{now}', 'wb') as f:
     pickle.dump(log, f)
+
+# %%

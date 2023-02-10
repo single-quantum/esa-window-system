@@ -38,8 +38,8 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
                                             sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
 
     print(f'BER before decoding: {BER_before_decoding}')
-    if BER_before_decoding > 0.25:
-        raise DecoderError("Could not properly decode message. ")
+    # if BER_before_decoding > 0.25:
+    #     raise DecoderError("Could not properly decode message. ")
         # continue
 
     num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120

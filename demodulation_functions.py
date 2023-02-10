@@ -6,22 +6,28 @@ import numpy.typing as npt
 from scipy.stats import linregress
 from tqdm import tqdm
 
-from parse_ppm_symbols import parse_ppm_symbols, parse_ppm_symbols_new
+import scipy as sp
+
+from parse_ppm_symbols import parse_ppm_symbols
 from ppm_parameters import (CSM, M, bin_length, m, num_bins_per_symbol,
-                            symbol_length, symbols_per_codeword)
+                            symbol_length, symbols_per_codeword, sample_size_awg)
 from utils import flatten
+from scipy.signal import correlate
+from scipy.fft import fft
 
-
-def check_csm(symbols):
+def check_csm(symbols, similarity_threshold=0.75):
+    """Check whether the given symbols sequence is the Codeword Synchronisation Marker (CSM), by element-wise comparison. 
+    
+    The similarity is the number of symbols that are equal and in the same place as the CSM. """
     check_csm = False
     csm_symbols = np.round(symbols).astype(int)
 
     try:
-        berts_sum = sum([1 if x == CSM[i] else 0 for (i, x) in enumerate(csm_symbols)])
+        similarity = sum([1 if x == CSM[i] else 0 for (i, x) in enumerate(csm_symbols)])
     except IndexError as e:
         print(e)
 
-    if berts_sum >= 12:
+    if similarity >= similarity_threshold*len(CSM):
         check_csm = True
 
     return check_csm
@@ -42,35 +48,51 @@ def estimate_msg_start_indexes(time_stamps, symbol_length) -> npt.NDArray:
 
     return msg_start_idxs
 
+def make_time_series(time_stamps, bin_length, shift=0):
+    # num_bins = int(time_stamps[-1]/bin_length)
+    time_vec = np.arange(time_stamps[0], time_stamps[-1], bin_length)
+    A = np.zeros(len(time_vec))
 
-def find_csm_idxs(time_stamps, CSM, bin_length, symbol_length):
-    csm_idxs = []
+    m = 0
+    n = 0
+    while m < len(time_vec)-1:
+        if time_vec[m] <= time_stamps[n] <= time_vec[m+1]:
+            A[m] = 1
+            n += 1
+        m += 1
 
-    i = 0
+    return A
 
-    while i < len(time_stamps) - len(CSM):
-        symbols, _ = parse_ppm_symbols(
-            time_stamps[i:i + len(CSM)] - time_stamps[i], bin_length, symbol_length)
-        j = 0
-        while len(symbols) < len(CSM) and j < 1000:
-            j += 1
-            symbols, _ = parse_ppm_symbols(
-                time_stamps[i:i + len(CSM) + j] - time_stamps[i], bin_length, symbol_length)
+def find_csm_times(time_stamps, CSM, bin_length, symbol_length):
+    """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
 
-        if len(symbols) > len(CSM):
-            symbols = symbols[:len(CSM)]
+    csm_time_stamps = np.array([bin_length*CSM[i] + i*symbol_length for i in range(len(CSM))]) + 0.5*bin_length
 
-        csm_found: bool = check_csm(symbols)
+    
 
-        if csm_found:
-            print('Found CSM at idx', i)
-            csm_idxs.append(i)
-            i = np.where(time_stamps >= time_stamps[i] + symbol_length * 15120 / m)[0][0] - 5
-            # i += int(0.7 * 15120 // m)
+    A = make_time_series(time_stamps, bin_length)
+    B = make_time_series(csm_time_stamps, bin_length)
 
-        i += 1
+    corr = np.correlate(A, B)
 
-    return csm_idxs
+    # where_corr finds all the shifts/delays in time steps of a slot_length
+    where_corr = np.where(corr >= 10)[0]
+    shift = 0
+    while where_corr.shape[0] == 0:
+        shift += 1
+        A = make_time_series(time_stamps[shift:], bin_length)
+        corr = np.correlate(A, B)
+        where_corr = np.where(corr >= 10)[0]
+
+        if shift > 2*len(CSM):
+            raise StopIteration("Could not find CSMs")
+
+    # where_corr += shift
+    t0 = time_stamps[shift]
+
+    csm_times = t0 + bin_length*where_corr - 1*bin_length
+
+    return csm_times
 
 
 def find_and_parse_codewords(csm_idxs, peak_locations, n0, ne):
@@ -82,12 +104,11 @@ def find_and_parse_codewords(csm_idxs, peak_locations, n0, ne):
     for i in range(len(csm_idxs) - 1):
         start = n0 + csm_idxs[i]
         stop = n0 + csm_idxs[i + 1]
-        t0_codeword = peak_locations[start] - 0.5 * bin_length
-        fraction_lost = (peak_locations[stop] - peak_locations[start]) / (symbol_length * len_codeword) - 1
+        # t0_codeword = peak_locations[start] - 0.5 * bin_length
+        fraction_lost = (stop - start) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, _ = parse_ppm_symbols_new(peak_locations[start:stop+1] - t0_codeword, bin_length, symbol_length)
-        # symbols_2, _ = parse_ppm_symbols(peak_locations[start:stop] - t0_codeword, bin_length, symbol_length)
+        symbols = parse_ppm_symbols(peak_locations, csm_idxs[i], csm_idxs[i+1], bin_length, symbol_length)
 
         # If `parse_ppm_symbols` did not manage to parse enough symbols from the
         # peak locations, add random PPM symbols at the end of the codeword.
@@ -95,6 +116,8 @@ def find_and_parse_codewords(csm_idxs, peak_locations, n0, ne):
             diff = len_codeword - len(symbols)
             symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
 
+        if num_codewords_lost == 0 and len(symbols) > len_codeword:
+            symbols = symbols[:len_codeword]
         # If there are lost CSMs, estimate where it should have been and remove these PPM symbols.
         if num_codewords_lost >= 1:
             csm_estimates_to_delete = flatten(
@@ -108,8 +131,7 @@ def find_and_parse_codewords(csm_idxs, peak_locations, n0, ne):
         msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     # Take the last CSM and parse until the end of the message.
-    t0_codeword = peak_locations[n0 + csm_idxs[-1]] - 0.5 * bin_length
-    symbols, _ = parse_ppm_symbols_new(peak_locations[n0 + csm_idxs[-1]:ne] - t0_codeword, bin_length, symbol_length)
+    symbols = parse_ppm_symbols(peak_locations, csm_idxs[i], csm_idxs[i+1], bin_length, symbol_length)
     msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     return msg_symbols
@@ -168,23 +190,12 @@ def demodulate(peak_locations: npt.NDArray):
 
     print(f'Number of detection events in message frame: {len(peak_locations[n0:ne])}')
 
-    t0_msg = peak_locations[n0] + CSM[0] * bin_length
-    t_end = peak_locations[-n0 - 1]
+    csm_times = find_csm_times(peak_locations, CSM, bin_length, symbol_length)
 
-    csm_idxs = find_csm_idxs(peak_locations[n0:ne] - t0_msg, CSM, bin_length, symbol_length)
-
-    # If 0 is not found in the CSM indexes, add it to the list of CSM indexes.
-    # It should however be noted that this is not an ideal assumption, as it can be straight up wrong.
-
-    if csm_idxs[0] > 5:
-        csm_idxs.append(0)
-        csm_idxs = np.sort(csm_idxs)
-        raise ValueError("Zero not found in CSM indexes")
-
-    print(f'Found {len(csm_idxs)} codewords. ')
+    print(f'Found {len(csm_times)} codewords. ')
     print()
 
-    msg_symbols = find_and_parse_codewords(csm_idxs, peak_locations, n0, ne)
+    msg_symbols = find_and_parse_codewords(csm_times, peak_locations, n0, ne)
     # msg_symbols.append([0])
 
     msg_symbols = np.array(flatten(msg_symbols))
