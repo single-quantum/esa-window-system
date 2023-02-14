@@ -62,17 +62,17 @@ def simulate_symbol_loss(
     return peaks
 
 
-simulate_noise_peaks: bool = True
+simulate_noise_peaks: bool = False
 simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = False
+simulate_darkcounts: bool = True
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
-darkcounts_factor: float = 0.005
+darkcounts_factor: float = 2*0.0005
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = True
+use_test_file: bool = False
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
 
@@ -85,7 +85,8 @@ print_parameter('Slot width (ns)', round(slot_width_ns, 3))
 print_parameter('Symbol length (ns)', round(symbol_length_ns, 3))
 print_parameter('Theoretical countrate (MHz)', 1 / (symbol_length_ns * 1E-9) * 1E-6)
 
-print_parameter('Number of guard slots', int(np.log2(M)))
+print_parameter('Number of bits per symbol', int(np.log2(M)))
+print_parameter('Number of guard slots', M//4)
 print_header("-")
 
 print()
@@ -123,11 +124,11 @@ if use_test_file:
 
     msg_peaks = find_peaks(samples, height=1, distance=2)[0]
 else:
-    detector_countrate = 12.7E6
+    detector_countrate = 60E6
     time_tagger_window_size = 50E-3
     num_events = detector_countrate * time_tagger_window_size
     fr = TimeTagger.FileReader(
-        "time tagger files/10-25-2022/jupiter_tiny_greyscale_64_samples_per_slot_CSM_65-0_interleaved_17-41-00.ttbin")
+        "jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-29-15.ttbin")
     data = fr.getData(num_events)
     time_stamps = data.getTimestamps()
     peak_locations = time_stamps * 1E-12
@@ -147,7 +148,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(0, 15):
+    for z in range(1, 15):
         print(f'num irrecoverable messages: {irrecoverable}')
         if irrecoverable > 3:
             raise StopIteration("Too many irrecoverable messages. ")
@@ -178,7 +179,10 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 darkcount_indexes = np.random.choice(msg_idx_range, num_darkcounts)
                 peaks = np.sort(np.hstack((peaks, darkcount_indexes)))
             timestamps = time_series[peaks]
-            xyz = ((time_series[noise_peaks[0]]-0.0*bin_length)/bin_length)/num_bins_per_symbol
+            # if simulate_noise_peaks:
+            
+            timestamps = np.hstack((timestamps, rng.random(size=15)*timestamps[0]))
+            timestamps = np.sort(timestamps)
 
             n0 = 0
             t0 = timestamps[n0]
@@ -192,16 +196,12 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 SNRs.append(SNR)
                 print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
 
-            shifted_time_stamps = np.array(timestamps - t0) + CSM[0] * bin_length
             peak_locations = timestamps
-            # time_stamps = np.array([bin_length*CSM[i] + i*symbol_length for i in range(len(CSM))]) + 0.5*bin_length
-            # corr = correlate(np.diff(peak_locations), np.diff(time_stamps))
-            # plt.figure()
-            # plt.plot(corr)
 
         try:
-            peak_locations = np.sort(np.hstack((peak_locations, 0)))
-            ppm_mapped_message = demodulate(peak_locations)
+            # peak_locations = np.sort(np.hstack((peak_locations, 0)))
+            # peak_locations = peak_locations - peak_locations[0]
+            ppm_mapped_message = demodulate(peak_locations[:200000])
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -257,7 +257,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             BER_after_decoding = np.sum(
                 np.abs(information_blocks[:len(sent_message)] - sent_message)) / len(sent_message)
 
-        if simulate_darkcounts:
+        if use_test_file and simulate_darkcounts:
             print(f'BER after decoding: {BER_after_decoding }. Number of darkcounts: {num_darkcounts}')
         else:
             print(f'BER after decoding: {BER_after_decoding }. ')

@@ -1,6 +1,6 @@
 import numpy as np
 
-from ppm_parameters import M
+from ppm_parameters import M, sample_size_awg
 
 
 def find_pulses_within_symbol_frame(
@@ -36,12 +36,12 @@ def check_timing_requirement(pulse: float, symbol_start: float, bin_length: floa
     
     return timing_requirement
 
-def parse_ppm_symbols(bin_times, start_time, stop_time, bin_length, symbol_length, **kwargs):
+def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time, slot_length, symbol_length, **kwargs):
     symbols = []
-    num_symbol_frames = int(round((stop_time-start_time)/symbol_length))
+    num_symbol_frames = int(round((stop_time-codeword_start_time)/symbol_length))
 
     for i in range(num_symbol_frames):
-        symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(i, symbol_length, bin_times, start_time)
+        symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(i, symbol_length, pulse_times, codeword_start_time)
 
         # No symbol detected in this symbol frame
         if symbol_frame_pulses.size == 0:
@@ -50,14 +50,14 @@ def parse_ppm_symbols(bin_times, start_time, stop_time, bin_length, symbol_lengt
 
         j = 0
         for pulse in symbol_frame_pulses:
-            symbol = (pulse - symbol_start - 0.5 * bin_length) / bin_length
+            symbol = (pulse - symbol_start - 0.5 * slot_length) / slot_length
 
             # Symbols cannot be in guard slots
             if round(symbol) > M:
                 continue
 
             # If the symbol is too far off the bin center, it is most likely a darkcount
-            timing_requirement = check_timing_requirement(pulse, symbol_start, bin_length)
+            timing_requirement = check_timing_requirement(pulse, symbol_start, slot_length)
             if not timing_requirement:
                 continue
 
