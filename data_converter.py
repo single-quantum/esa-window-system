@@ -1,17 +1,21 @@
-import numpy as np
-from utils import tobits
-import numpy.typing as npt
-from pathlib import Path
 import pathlib
+from pathlib import Path
+
+import numpy as np
+import numpy.typing as npt
 from PIL import Image
+
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
+from utils import tobits
 
 IMG_SUFFIXES = [".png", ".jpg", ".jpeg"]
+
 
 def _validate(user_data, data_type):
     """Validate the user data. Raise a type error if it is not valid. """
     if not isinstance(user_data, data_type):
         raise TypeError(f"Input data must be a string. Input data is a {type(user_data)}")
+
 
 class DataConverter:
     def __init__(self, user_data):
@@ -31,7 +35,7 @@ class DataConverter:
 
         return np.array(tobits(user_data))
 
-    def from_image(self, filepath: Path, greyscale = True) -> npt.NDArray:
+    def from_image(self, filepath: Path, greyscale=True) -> npt.NDArray:
         """Take a filepath and convert the image to a bit stream. """
         _validate(filepath, Path)
         if filepath.suffix not in IMG_SUFFIXES:
@@ -45,7 +49,6 @@ class DataConverter:
         img = Image.open(filepath)
         img = img.convert(img_mode)
         img_array = np.asarray(img).astype(int)
-
 
         # In the case of greyscale, each pixel has a value from 0 to 255.
         # This would be the same as saying that each pixel is a symbol, which should be mapped to an 8 bit sequence.

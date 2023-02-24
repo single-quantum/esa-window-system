@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 
 from data_converter import DataConverter
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
-                            IMG_SHAPE, PAYLOAD_TYPE, M, bin_length, m,
-                            num_samples_per_slot, num_symbols_per_slice,
-                            sample_size_awg, slot_factor, symbols_per_codeword, CODE_RATE)
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
+                            GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, M, bin_length,
+                            m, num_samples_per_slot, num_symbols_per_slice,
+                            sample_size_awg, slot_factor, symbols_per_codeword)
 from scppm_encoder import encoder
 
 ADD_ASM: bool = True
@@ -65,7 +65,7 @@ match PAYLOAD_TYPE:
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
-        num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword+len(CSM)))
+        num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword + len(CSM)))
         num_slots = slot_mapped_sequence.flatten().shape[0]
         message_time_microseconds = num_slots * bin_length * 1E6
 
@@ -117,7 +117,7 @@ df = pd.DataFrame(pulse)
 # %%
 interleave_code = f'c{int(CHANNEL_INTERLEAVE)}b{int(BIT_INTERLEAVE)}'
 
-# '/' is not allowed in filenames. 
+# '/' is not allowed in filenames.
 cr = str(CODE_RATE).replace('/', '-')
 
 match PAYLOAD_TYPE:

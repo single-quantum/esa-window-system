@@ -1,8 +1,8 @@
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 
 
 class Edge:
-    
+
     __slots__ = ('from_state', 'to_state', 'edge_input', 'edge_output', 'gamma', 'lmbda', 'hamming_distance')
 
     def __init__(self):
@@ -41,6 +41,7 @@ class Edge:
 
 class State:
     __slots__ = ('label', 'edges', 'alpha', 'beta')
+
     def __init__(self, label: int, num_edges: int):
         self.label = label
         # self.edges = [Edge() for _ in range(num_edges)]

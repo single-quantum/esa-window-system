@@ -121,6 +121,7 @@ def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
     arr = arr.reshape((-1, information_block_size))
     return arr
 
+
 def unpuncture(encoded_sequence, code_rate):
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
@@ -130,15 +131,15 @@ def unpuncture(encoded_sequence, code_rate):
 
     P = puncture_scheme[code_rate]
 
-    factor = code_rate/Fraction(1, 3)
-    unpunctured_sequence = np.zeros(int(factor*len(encoded_sequence)))
+    factor = code_rate / Fraction(1, 3)
+    unpunctured_sequence = np.zeros(int(factor * len(encoded_sequence)))
 
     j = 0
-    for i in range(len(unpunctured_sequence)-1):
-        if P[i%6] == 1:
+    for i in range(len(unpunctured_sequence) - 1):
+        if P[i % 6] == 1:
             unpunctured_sequence[i] = encoded_sequence[j]
             j += 1
-        if (i+1)%(15120/6) == 0:
+        if (i + 1) % (15120 / 6) == 0:
             unpunctured_sequence[i] = encoded_sequence[j]
             # j += 1
 
@@ -158,7 +159,7 @@ def puncture(convoluted_bit_sequence: npt.NDArray, code_rate: Fraction) -> npt.N
     # (See page 3-12 of the CCSDS 142.0-B-1 blue book, August 2019 edition)
 
     convolutional_codewords = np.zeros(
-        (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1]/(3*float(code_rate))))
+        (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1] / (3 * float(code_rate))))
     )
     P = puncture_scheme[code_rate]
     for i, row in enumerate(convoluted_bit_sequence):
@@ -220,16 +221,16 @@ def map_PPM_symbols(arr, m: int):
     # Check if PPM symbols are consistent with the PPM order
     if not np.all(arr < 2**m):
         raise ValueError(f"All PPM symbols should be smaller than 2^{m}")
-    
+
     # Check if array is a bit array
     if not np.all(np.logical_or(arr == 0, arr == 1)):
         raise ValueError("Array is not a bit array. All inputs should be 1 or 0. ")
-    
+
     if arr.shape[0] // m != arr.shape[0] / m:
         raise ValueError(f"Input array is not a multiple of m={m}")
-    
+
     S = arr.shape[0] // m
-    
+
     output_arr = np.zeros(S, dtype=int)
 
     for s in range(S):
@@ -356,13 +357,13 @@ def get_csm(M=16):
     return w
 
 
-def slot_map(ppm_symbols, M: int, insert_guardslots: bool=True):
+def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True):
     """Convert each PPM symbol to a list of ones and zeros, where the one indicates the position of the PPM pulse.
-    
+
     For example, with a PPM order of 4, and a PPM symbol 3, the slot mapped vector would be [0, 0, 0, 1, 0]"""
     # Input validation
     validate_PPM_order(M)
-    
+
     if not isinstance(ppm_symbols, np.ndarray):
         ppm_symbols = np.array(ppm_symbols, dtype=int)
 
