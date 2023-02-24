@@ -39,4 +39,5 @@ num_symbols_per_slice: int = 15120
 symbols_per_codeword = num_symbols_per_slice // m
 
 if CHANNEL_INTERLEAVE:
-    assert (B_interleaver * N_interleaver) % symbols_per_codeword == 0, "The product of B and N should be a multiple of 15120/m"
+    if not (B_interleaver * N_interleaver) % symbols_per_codeword == 0:
+        raise ValueError("The product of B and N should be a multiple of 15120/m")
