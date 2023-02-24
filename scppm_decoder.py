@@ -40,7 +40,6 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
     print(f'BER before decoding: {BER_before_decoding}')
     # if BER_before_decoding > 0.25:
     #     raise DecoderError("Could not properly decode message. ")
-        # continue
 
     num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
     if (diff := 15120 - num_leftover_symbols) < 100:
@@ -108,7 +107,7 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
 
     # information_blocks = predicted_msg.reshape((-1, 5040)).flatten()
     # Derandomize
-    # information_blocks = randomize(termination_bits_removed)
+    information_blocks = randomize(information_blocks)
 
     while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
         information_blocks = np.hstack((information_blocks, 0))
