@@ -50,7 +50,9 @@ def SCPPM_encoder(information_blocks, save_encoded_sequence_to_file=True):
     # The encoded message can be saved to a file, to compare the BER before
     # and after decoding
     if save_encoded_sequence_to_file:
-        with open(f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence', 'wb') as f:
+        filename: str = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}' +\
+            '-PPM_interleaved_sent_bit_sequence'
+        with open(filename, 'wb') as f:
             pickle.dump(encoded_message, f)
 
     # Map the encoded message bit stream to PPM symbols
