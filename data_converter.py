@@ -1,5 +1,6 @@
 import pathlib
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -8,25 +9,26 @@ from PIL import Image
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from utils import tobits
 
-IMG_SUFFIXES = [".png", ".jpg", ".jpeg"]
+IMG_SUFFIXES: list[str] = [".png", ".jpg", ".jpeg"]
 
 
-def _validate(user_data, data_type):
+def _validate(user_data: Any, data_type: Any) -> None:
     """Validate the user data. Raise a type error if it is not valid. """
     if not isinstance(user_data, data_type):
         raise TypeError(f"Input data must be a string. Input data is a {type(user_data)}")
 
 
 class DataConverter:
-    def __init__(self, user_data):
+    def __init__(self, user_data: Any):
         self.bit_array: npt.NDArray[np.int_]
         match user_data:
             case str():
                 self.bit_array = self.from_string(user_data)
             case pathlib.Path() if user_data.suffix in IMG_SUFFIXES:
                 self.bit_array = self.from_image(user_data)
-            case pathlib.Path() if user_data.suffix == '.csv':
-                self.bit_array = []
+            # CSV not yet implemented
+            # case pathlib.Path() if user_data.suffix == '.csv':
+            #     self.bit_array = []
             case _:
                 raise TypeError('Data type not supported')
 
@@ -40,7 +42,7 @@ class DataConverter:
         """Take a filepath and convert the image to a bit stream. """
         _validate(filepath, Path)
         if filepath.suffix not in IMG_SUFFIXES:
-            raise ValueError(f"File does not have the correct filetype. Should be one of .png, .jpg, or .jpeg")
+            raise ValueError("File does not have the correct filetype. Should be one of .png, .jpg, or .jpeg")
 
         if greyscale:
             img_mode = "L"

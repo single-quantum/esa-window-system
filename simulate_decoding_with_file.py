@@ -2,7 +2,6 @@
 import pickle
 from datetime import datetime
 from pathlib import Path
-from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,17 +10,17 @@ import pandas as pd
 import TimeTagger
 from numpy.random import default_rng
 from PIL import Image
-from scipy.signal import correlate, find_peaks
+from scipy.signal import find_peaks
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
                             GREYSCALE, IMG_SHAPE, B_interleaver, M,
-                            N_interleaver, bin_length, m, num_bins_per_symbol,
-                            num_samples_per_slot, sample_size_awg,
-                            symbol_length, symbols_per_codeword)
+                            N_interleaver, m, num_bins_per_symbol,
+                            num_samples_per_slot, sample_size_awg)
 from scppm_decoder import DecoderError, decode
+from trellis import Trellis
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
@@ -110,6 +109,10 @@ mean_SNRs = []
 symbols_lost_lower_bound = 5000
 symbols_lost_upper_bound = 8000
 
+msg_peaks: npt.NDArray[np.int_] = np.array([])
+time_series: npt.NDArray[np.float_] = np.array([])
+peak_locations: npt.NDArray[np.float_] = np.array([])
+
 if use_test_file:
     filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1_2-3-code-rate.csv'
     print(f'Decoding file: {filename}')
@@ -134,6 +137,7 @@ else:
     print(f'Number of events: {len(time_stamps)}')
 
 detection_efficiencies = np.arange(0.95, 1.05, 0.05)
+cached_trellis: Trellis | None = None
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
 if cached_trellis_file_path.is_file():
@@ -155,6 +159,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
         rng = default_rng(SEED)
         np.random.seed(SEED)
 
+        num_darkcounts: int = 0
         if use_test_file:
             # Simulate noise peaks before start and after end of message
             if simulate_noise_peaks:
@@ -197,8 +202,6 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             peak_locations = timestamps
 
         try:
-            # peak_locations = np.sort(np.hstack((peak_locations, 0)))
-            # peak_locations = peak_locations - peak_locations[0]
             ppm_mapped_message = demodulate(peak_locations[:200000])
         except ValueError as e:
             irrecoverable += 1
@@ -206,11 +209,14 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             print('Zero not found in CSM indexes')
             continue
 
+        information_blocks: npt.NDArray[np.int_] = np.array([])
+        BER_before_decoding: float | None = None
+
         try:
             information_blocks, BER_before_decoding = decode(
                 ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
                 **{
-                    'use_cached_trellis': True,
+                    'use_cached_trellis': False,
                     'cached_trellis_file_path': cached_trellis_file_path,
                     'cached_trellis': cached_trellis
                 })
@@ -283,33 +289,35 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
         # plt.ylabel('Pixel number (y)')
         # plt.text(x=2, y=90, s=f'BER={BER_after_decoding:.3f}', ha='left',
         #          va='center', color='magenta', size=13, weight='bold')
-        # # plt.savefig(f'BER simulation/decoded_img_64_samples_per_bin_interleaved_{num_symbols_lost}_symbols_lost_seed_{SEED}_random_fill.png')
+        # filename = f'BER simulation/decoded_img_64_samples_per_bin_interleaved_' +\
+        # f'{num_symbols_lost}_symbols_lost_seed_{SEED}_random_fill.png'
+        # # plt.savefig(filename)
         # plt.show()
 
         # print()
-    BERS_after = np.array(BERS_after)
-    BERS_before = np.array(BERS_before)
+    BERS_after_arr: npt.NDArray[np.float_] = np.array(BERS_after, dtype=float)
+    BERS_before_arr: npt.NDArray[np.float_] = np.array(BERS_before, dtype=float)
 
     # BERS_after = BERS_after[np.where(BERS_after <= 3 * np.std(BERS_after))[0]]
     if plot_BER_distribution:
         plt.figure()
-        plt.hist(BERS_before, label='Before decoding')
-        plt.hist(BERS_after, label='After decoding')
+        plt.hist(BERS_before_arr, label='Before decoding')
+        plt.hist(BERS_after_arr, label='After decoding')
         plt.title('BER before and after decoding (10% darkcounts)')
         plt.ylabel('Occurences')
         plt.xlabel('Bit Error Ratio (-)')
         plt.legend()
         plt.show()
 
-    bit_error_ratios_after.append(np.mean(BERS_after))
-    bit_error_ratios_after_std.append(np.std(BERS_after))
+    bit_error_ratios_after.append(np.mean(BERS_after_arr))
+    bit_error_ratios_after_std.append(np.std(BERS_after_arr))
 
-    bit_error_ratios_before.append(np.mean(BERS_before))
-    bit_error_ratios_before_std.append(np.std(BERS_before))
+    bit_error_ratios_before.append(np.mean(BERS_before_arr))
+    bit_error_ratios_before_std.append(np.std(BERS_before_arr))
     mean_SNRs.append(np.mean(SNRs))
 
 fig, axs = plt.subplots(1)
-axs.errorbar(
+axs[0].errorbar(
     detection_efficiencies, bit_error_ratios_before,
     bit_error_ratios_after_std, 0,
     capsize=2,
@@ -317,7 +325,7 @@ axs.errorbar(
     marker='o',
     markersize=5)
 
-axs.errorbar(
+axs[0].errorbar(
     detection_efficiencies, bit_error_ratios_after,
     bit_error_ratios_before_std, 0,
     capsize=2,
@@ -325,9 +333,9 @@ axs.errorbar(
     marker='o',
     markersize=5)
 
-axs.set_yscale('log')
-axs.set_ylabel('Bit Error Ratio (-)')
-axs.set_xlabel('Signal to Noise Ratio (-)')
+axs[0].set_yscale('log')
+axs[0].set_ylabel('Bit Error Ratio (-)')
+axs[0].set_xlabel('Signal to Noise Ratio (-)')
 plt.title('BER as function of SNR')
 plt.legend()
 plt.show()

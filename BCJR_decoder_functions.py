@@ -48,7 +48,8 @@ def calculate_alphas(trellis, alpha, log_bcjr=True, verbose=False):
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
-    It says something about the likelihood of being in that state, given the history of the received sequence up to that state.
+    It says something about the likelihood of being in that state,
+    given the history of the received sequence up to that state.
     Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. """
     if verbose:
         print('Calculating alphas')
@@ -99,7 +100,8 @@ def calculate_alpha_inner_SISO(trellis, gamma_primes, log_bcjr=True):
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
-    It says something about the likelihood of being in that state, given the history of the received sequence up to that state.
+    It says something about the likelihood of being in that state,
+    given the history of the received sequence up to that state.
     Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. """
     # print('Calculating alphas')
 
@@ -129,7 +131,8 @@ def calculate_beta_inner_SISO(trellis, gamma_primes, log_bcjr=True):
     """ Calculate the beta for each state in the trellis.
 
     Beta is a likelihood that has a forward recursion relation to next states.
-    It says something about the likelihood of being in that state, given the future of the received sequence up to that state.
+    It says something about the likelihood of being in that state,
+    given the future of the received sequence up to that state.
     Beta is calculated by taking each edge that is connected to the given state and weighing it with gamma. """
     # print('Calculating betas')
 
@@ -167,7 +170,6 @@ def calculate_betas(trellis, beta, log_bcjr=True, verbose=False):
     else:
         trellis.stages[-1].states[0].beta = 1
 
-    num_states = len(trellis.stages[0].states)
     time_steps = len(trellis.stages) - 1
 
     with tqdm(total=time_steps, leave=False) as pbar:
@@ -207,14 +209,6 @@ def pi_k(PPM_symbol_vector, bit_LLR):
 def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bcjr=True, verbose=False):
     if verbose:
         print('Calculating gammas')
-
-    from fractions import Fraction
-    puncture_scheme: dict[Fraction, list[int]] = {
-        Fraction(1, 3): [1, 1, 1, 1, 1, 1],
-        Fraction(1, 2): [1, 1, 0, 1, 1, 0],
-        Fraction(2, 3): [1, 1, 0, 0, 1, 0]
-    }
-    from encoder_functions import puncture
 
     # Gamma values are a certain weight coupled to each edge.
     for k, stage in tqdm(enumerate(trellis.stages[:-1]), leave=False):
@@ -256,7 +250,7 @@ def calculate_gamma_primes(trellis: Trellis):
     return gamma_prime
 
 
-def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False):
+def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False) -> npt.NDArray[np.float_]:
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -268,7 +262,7 @@ def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False):
     if verbose:
         print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
-    LLR = np.zeros(time_steps)
+    LLR = np.zeros(time_steps, dtype=float)
 
     # The last stage has no edges
     for t, stage in enumerate(trellis.stages[:-1]):
@@ -295,7 +289,7 @@ def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False):
 
         if not log_bcjr:
             LLR[t] = np.log(numerator / denomenator)
-            return
+            continue
 
         # When leaving from the first state in the first timestep, there's only two transitions possible
         if len(a) == 1 and len(b) == 1:
@@ -318,7 +312,8 @@ def calculate_inner_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bc
     To calculate this, you need to sum over all states that had a 0 as input for the numerator,
     While summing over all the states that had a 1 as input for the denominator.
 
-    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods for each k-th PPM symbol.
+    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods
+    for each k-th PPM symbol.
     """
     # print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
@@ -357,7 +352,8 @@ def calculate_outer_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bc
     To calculate this, you need to sum over all states that had a 0 as input for the numerator,
     While summing over all the states that had a 1 as input for the denominator.
 
-    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods for each k-th PPM symbol.
+    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods
+    for each k-th PPM symbol.
     """
     # print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
@@ -402,14 +398,14 @@ def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=Fals
     beta = np.zeros((trellis.num_states, time_steps + 1))
 
     # Calculate alphas, betas, gammas and LLRs
-    gammas = calculate_gammas(trellis, received_sequence, trellis.num_output_bits, Es, N0, log_bcjr=LOG_BCJR)
+    calculate_gammas(trellis, received_sequence, trellis.num_output_bits, Es, N0, log_bcjr=LOG_BCJR)
     alpha = calculate_alphas(trellis, alpha, log_bcjr=LOG_BCJR)
     beta = calculate_betas(trellis, beta, log_bcjr=LOG_BCJR)
-    LLR = calculate_LLRs(trellis, alpha, beta, log_bcjr=LOG_BCJR)
+    LLRs = calculate_LLRs(trellis, alpha, beta, log_bcjr=LOG_BCJR)
 
     if verbose:
         print('Message decoded')
-    u_hat = np.array([1 if l >= 0 else 0 for l in LLR])
+    u_hat = np.array([1 if llr >= 0 else 0 for llr in LLRs])
 
     return u_hat
 

@@ -200,9 +200,10 @@ def convolve(
 
     # To initialize `arr`, add the initial state.
     arr = np.hstack((tuple(reversed(initial_state)), arr))
+    f: npt.NDArray[np.int_] = np.array([])
 
     for i in range(num_windows):
-        f: npt.NDArray[np.int_] = arr[i:i + 3]
+        f = arr[i:i + 3]
 
         h = [f[2] ^ f[0], f[0] ^ f[1] ^ f[2], f[0] ^ f[1] ^ f[2]]
         convolutional_codeword[3 * i:3 * i + 3] = h

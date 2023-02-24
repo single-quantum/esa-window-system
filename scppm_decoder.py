@@ -24,7 +24,7 @@ def decode(
     BIT_INTERLEAVE: bool = True,
     CODE_RATE: Fraction = Fraction(1, 3),
     **kwargs
-):
+) -> tuple[npt.NDArray[np.int_], float]:
 
     convoluted_bit_sequence: npt.NDArray[np.int_]
 
