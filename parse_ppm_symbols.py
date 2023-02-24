@@ -1,22 +1,23 @@
 import numpy as np
+import numpy.typing as npt
 
-from ppm_parameters import M, sample_size_awg
+from ppm_parameters import M
 
 
 def find_pulses_within_symbol_frame(
     i: int,
     symbol_length: float,
-    bin_times: list[float],
+    bin_times: npt.NDArray[np.float_],
     start_time: float
-) -> tuple[list[float], float, float]:
+) -> tuple[npt.NDArray[np.float_], float, float]:
     """Find all time events (pulses) within the given symbol frame, defined by i and the symbol length.
 
     Returns a list of time events within the frame, as well as the symbol start and end time.
     """
-    symbol_start = start_time + i * symbol_length
-    symbol_end = start_time + (i + 1) * symbol_length
+    symbol_start: float = start_time + i * symbol_length
+    symbol_end: float = start_time + (i + 1) * symbol_length
 
-    symbol_frame_pulses = bin_times[np.logical_and(
+    symbol_frame_pulses: npt.NDArray[np.float_] = bin_times[np.logical_and(
         bin_times >= symbol_start, bin_times <= symbol_end)]
 
     return symbol_frame_pulses, symbol_start, symbol_end
@@ -38,9 +39,16 @@ def check_timing_requirement(pulse: float, symbol_start: float, bin_length: floa
     return timing_requirement
 
 
-def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time,
-                      slot_length, symbol_length, num_darkcounts=0, **kwargs):
-    symbols = []
+def parse_ppm_symbols(
+        pulse_times: npt.NDArray[np.float_],
+        codeword_start_time: float,
+        stop_time: float,
+        slot_length: float,
+        symbol_length: float,
+        num_darkcounts: int = 0,
+        **kwargs) -> tuple[list[float], int]:
+
+    symbols: list[float] = []
     num_symbol_frames = int(round((stop_time - codeword_start_time) / symbol_length))
 
     for i in range(num_symbol_frames):
@@ -76,7 +84,6 @@ def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time,
         # This makes sure that there will always be a symbol in each symbol frame.
         if j == 0:
             symbols.append(0)
-            xyz = 1
 
     return symbols, num_darkcounts
 

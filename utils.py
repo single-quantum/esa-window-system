@@ -1,8 +1,10 @@
 import itertools
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 from numpy.random import default_rng
 from tabulate import tabulate
 
@@ -92,7 +94,7 @@ def generate_outer_code_edges(memory_size, bpsk_encoding=True):
         state_edges = []
         for input_bit in input_bits:
             from_state = i
-            output, terminal_state = convolve([input_bit], initial_state=initial_state)
+            output, terminal_state = convolve(np.array([input_bit]), initial_state=initial_state)
             to_state = states.index(terminal_state)
             e = Edge()
             if bpsk_encoding:
@@ -117,10 +119,12 @@ def AWGN(input_sequence, sigma=0.8):
 def flatten(list_of_lists):
     return [i for sublist in list_of_lists for i in sublist]
 
-def moving_average(a, n=3):
+
+def moving_average(arr: npt.NDArray[Any], n: int = 3) -> npt.NDArray[Any]:
     """Calculates the moving average of the array `a`, with a window size of `n`
-    
-    Source: https://stackoverflow.com/questions/14313510/how-to-calculate-rolling-moving-average-using-python-numpy-scipy"""
-    ret = np.cumsum(a, dtype=float)
+
+    Source:
+    https://stackoverflow.com/questions/14313510/how-to-calculate-rolling-moving-average-using-python-numpy-scipy"""
+    ret: npt.NDArray[np.float_] = np.cumsum(arr, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n

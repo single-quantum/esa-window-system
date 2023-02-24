@@ -11,19 +11,17 @@ import pandas as pd
 import TimeTagger
 from numpy.random import default_rng
 from PIL import Image
-from scipy.signal import find_peaks
+from scipy.signal import correlate, find_peaks
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
-
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             GREYSCALE, IMG_SHAPE, B_interleaver, M,
                             N_interleaver, bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg,
                             symbol_length, symbols_per_codeword)
 from scppm_decoder import DecoderError, decode
-from scipy.signal import correlate
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
@@ -62,17 +60,17 @@ def simulate_symbol_loss(
     return peaks
 
 
-simulate_noise_peaks: bool = False
-simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = True
+simulate_noise_peaks: bool = True
+simulate_lost_symbols: bool = False
+simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
-darkcounts_factor: float = 2*0.0005
+darkcounts_factor: float = 2 * 0.01
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = False
+use_test_file: bool = True
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
 
@@ -86,7 +84,7 @@ print_parameter('Symbol length (ns)', round(symbol_length_ns, 3))
 print_parameter('Theoretical countrate (MHz)', 1 / (symbol_length_ns * 1E-9) * 1E-6)
 
 print_parameter('Number of bits per symbol', int(np.log2(M)))
-print_parameter('Number of guard slots', M//4)
+print_parameter('Number of guard slots', M // 4)
 print_header("-")
 
 print()
@@ -135,7 +133,7 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-detection_efficiencies = np.arange(0.55, 1.0, 0.05)
+detection_efficiencies = np.arange(0.95, 1.05, 0.05)
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
 if cached_trellis_file_path.is_file():
@@ -180,8 +178,8 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 peaks = np.sort(np.hstack((peaks, darkcount_indexes)))
             timestamps = time_series[peaks]
             # if simulate_noise_peaks:
-            
-            timestamps = np.hstack((timestamps, rng.random(size=15)*timestamps[0]))
+
+            timestamps = np.hstack((timestamps, rng.random(size=15) * timestamps[0]))
             timestamps = np.sort(timestamps)
 
             n0 = 0

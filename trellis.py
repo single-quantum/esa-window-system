@@ -23,7 +23,7 @@ class Edge:
             to_state: int,
             edge_input: int | list[int],
             edge_output: tuple,
-            gamma: float):
+            gamma: float | None):
 
         self.from_state = from_state
         self.to_state = to_state
@@ -44,10 +44,9 @@ class State:
 
     def __init__(self, label: int, num_edges: int):
         self.label = label
-        # self.edges = [Edge() for _ in range(num_edges)]
-        self.edges = []
-        self.alpha = None
-        self.beta = None
+        self.edges: list[Edge] = []
+        self.alpha: None | float = None
+        self.beta: None | float = None
 
     def __str__(self):
         return self.label

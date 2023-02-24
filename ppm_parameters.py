@@ -9,7 +9,7 @@ num_samples_per_slot: int = 8            # Number of samples per bin
 
 # Note: The fraction type is needed for proper match casing
 CODE_RATE = Fraction(2, 3)
-PAYLOAD_TYPE: str = 'image'
+PAYLOAD_TYPE: str = 'calibration'
 GREYSCALE: bool = True
 IMG_SHAPE: tuple[int, int] = (95, 100)
 

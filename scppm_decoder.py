@@ -2,6 +2,7 @@ import pickle
 from fractions import Fraction
 
 import numpy as np
+import numpy.typing as npt
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
 from encoder_functions import (bit_deinterleave, channel_deinterleave,
@@ -14,13 +15,24 @@ class DecoderError(Exception):
     pass
 
 
-def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE=True,
-           BIT_INTERLEAVE=True, CODE_RATE=Fraction(1, 3), **kwargs):
+def decode(
+    ppm_mapped_message: npt.NDArray[np.int_],
+    B_interleaver: int,
+    N_interleaver: int,
+    m: int,
+    CHANNEL_INTERLEAVE: bool = True,
+    BIT_INTERLEAVE: bool = True,
+    CODE_RATE: Fraction = Fraction(1, 3),
+    **kwargs
+):
+
+    convoluted_bit_sequence: npt.NDArray[np.int_]
+
     # Deinterleave
     if CHANNEL_INTERLEAVE:
         print('Deinterleaving PPM symbols')
         ppm_mapped_message = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
-        num_zeros_interleaver = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
+        num_zeros_interleaver: int = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
         convoluted_bit_sequence = ppm_symbols_to_bit_array(
             ppm_mapped_message[:(len(ppm_mapped_message) - num_zeros_interleaver)], m)
     else:

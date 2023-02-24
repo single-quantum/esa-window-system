@@ -8,6 +8,7 @@ import numpy.typing as npt
 from numpy import dot
 from tqdm import tqdm
 
+from trellis import Trellis
 from utils import flatten
 
 
@@ -22,7 +23,7 @@ for key in keys:
 
 
 @lru_cache(maxsize=256)
-def max_star(a, b):
+def max_star(a: float, b: float) -> float:
     if abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
         return max(a, b)
     elif a == -np.inf or b == -np.inf:
@@ -240,7 +241,7 @@ def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, symbol_channel_LLRs):
                 # print(edge.from_state, edge.to_state, symbol_bit_LLRs[k], edge.edge_output, edge.gamma)
 
 
-def calculate_gamma_primes(trellis):
+def calculate_gamma_primes(trellis: Trellis):
     gamma_prime = np.zeros((2, 2, len(trellis.stages[:-1])))
     for k, stage in enumerate(trellis.stages[:-1]):
         combinations = list(itertools.product([0, 1], repeat=2))
@@ -413,11 +414,11 @@ def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=Fals
     return u_hat
 
 
-def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt.NDArray[np.uint8]:
+def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt.NDArray[np.int_]:
     """Map PPM symbols back to bit array. """
     received_symbols = np.array(received_symbols)
     reshaped_ppm_symbols = received_symbols.astype(np.uint8).reshape(received_symbols.shape[0], 1)
-    bits_array = np.unpackbits(reshaped_ppm_symbols, axis=1)
-    received_sequence = bits_array[:, -m:].reshape(-1)
+    bits_array = np.unpackbits(reshaped_ppm_symbols, axis=1).astype(int)
+    received_sequence: npt.NDArray[np.int_] = bits_array[:, -m:].reshape(-1)
 
     return received_sequence

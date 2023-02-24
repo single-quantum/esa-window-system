@@ -19,6 +19,7 @@ def _validate(user_data, data_type):
 
 class DataConverter:
     def __init__(self, user_data):
+        self.bit_array: npt.NDArray[np.int_]
         match user_data:
             case str():
                 self.bit_array = self.from_string(user_data)
@@ -29,13 +30,13 @@ class DataConverter:
             case _:
                 raise TypeError('Data type not supported')
 
-    def from_string(self, user_data: str) -> npt.NDArray:
+    def from_string(self, user_data: str) -> npt.NDArray[np.int_]:
         """Convert a string to a bit array. """
         _validate(user_data, str)
 
         return np.array(tobits(user_data))
 
-    def from_image(self, filepath: Path, greyscale=True) -> npt.NDArray:
+    def from_image(self, filepath: Path, greyscale=True) -> npt.NDArray[np.int_]:
         """Take a filepath and convert the image to a bit stream. """
         _validate(filepath, Path)
         if filepath.suffix not in IMG_SUFFIXES:

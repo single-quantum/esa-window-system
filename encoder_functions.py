@@ -1,5 +1,6 @@
 import math
 from fractions import Fraction
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -122,7 +123,7 @@ def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
     return arr
 
 
-def unpuncture(encoded_sequence, code_rate):
+def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction) -> npt.NDArray[np.int_]:
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
         Fraction(1, 2): [1, 1, 0, 1, 1, 0],
@@ -132,7 +133,7 @@ def unpuncture(encoded_sequence, code_rate):
     P = puncture_scheme[code_rate]
 
     factor = code_rate / Fraction(1, 3)
-    unpunctured_sequence = np.zeros(int(factor * len(encoded_sequence)))
+    unpunctured_sequence = np.zeros(int(factor * len(encoded_sequence)), dtype=int)
 
     j = 0
     for i in range(len(unpunctured_sequence) - 1):
@@ -146,7 +147,7 @@ def unpuncture(encoded_sequence, code_rate):
     return unpunctured_sequence
 
 
-def puncture(convoluted_bit_sequence: npt.NDArray, code_rate: Fraction) -> npt.NDArray:
+def puncture(convoluted_bit_sequence: npt.NDArray[np.int_], code_rate: Fraction) -> npt.NDArray[np.int_]:
     """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
@@ -158,8 +159,8 @@ def puncture(convoluted_bit_sequence: npt.NDArray, code_rate: Fraction) -> npt.N
     # "3.8.2.3.2 The puncturing shall be accomplished using the following procedure:"
     # (See page 3-12 of the CCSDS 142.0-B-1 blue book, August 2019 edition)
 
-    convolutional_codewords = np.zeros(
-        (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1] / (3 * float(code_rate))))
+    convolutional_codewords: npt.NDArray[np.int_] = np.zeros(
+        (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1] / (3 * float(code_rate)))), dtype=int
     )
     P = puncture_scheme[code_rate]
     for i, row in enumerate(convoluted_bit_sequence):
@@ -187,26 +188,26 @@ def accumulate(arr: npt.NDArray) -> npt.NDArray:
     return n_j
 
 
-def convolve(arr, initial_state=[0, 0]):
+def convolve(
+        arr: npt.NDArray[np.int_],
+        initial_state: tuple[int, int] = (0, 0)) -> tuple[npt.NDArray[np.int_], tuple[Any, ...]]:
     """Use a convolutional shift register to generate a convoluted codeword. """
     # Number of sliding windows that are iterated over to generate the
     # convolutional codeword
-    num_windows: int = len(arr)
-    convolutional_codeword = np.zeros(3 * num_windows, dtype=int)
 
-    # For now, I pad the SCCM encoder input block with 0 zeros, but these
-    # should come from the next SCPPM block in the sequence.
-    # arr = np.pad(arr, (2, 0))
+    num_windows: int = arr.shape[0]
+    convolutional_codeword: npt.NDArray[np.int_] = np.zeros(3 * num_windows, dtype=int)
+
+    # To initialize `arr`, add the initial state.
     arr = np.hstack((tuple(reversed(initial_state)), arr))
-    # arr = np.pad(arr, (0, 2))
 
     for i in range(num_windows):
-        f = arr[i:i + 3]
+        f: npt.NDArray[np.int_] = arr[i:i + 3]
 
         h = [f[2] ^ f[0], f[0] ^ f[1] ^ f[2], f[0] ^ f[1] ^ f[2]]
         convolutional_codeword[3 * i:3 * i + 3] = h
 
-    terminal_state = tuple(np.flip(f[1:]))
+    terminal_state: tuple[Any, ...] = tuple(np.flip(f[1:]))
 
     return convolutional_codeword, terminal_state
 
@@ -242,18 +243,19 @@ def map_PPM_symbols(arr, m: int):
     return output_arr
 
 
-def bit_interleave(arr: npt.ArrayLike) -> npt.NDArray[np.int_]:
+def bit_interleave(arr: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
     """Shuffle some bits around to make a so-called bit-interleaved codeword.
 
     Note: works only with 15120 element arrays. The modulo 15120 is hard coded for a reason.
     This is because the permutation polynomial in `bit_deinterleave` only works properly with 15120 element arrays.
     For any other length array, the interleaved array might not be invertable. """
 
-    assert len(arr) == 15120, "Input array should have length 15120"
+    if arr.shape[0] != 15120:
+        raise ValueError("Input array should have length 15120")
 
     interleaved_output = np.zeros_like(arr).astype(int)
 
-    # pi_j is the new index for the interleaved array
+    # pi_j is the bit index from the original bit array
     for j in range(interleaved_output.shape[0]):
         pi_j = (11 * j + 210 * j**2) % 15120
         interleaved_output[j] = arr[pi_j]
@@ -278,7 +280,7 @@ def bit_deinterleave(arr: np.ndarray | list[float]) -> npt.NDArray[np.int_]:
     return deinterleaved_array
 
 
-def channel_interleave(arr, B, N):
+def channel_interleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray[np.int_]:
     """Use N slots of linear shift registers to interleave the PPM symbols.
 
     - Input:
@@ -286,9 +288,10 @@ def channel_interleave(arr, B, N):
         - `B`: Base length of the linear shift registers. Such that the i-th shift register has length i*B
         - `N`: Number of rows
     """
-    output = []
-    remap_indeces = []
+    output: list[int] = []
+    remap_indeces: list[int] = []
 
+    # First determine the order of elements for the interleaved array .
     remap_indeces.append(0)
     for i in range(1, arr.shape[0] + B * N * (N - 1)):
         if i % N == 0:
@@ -307,10 +310,12 @@ def channel_interleave(arr, B, N):
         else:
             output.append(arr[i])
 
-    return np.array(output, dtype=int)
+    output_array: npt.NDArray[np.int_] = np.array(output, dtype=int)
+
+    return output_array
 
 
-def channel_deinterleave(arr: npt.ArrayLike, B: int, N: int) -> list[int]:
+def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray[np.int_]:
     """Use N slots of linear shift registers to interleave the PPM symbols.
 
     - Input:
@@ -319,8 +324,8 @@ def channel_deinterleave(arr: npt.ArrayLike, B: int, N: int) -> list[int]:
         - `N`: Number of rows
     """
     arr = np.array(arr, dtype=int)
-    output = []
-    remap_indeces = []
+    output: list[int] = []
+    remap_indeces: list[int] = []
 
     remap_indeces.append(0)
     for i in range(1, arr.shape[0] + B * N * (N - 1)):
@@ -340,10 +345,12 @@ def channel_deinterleave(arr: npt.ArrayLike, B: int, N: int) -> list[int]:
         else:
             output.append(arr[i])
 
-    return output
+    output_arr: npt.NDArray[np.int_] = np.array(output, dtype=int)
+
+    return output_arr
 
 
-def get_csm(M=16):
+def get_csm(M: int = 16) -> npt.NDArray[np.int_]:
     validate_PPM_order(M)
 
     match M:
@@ -357,7 +364,7 @@ def get_csm(M=16):
     return w
 
 
-def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True):
+def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True) -> npt.NDArray[np.int_]:
     """Convert each PPM symbol to a list of ones and zeros, where the one indicates the position of the PPM pulse.
 
     For example, with a PPM order of 4, and a PPM symbol 3, the slot mapped vector would be [0, 0, 0, 1, 0]"""
@@ -371,7 +378,7 @@ def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True):
     if not np.all(ppm_symbols < M):
         raise ValueError(f"All PPM symbols should be smaller than {M}")
 
-    slot_mapped = np.zeros((len(ppm_symbols), M))
+    slot_mapped = np.zeros((len(ppm_symbols), M), dtype=int)
     for j in range(len(ppm_symbols)):
         slot_mapped[j, ppm_symbols[j]] = 1
 

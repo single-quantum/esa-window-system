@@ -2,6 +2,7 @@ import pickle
 from fractions import Fraction
 
 import numpy as np
+import numpy.typing as npt
 
 from encoder_functions import (bit_interleave, channel_interleave, convolve,
                                get_csm, map_PPM_symbols, puncture, randomize,
@@ -22,7 +23,7 @@ def preprocess_bit_stream(bit_stream):
     return information_blocks
 
 
-def SCPPM_encoder(information_blocks, save_encoded_sequence_to_file=True):
+def SCPPM_encoder(information_blocks: npt.NDArray, save_encoded_sequence_to_file: bool = True):
     """The SCPPM encoder consists of the convolutional encoder, code interleaver, accumulator and PPM symbol mapper.
 
     Returns a sequence of PPM symbols.
@@ -37,7 +38,7 @@ def SCPPM_encoder(information_blocks, save_encoded_sequence_to_file=True):
         convoluted_bit_sequence[i], _ = convolve(row)
 
     if CODE_RATE != Fraction(1, 3):
-        convolutional_codewords = puncture(convoluted_bit_sequence, CODE_RATE)
+        convolutional_codewords: npt.NDArray = puncture(convoluted_bit_sequence, CODE_RATE)
     else:
         convolutional_codewords = convoluted_bit_sequence
 
