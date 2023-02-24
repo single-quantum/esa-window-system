@@ -2,7 +2,6 @@ import numpy as np
 
 from ppm_parameters import M, sample_size_awg
 
-
 def find_pulses_within_symbol_frame(
         i: int, 
         symbol_length: float, 
@@ -36,7 +35,7 @@ def check_timing_requirement(pulse: float, symbol_start: float, bin_length: floa
     
     return timing_requirement
 
-def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time, slot_length, symbol_length, **kwargs):
+def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time, slot_length, symbol_length, num_darkcounts=0, **kwargs):
     symbols = []
     num_symbol_frames = int(round((stop_time-codeword_start_time)/symbol_length))
 
@@ -49,6 +48,9 @@ def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time, slot_length, 
             continue
 
         j = 0
+        if len(symbol_frame_pulses) > 1:
+            num_darkcounts += 1
+        
         for pulse in symbol_frame_pulses:
             symbol = (pulse - symbol_start - 0.5 * slot_length) / slot_length
 
@@ -57,9 +59,9 @@ def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time, slot_length, 
                 continue
 
             # If the symbol is too far off the bin center, it is most likely a darkcount
-            timing_requirement = check_timing_requirement(pulse, symbol_start, slot_length)
-            if not timing_requirement:
-                continue
+            # timing_requirement = check_timing_requirement(pulse, symbol_start, slot_length)
+            # if not timing_requirement:
+            #     continue
 
             symbols.append(symbol)
             j += 1
@@ -71,7 +73,7 @@ def parse_ppm_symbols(pulse_times, codeword_start_time, stop_time, slot_length, 
             symbols.append(0)
             xyz = 1
 
-    return symbols
+    return symbols, num_darkcounts
 
 
 def rolling_window(a, size):
