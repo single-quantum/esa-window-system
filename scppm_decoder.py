@@ -89,7 +89,6 @@ def decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEA
         #         pickle.dump(tr, f)
 
     Es = 5
-    N0 = 1
 
     encoded_sequence = bpsk_encoding(deinterleaved_received_sequence.astype(float))
 
