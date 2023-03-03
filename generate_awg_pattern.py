@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from data_converter import DataConverter
+from data_converter import message_from_payload
 from encoder_functions import slot_map
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, M, bin_length,
@@ -22,22 +22,6 @@ memory_size: int = 2         # Memory size of the convolutional encoder
 
 # 1 means: no guard slot, 5/4 means: M/4 guard slots
 num_bins_per_symbol = int(slot_factor * M)
-
-
-def message_from_payload(payload: str) -> npt.NDArray[np.int_]:
-    d: DataConverter
-
-    match payload:
-        case 'string':
-            d = DataConverter("Hello World!")
-            return d.bit_array
-        case 'image':
-            file = Path("sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
-            d = DataConverter(file)
-            return d.bit_array
-        case _:
-            raise ValueError("Payload type not recognized. Should be one of 'string' or 'image'")
-
 
 msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
 num_PPM_symbols: int
@@ -76,7 +60,7 @@ match PAYLOAD_TYPE:
         slot_mapped_sequence = slot_map(msg_PPM_symbols, M)
 
     case _:
-        sent_message: npt.NDArray[np.int_] = message_from_payload(PAYLOAD_TYPE)
+        sent_message: npt.NDArray[np.int_] = message_from_payload(PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
         num_bits_sent = len(sent_message)
 
         slot_mapped_sequence = encoder(sent_message)

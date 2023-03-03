@@ -17,7 +17,6 @@ def _validate(user_data: Any, data_type: Any) -> None:
     if not isinstance(user_data, data_type):
         raise TypeError(f"Input data must be a string. Input data is a {type(user_data)}")
 
-
 class DataConverter:
     def __init__(self, user_data: Any):
         self.bit_array: npt.NDArray[np.int_]
@@ -64,3 +63,20 @@ class DataConverter:
 
     def from_csv(self, filpath: Path):
         pass
+
+def message_from_payload(payload_type: str, **kwargs) -> npt.NDArray[np.int_]:
+    d: DataConverter
+
+    match payload_type:
+        case 'string':
+            d = DataConverter("Hello World!")
+            return d.bit_array
+        case 'image':
+            filepath = kwargs.get('filepath')
+            if not filepath:
+                raise ValueError("File path cannot be empty. ")
+            file = Path(filepath)
+            d = DataConverter(file)
+            return d.bit_array
+        case _:
+            raise ValueError("Payload type not recognized. Should be one of 'string' or 'image'")
