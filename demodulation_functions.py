@@ -161,7 +161,7 @@ def demodulate(peak_locations: npt.NDArray) -> npt.NDArray[np.int_]:
     csm_times: npt.NDArray[np.float_] = find_csm_times(peak_locations, CSM, bin_length, symbol_length)
 
     num_detection_events: int = np.where((peak_locations >= csm_times[0]) & (
-        peak_locations <= csm_times[-1]))[0].shape[0]
+        peak_locations <= csm_times[-1]+symbols_per_codeword*symbol_length))[0].shape[0]
 
     print(f'Found {len(csm_times)} codewords. ')
     print(f'Number of detection events in message frame: {num_detection_events}')
