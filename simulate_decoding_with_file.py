@@ -60,13 +60,13 @@ def simulate_symbol_loss(
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = False
-simulate_darkcounts: bool = False
+simulate_lost_symbols: bool = True
+simulate_darkcounts: bool = True
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
-darkcounts_factor: float = 2 * 0.01
+darkcounts_factor: float = 0.01
 detector_jitter = 5 * 25E-12
 
 use_test_file: bool = True
@@ -136,7 +136,7 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-detection_efficiencies = np.arange(0.95, 1.05, 0.05)
+detection_efficiencies = np.arange(0.55, 0.70, 0.05)
 cached_trellis: Trellis | None = None
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
@@ -150,7 +150,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(1, 15):
+    for z in range(0, 10):
         print(f'num irrecoverable messages: {irrecoverable}')
         if irrecoverable > 3:
             raise StopIteration("Too many irrecoverable messages. ")
@@ -216,7 +216,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             information_blocks, BER_before_decoding = decode(
                 ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
                 **{
-                    'use_cached_trellis': False,
+                    'use_cached_trellis': True,
                     'cached_trellis_file_path': cached_trellis_file_path,
                     'cached_trellis': cached_trellis
                 })
@@ -229,8 +229,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
         if GREYSCALE:
             pixel_values = map_PPM_symbols(information_blocks, 8)
-            # img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
-            img_arr = pixel_values[:9400].reshape((94, 100))
+            img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
             CMAP = 'Greys'
             MODE = "L"
             IMG_MODE = 'L'
@@ -317,7 +316,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     mean_SNRs.append(np.mean(SNRs))
 
 fig, axs = plt.subplots(1)
-axs[0].errorbar(
+axs.errorbar(
     detection_efficiencies, bit_error_ratios_before,
     bit_error_ratios_after_std, 0,
     capsize=2,
@@ -325,7 +324,7 @@ axs[0].errorbar(
     marker='o',
     markersize=5)
 
-axs[0].errorbar(
+axs.errorbar(
     detection_efficiencies, bit_error_ratios_after,
     bit_error_ratios_before_std, 0,
     capsize=2,
@@ -333,9 +332,9 @@ axs[0].errorbar(
     marker='o',
     markersize=5)
 
-axs[0].set_yscale('log')
-axs[0].set_ylabel('Bit Error Ratio (-)')
-axs[0].set_xlabel('Signal to Noise Ratio (-)')
+axs.set_yscale('log')
+axs.set_ylabel('Bit Error Ratio (-)')
+axs.set_xlabel('Signal to Noise Ratio (-)')
 plt.title('BER as function of SNR')
 plt.legend()
 plt.show()
