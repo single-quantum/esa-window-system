@@ -1,5 +1,7 @@
 # %%
 import pickle
+import re
+
 from datetime import datetime
 from pathlib import Path
 
@@ -69,9 +71,21 @@ num_photons_per_pulse = 5
 darkcounts_factor: float = 0.01
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = True
+use_test_file: bool = False
+use_latest_tt_file: bool = True
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
+
+if use_test_file:
+    time_events_filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1_2-3-code-rate.csv'
+elif not use_test_file and use_latest_tt_file:
+    time_tagger_files_dir = Path(__file__).parent.absolute() / 'time tagger files'
+    tt_files = time_tagger_files_dir.rglob('*.ttbin')
+    files = [x for x in tt_files if x.is_file()]
+    files = sorted(files, key=lambda x: x.lstat().st_mtime)
+    latest_file = re.split('\.\d{1}', files[-1].stem)[0] + '.ttbin'
+else:
+    time_events_filename = "jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-40-59.ttbin"
 
 slot_width_ns = num_samples_per_slot * sample_size_awg / 1000
 symbol_length_ns = num_bins_per_symbol * slot_width_ns
@@ -114,9 +128,8 @@ time_series: npt.NDArray[np.float_] = np.array([])
 peak_locations: npt.NDArray[np.float_] = np.array([])
 
 if use_test_file:
-    filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1_2-3-code-rate.csv'
-    print(f'Decoding file: {filename}')
-    samples = pd.read_csv(filename, header=None)
+    print(f'Decoding file: {time_events_filename}')
+    samples = pd.read_csv(time_events_filename, header=None)
     samples = samples.to_numpy().flatten()
 
     # Make a time series based on the length of samples and how long one sample is in time
@@ -125,11 +138,10 @@ if use_test_file:
 
     msg_peaks = find_peaks(samples, height=1, distance=2)[0]
 else:
-    detector_countrate = 60E6
+    detector_countrate = 80E6
     time_tagger_window_size = 50E-3
     num_events = detector_countrate * time_tagger_window_size
-    fr = TimeTagger.FileReader(
-        "jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-29-15.ttbin")
+    fr = TimeTagger.FileReader(time_events_filename)
     data = fr.getData(num_events)
     time_stamps = data.getTimestamps()
     peak_locations = time_stamps * 1E-12
@@ -202,7 +214,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             peak_locations = timestamps
 
         try:
-            ppm_mapped_message = demodulate(peak_locations[:200000])
+            ppm_mapped_message = demodulate(peak_locations[100000:300000])
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -216,7 +228,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             information_blocks, BER_before_decoding = decode(
                 ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
                 **{
-                    'use_cached_trellis': True,
+                    'use_cached_trellis': False,
                     'cached_trellis_file_path': cached_trellis_file_path,
                     'cached_trellis': cached_trellis
                 })
