@@ -75,6 +75,7 @@ match PAYLOAD_TYPE:
 if PAYLOAD_TYPE == 'image':
     print(f'Sending image with shape {IMG_SHAPE[0]}x{IMG_SHAPE[1]}')
 print(f'num symbols sent: {num_PPM_symbols}')
+print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols}')
 print(f'Number of codewords: {num_codewords}')
 print(f'Datarate: {1000*num_bits_sent/(message_time_microseconds*1000):.2f} Mbps')
 print(f'Message time span: {message_time_microseconds:.3f} microseconds')
