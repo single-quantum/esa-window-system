@@ -1,0 +1,7 @@
+This is a small guide on how we perform the measurements, which serves as a check list to make sure we did everything correctly.
+
+1. Connect DAC and AWG
+2. Setup DAC, use Antonio's config file
+3. TURN ON THE WAVEFORM GENERATOR (external DAC clock)
+4. Connect amplifier to output of AWG
+5. Turn on both amplifiers (also the one to the signal combiner box)
