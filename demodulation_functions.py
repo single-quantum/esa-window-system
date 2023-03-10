@@ -69,7 +69,7 @@ def find_csm_times(
 
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
-    where_corr: npt.NDArray[np.int_] = np.where(corr >= 10)[0]
+    where_corr: npt.NDArray[np.int_] = np.where(corr >= 7)[0]
 
     if where_corr.shape[0] == 0:
         raise ValueError("Could not find any CSM. ")
@@ -77,8 +77,8 @@ def find_csm_times(
     # Make a moving average of the correlation to find out where the start and end is of the message
     moving_avg_corr: npt.NDArray[np.int_] = moving_average(corr, n=1000)
     message_start_idxs: npt.NDArray[np.int_] = find_peaks(
-        moving_avg_corr,
-        height=(0, 0.9),
+        -(moving_avg_corr-min(moving_avg_corr))/(max(moving_avg_corr)-min(moving_avg_corr))+1,
+        height=(0.6, 1),
         distance=symbols_per_codeword * num_bins_per_symbol)[0]
 
     if message_start_idxs.shape[0] == 0:
@@ -93,7 +93,7 @@ def find_csm_times(
     csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr - 1 * slot_length
 
     time_shift: float = determine_CSM_time_shift(csm_times, time_stamps, slot_length)
-    csm_times += time_shift - 0.5 * slot_length
+    csm_times += time_shift - 0.5*slot_length
 
     return csm_times
 
