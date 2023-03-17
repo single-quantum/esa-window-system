@@ -118,7 +118,7 @@ def decode(
 
     # information_blocks = predicted_msg.reshape((-1, 5040)).flatten()
     # Derandomize
-    information_blocks = randomize(information_blocks)
+    # information_blocks = randomize(information_blocks)
 
     while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
         information_blocks = np.hstack((information_blocks, 0))
