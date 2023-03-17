@@ -146,11 +146,10 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
     symbols, num_darkcounts = parse_ppm_symbols(
         peak_locations[peak_locations > csm_times[-1]],
         csm_times[-1],
-        csm_times[-1] + 1 * (symbols_per_codeword + len(CSM)) * symbol_length,
+        csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length,
         bin_length,
         symbol_length
     )
-
     msg_symbols.append(np.round(symbols[len(CSM):]).astype(int))
 
     print(f'Estimated number of darkcounts in message frame: {num_darkcounts}')
