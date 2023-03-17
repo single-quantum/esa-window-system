@@ -20,15 +20,10 @@ slot_mapped_sequence = encoder(sent_bits)
 ppm_mapped_message = np.nonzero(slot_mapped_sequence)[1]
 
 # The ppm mapped message still includes the synchronisation marker. 
-# For now, the decoder still expects the CSMs to be removed. 
-# Maybe it makes more sense to put this functionality in the decoder
-num_codewords = int(ppm_mapped_message.shape[0]/(symbols_per_codeword+len(CSM)))
-csm_idxs = []
-for i in range(num_codewords):
-    csm_idxs.append(np.arange(i*(symbols_per_codeword+len(CSM)), i*symbols_per_codeword+(i+1)*len(CSM), 1))
+# Remove CSMs
 
-csm_idxs = flatten(csm_idxs)
-ppm_mapped_message = np.delete(ppm_mapped_message, csm_idxs)
+ppm_mapped_message = ppm_mapped_message.reshape((-1, symbols_per_codeword+len(CSM)))
+ppm_mapped_message = ppm_mapped_message[:, len(CSM):]
 
 decoded_message = decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE=True, BIT_INTERLEAVE=True, CODE_RATE=CODE_RATE)
 
