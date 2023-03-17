@@ -1,7 +1,6 @@
 # %%
 import pickle
 import re
-
 from datetime import datetime
 from pathlib import Path
 
@@ -19,7 +18,7 @@ from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
                             GREYSCALE, IMG_SHAPE, B_interleaver, M,
-                            N_interleaver, m, num_bins_per_symbol,
+                            N_interleaver, bin_length, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg)
 from scppm_decoder import DecoderError, decode
 from trellis import Trellis
@@ -71,19 +70,21 @@ num_photons_per_pulse = 5
 darkcounts_factor: float = 0.01
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = False
+use_test_file: bool = True
 use_latest_tt_file: bool = True
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
+
+time_events_filename: str
 
 if use_test_file:
     time_events_filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1_2-3-code-rate.csv'
 elif not use_test_file and use_latest_tt_file:
     time_tagger_files_dir = Path(__file__).parent.absolute() / 'time tagger files'
     tt_files = time_tagger_files_dir.rglob('*.ttbin')
-    files = [x for x in tt_files if x.is_file()]
+    files: list[Path] = [x for x in tt_files if x.is_file()]
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
-    latest_file = re.split('\.\d{1}', files[-1].stem)[0] + '.ttbin'
+    time_events_filename = re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
 else:
     time_events_filename = "jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-40-59.ttbin"
 
@@ -148,7 +149,7 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-detection_efficiencies = np.arange(0.55, 0.70, 0.05)
+detection_efficiencies = np.arange(0.40, 0.70, 0.05)
 cached_trellis: Trellis | None = None
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
@@ -212,9 +213,11 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
 
             peak_locations = timestamps
+            peak_locations = np.hstack((peak_locations, peak_locations[:len(peak_locations) // 2] + 0.1 * bin_length))
+            peak_locations = np.sort(peak_locations)
 
         try:
-            ppm_mapped_message = demodulate(peak_locations[100000:300000])
+            ppm_mapped_message = demodulate(peak_locations)
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -228,7 +231,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             information_blocks, BER_before_decoding = decode(
                 ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
                 **{
-                    'use_cached_trellis': False,
+                    'use_cached_trellis': True,
                     'cached_trellis_file_path': cached_trellis_file_path,
                     'cached_trellis': cached_trellis
                 })
