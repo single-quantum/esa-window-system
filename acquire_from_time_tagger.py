@@ -1,3 +1,4 @@
+"""This script is used to acquire time tags from the Swabian time tagger ultra. """
 from datetime import datetime
 from time import sleep
 
