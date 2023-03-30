@@ -5,18 +5,18 @@ from numpy import log2
 from encoder_functions import get_csm
 
 DAC_DATA_RATE: float = 8.82091E9       # DAC data rate in Hz
-num_samples_per_slot: int = 8            # Number of samples per bin
+num_samples_per_slot: int = 16            # Number of samples per bin
 
 # Note: The fraction type is needed for proper match casing
 CODE_RATE = Fraction(2, 3)
-PAYLOAD_TYPE: str = 'calibration'
+PAYLOAD_TYPE: str = 'image'
 GREYSCALE: bool = True
 IMG_SHAPE: tuple[int, int] = (95, 100)
 
 # PPM parameters
 M: int = 8                  # each m = 4 bits are mapped from 0 to M = 16
 m: int = int(log2(M))
-slot_factor: float = 5 / 4   # 1 means: no guard slot, 5/4 means: M/4 guard slots
+slot_factor: float = 5 / 4  # 1 means: no guard slot, 5/4 means: M/4 guard slots
 
 
 # Channel interleaver parameters

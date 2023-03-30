@@ -18,10 +18,12 @@ from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
                             GREYSCALE, IMG_SHAPE, B_interleaver, M,
-                            N_interleaver, bin_length, m, num_bins_per_symbol,
+                            N_interleaver, m, num_bins_per_symbol,
                             num_samples_per_slot, sample_size_awg)
+from ppm_parameters import bin_length as slot_length
 from scppm_decoder import DecoderError, decode
 from trellis import Trellis
+from utils import flatten
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):
@@ -59,10 +61,28 @@ def simulate_symbol_loss(
 
     return peaks
 
+def simulate_darkcounts_timestamps(rng, lmbda):
+    num_slots = int((time_series[msg_peaks][-1]-time_series[msg_peaks][0])/slot_length)
+    p = rng.poisson(lmbda, num_slots)
+    
+    darkcounts_timestamps = []
+    t0 = time_series[msg_peaks][0]
+    for slot_idx, num_events in enumerate(p):
+        if num_events == 0:
+            continue
+        slot_start = t0 + slot_idx*slot_length
+        slot_end = t0 + (slot_idx+1)*slot_length
+
+        darkcounts = rng.uniform(slot_start, slot_end, num_events)
+        darkcounts_timestamps.append(darkcounts)
+
+    darkcounts_timestamps = np.array(flatten(darkcounts_timestamps))
+
+    return darkcounts_timestamps
 
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = True
-simulate_darkcounts: bool = True
+simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
@@ -70,23 +90,25 @@ num_photons_per_pulse = 5
 darkcounts_factor: float = 0.01
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = True
-use_latest_tt_file: bool = True
+use_test_file: bool = False
+use_latest_tt_file: bool = False
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
 
 time_events_filename: str
+reference_file_path = 'jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
 
 if use_test_file:
     time_events_filename = 'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_8-PPM_8_3_c1b1_2-3-code-rate.csv'
 elif not use_test_file and use_latest_tt_file:
-    time_tagger_files_dir = Path(__file__).parent.absolute() / 'time tagger files'
-    tt_files = time_tagger_files_dir.rglob('*.ttbin')
+    tt_files_dir = 'time tagger files/'
+    tt_files_path = Path(__file__).parent.absolute() / tt_files_dir
+    tt_files = tt_files_path.rglob('*.ttbin')
     files: list[Path] = [x for x in tt_files if x.is_file()]
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
-    time_events_filename = re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
+    time_events_filename = tt_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
 else:
-    time_events_filename = "jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-40-59.ttbin"
+    time_events_filename = "time tagger files/jupiter_tiny_greyscale_16_samples_per_slot_CSM_0_interleaved_15-56-53.ttbin"
 
 slot_width_ns = num_samples_per_slot * sample_size_awg / 1000
 symbol_length_ns = num_bins_per_symbol * slot_width_ns
@@ -121,9 +143,6 @@ bit_error_ratios_before_std = []
 # The simulation is repeated a couple of times, so take the mean SNR for each set of simulations.
 mean_SNRs = []
 
-symbols_lost_lower_bound = 5000
-symbols_lost_upper_bound = 8000
-
 msg_peaks: npt.NDArray[np.int_] = np.array([])
 time_series: npt.NDArray[np.float_] = np.array([])
 peak_locations: npt.NDArray[np.float_] = np.array([])
@@ -149,7 +168,7 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-detection_efficiencies = np.arange(0.40, 0.70, 0.05)
+detection_efficiencies = np.arange(0.50, 1.00, 0.05)
 cached_trellis: Trellis | None = None
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
@@ -188,14 +207,11 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
             num_symbols_received = len(peaks)
 
-            if simulate_darkcounts:
-                num_darkcounts = int(len(msg_peaks) * darkcounts_factor)
-                # To make sure we have a unique set of integers, create a range and do a choice from that.
-                msg_idx_range = np.arange(np.min(msg_peaks), np.max(msg_peaks), 1)
-                darkcount_indexes = np.random.choice(msg_idx_range, num_darkcounts)
-                peaks = np.sort(np.hstack((peaks, darkcount_indexes)))
+
             timestamps = time_series[peaks]
-            # if simulate_noise_peaks:
+            if simulate_darkcounts:
+                darkcounts_timestamps = simulate_darkcounts_timestamps(rng, 0.01)
+                timestamps = np.sort(np.hstack((timestamps, darkcounts_timestamps)))
 
             timestamps = np.hstack((timestamps, rng.random(size=15) * timestamps[0]))
             timestamps = np.sort(timestamps)
@@ -213,7 +229,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
 
             peak_locations = timestamps
-            peak_locations = np.hstack((peak_locations, peak_locations[:len(peak_locations) // 2] + 0.1 * bin_length))
+            # peak_locations = np.hstack((peak_locations, peak_locations[:len(peak_locations) // 2] + 0.1 * slot_length))
             peak_locations = np.sort(peak_locations)
 
         try:
@@ -229,7 +245,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
         try:
             information_blocks, BER_before_decoding = decode(
-                ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
+                ppm_mapped_message, B_interleaver, N_interleaver, m, reference_file_path, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
                 **{
                     'use_cached_trellis': True,
                     'cached_trellis_file_path': cached_trellis_file_path,

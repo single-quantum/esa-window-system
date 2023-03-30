@@ -3,7 +3,6 @@ import numpy.typing as npt
 
 from ppm_parameters import M
 
-
 def find_pulses_within_symbol_frame(
     i: int,
     symbol_length: float,
@@ -31,12 +30,13 @@ def check_timing_requirement(pulse: float, symbol_start: float, bin_length: floa
     slot_end: float = (A + 1) * bin_length
     center: float = slot_start + (slot_end - slot_start) / 2
     sigma: float = 0.1 * bin_length
+    off_center_time = center - (pulse - symbol_start)
 
     # Pulse time does not comply with the timing requirement
     if abs(center - (pulse - symbol_start)) > 3 * sigma:
         timing_requirement = False
 
-    return timing_requirement
+    return timing_requirement, off_center_time
 
 
 def parse_ppm_symbols(
@@ -51,6 +51,7 @@ def parse_ppm_symbols(
     symbols: list[float] = []
     num_symbol_frames = int(round((stop_time - codeword_start_time) / symbol_length))
 
+    off_center_times = kwargs.get('off_center_times', [])
     for i in range(num_symbol_frames):
         symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(
             i, symbol_length, pulse_times, codeword_start_time)
@@ -62,7 +63,7 @@ def parse_ppm_symbols(
 
         j = 0
         if len(symbol_frame_pulses) > 1:
-            num_darkcounts += 1
+            num_darkcounts += len(symbol_frame_pulses)-1
 
         for pulse in symbol_frame_pulses:
             symbol = (pulse - symbol_start - 0.5 * slot_length) / slot_length
@@ -72,7 +73,8 @@ def parse_ppm_symbols(
                 continue
 
             # If the symbol is too far off the bin center, it is most likely a darkcount
-            # timing_requirement = check_timing_requirement(pulse, symbol_start, slot_length)
+            _, off_center_time = check_timing_requirement(pulse, symbol_start, slot_length)
+            off_center_times.append(off_center_time)
             # if not timing_requirement:
             #     continue
 
@@ -85,7 +87,9 @@ def parse_ppm_symbols(
         if j == 0:
             symbols.append(0)
 
-    return symbols, num_darkcounts
+
+
+    return symbols, num_darkcounts, off_center_times
 
 
 def rolling_window(a, size):

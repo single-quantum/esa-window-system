@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from utils import flatten
 
 # Convert image to bit array
+reference_file_path = 'jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
 sent_bits = message_from_payload('image', filepath='sample_payloads/pillars-of-creation-tiny.png')
 
 # Put the payload through the encoder
@@ -25,7 +26,7 @@ ppm_mapped_message = np.nonzero(slot_mapped_sequence)[1]
 ppm_mapped_message = ppm_mapped_message.reshape((-1, symbols_per_codeword+len(CSM)))
 ppm_mapped_message = ppm_mapped_message[:, len(CSM):]
 
-decoded_message = decode(ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE=True, BIT_INTERLEAVE=True, CODE_RATE=CODE_RATE)
+decoded_message = decode(ppm_mapped_message, B_interleaver, N_interleaver, m, reference_file_path, CHANNEL_INTERLEAVE=True, BIT_INTERLEAVE=True, CODE_RATE=CODE_RATE)
 
 pixel_values = map_PPM_symbols(decoded_message[0], 8)
 img_arr = pixel_values[:100*101].reshape((101, 100))

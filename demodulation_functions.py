@@ -7,6 +7,7 @@ from ppm_parameters import (CSM, M, num_bins_per_symbol,
                             symbol_length, symbols_per_codeword)
 from ppm_parameters import bin_length as slot_length
 from utils import flatten, moving_average
+import matplotlib.pyplot as plt
 
 
 def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) -> npt.NDArray[np.int_]:
@@ -70,7 +71,8 @@ def find_csm_times(
 
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
-    where_corr: npt.NDArray[np.int_] = np.where(corr >= 10)[0]
+    # where_corr: npt.NDArray[np.int_] = np.where(corr >= 10)[0]
+    where_corr = find_peaks(corr, height=9, distance=symbols_per_codeword*num_bins_per_symbol)[0]
 
     if where_corr.shape[0] == 0:
         raise ValueError("Could not find any CSM. ")
@@ -107,6 +109,7 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
     num_darkcounts: int = 0
     symbols: list[float] | npt.NDArray[np.float_]
 
+    off_center_times = []
     for i in range(len(csm_times) - 1):
         start: float = csm_times[i]
         stop: float = csm_times[i + 1]
@@ -114,13 +117,15 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
         fraction_lost: float = (stop - start) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, num_darkcounts = parse_ppm_symbols(
+
+        symbols, num_darkcounts, off_center_times = parse_ppm_symbols(
             peak_locations[peak_locations > csm_times[i]],
             csm_times[i],
             csm_times[i + 1],
             slot_length,
             symbol_length,
-            num_darkcounts
+            num_darkcounts,
+            **{'off_center_times': off_center_times}
         )
 
         # If `parse_ppm_symbols` did not manage to parse enough symbols from the
@@ -140,19 +145,30 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
         msg_symbols.append(np.round(symbols).astype(int))
 
     # Take the last CSM and parse until the end of the message.
-    symbols, num_darkcounts = parse_ppm_symbols(
+    symbols, num_darkcounts, off_center_times = parse_ppm_symbols(
         peak_locations[peak_locations > csm_times[-1]],
         csm_times[-1],
         csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length,
         slot_length,
-        symbol_length
+        symbol_length,
+        num_darkcounts,
+        **{'off_center_times': off_center_times}
     )
     msg_symbols.append(np.round(symbols).astype(int))
+
+    plt.figure()
+    plt.hist(np.array(off_center_times)*1E12, bins=20)
+    plt.axvline(slot_length/2*1E12, 0, 2800, linestyle='--', color='r')
+    plt.axvline(-slot_length/2*1E12, 0, 2800, linestyle='--', color='r')
+    plt.axvline(0.3*slot_length/2*1E12, 0, 2800, linestyle='--', color='g')
+    plt.axvline(-0.3*slot_length/2*1E12, 0, 2800, linestyle='--', color='g')
+    plt.show()
+
 
     print(f'Estimated number of darkcounts in message frame: {num_darkcounts}')
     return msg_symbols
 
-def get_num_events_per_slot(csm_times, peak_locations, msg_end_time):
+def get_num_events_per_slot(csm_times, peak_locations):
     # Timespan of the entire message
     msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM))*symbol_length
     msg_start_idx = np.where(peak_locations>=csm_times[0])[0][0]
@@ -193,6 +209,7 @@ def demodulate(peak_locations: npt.NDArray) -> npt.NDArray[np.int_]:
     # But if a CSM is missed, it could be that one entry in the array is twice as long, in
     # which case numpy doesn't want to cast the ragged list to an array. 
     msg_symbols = np.array(flatten(msg_symbols)).reshape((-1, symbols_per_codeword+len(CSM)))
-    msg_symbols = msg_symbols[:, len(CSM):]
+    msg_symbols = msg_symbols[:, len(CSM):].reshape(-1)
+    print('Number of demodulated symbols: ', len(msg_symbols))
 
     return msg_symbols

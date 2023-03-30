@@ -20,6 +20,7 @@ def decode(
     B_interleaver: int,
     N_interleaver: int,
     m: int,
+    reference_file_path: str,
     CHANNEL_INTERLEAVE: bool = True,
     BIT_INTERLEAVE: bool = True,
     CODE_RATE: Fraction = Fraction(1, 3),
@@ -39,7 +40,7 @@ def decode(
         convoluted_bit_sequence = ppm_symbols_to_bit_array(ppm_mapped_message, m)
 
     # Get the BER before decoding
-    with open('jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence', 'rb') as f:
+    with open(reference_file_path, 'rb') as f:
         sent_bit_sequence: list = pickle.load(f)
 
     if len(convoluted_bit_sequence) > len(sent_bit_sequence):

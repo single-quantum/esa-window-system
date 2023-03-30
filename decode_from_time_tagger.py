@@ -49,6 +49,7 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
 
 use_latest_tt_file: bool = False
 time_tagger_files_dir: str = 'time tagger files/'
+reference_file_path = 'jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
 
 if use_latest_tt_file:
     time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
@@ -67,7 +68,7 @@ print(f'Number of events: {len(time_events)}')
 ppm_mapped_message = demodulate(time_events[100000:300000])
 
 information_blocks, BER_before_decoding = decode(
-    ppm_mapped_message, B_interleaver, N_interleaver, m, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
+    ppm_mapped_message, B_interleaver, N_interleaver, m, reference_file_path, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
     **{'use_cached_trellis': False, })
 
 
