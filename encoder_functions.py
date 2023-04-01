@@ -214,6 +214,7 @@ def convolve(
 
 
 def map_PPM_symbols(arr, m: int):
+    """Map input array of bits to PPM symbols. """
     # Input validation
     validate_PPM_order(2**m)
 

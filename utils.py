@@ -1,5 +1,6 @@
 import itertools
 from datetime import datetime
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -128,3 +129,17 @@ def moving_average(arr: npt.NDArray[Any], n: int = 3) -> npt.NDArray[Any]:
     ret: npt.NDArray[np.float_] = np.cumsum(arr, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
+
+
+def check_user_settings(user_settings: dict) -> None:
+    B_interleaver: int | None = user_settings.get('B_interleaver')
+    if B_interleaver is None:
+        raise KeyError("B_interleaver not found in `user_settings`")
+    if not isinstance(B_interleaver, int):
+        raise ValueError("B_interleaver should be an integer. ")
+
+    N_interleaver: int | None = user_settings.get('N_interleaver')
+    if N_interleaver is None:
+        raise KeyError("N_interleaver not found in `user_settings`")
+    if not isinstance(N_interleaver, int):
+        raise ValueError("N_interleaver should be an integer. ")
