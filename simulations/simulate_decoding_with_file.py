@@ -18,9 +18,10 @@ from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
                             GREYSCALE, IMG_SHAPE, B_interleaver, M,
-                            N_interleaver, m, num_bins_per_symbol,
-                            num_samples_per_slot, sample_size_awg)
+                            N_interleaver)
 from ppm_parameters import bin_length as slot_length
+from ppm_parameters import (m, num_bins_per_symbol, num_samples_per_slot,
+                            sample_size_awg)
 from scppm_decoder import DecoderError, decode
 from trellis import Trellis
 from utils import flatten
@@ -61,17 +62,18 @@ def simulate_symbol_loss(
 
     return peaks
 
+
 def simulate_darkcounts_timestamps(rng, lmbda):
-    num_slots = int((time_series[msg_peaks][-1]-time_series[msg_peaks][0])/slot_length)
+    num_slots = int((time_series[msg_peaks][-1] - time_series[msg_peaks][0]) / slot_length)
     p = rng.poisson(lmbda, num_slots)
-    
+
     darkcounts_timestamps = []
     t0 = time_series[msg_peaks][0]
     for slot_idx, num_events in enumerate(p):
         if num_events == 0:
             continue
-        slot_start = t0 + slot_idx*slot_length
-        slot_end = t0 + (slot_idx+1)*slot_length
+        slot_start = t0 + slot_idx * slot_length
+        slot_end = t0 + (slot_idx + 1) * slot_length
 
         darkcounts = rng.uniform(slot_start, slot_end, num_events)
         darkcounts_timestamps.append(darkcounts)
@@ -79,6 +81,7 @@ def simulate_darkcounts_timestamps(rng, lmbda):
     darkcounts_timestamps = np.array(flatten(darkcounts_timestamps))
 
     return darkcounts_timestamps
+
 
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = True
@@ -90,7 +93,7 @@ num_photons_per_pulse = 5
 darkcounts_factor: float = 0.01
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = False
+use_test_file: bool = True
 use_latest_tt_file: bool = False
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
@@ -206,7 +209,6 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 peaks = simulate_symbol_loss(peaks, num_photons_per_pulse, detection_efficiency, seed=SEED)
 
             num_symbols_received = len(peaks)
-
 
             timestamps = time_series[peaks]
             if simulate_darkcounts:
