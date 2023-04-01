@@ -1,4 +1,5 @@
 import itertools
+from functools import lru_cache
 from itertools import chain
 from math import exp
 
@@ -7,8 +8,9 @@ import numpy.typing as npt
 from numpy import dot
 from tqdm import tqdm
 
+from trellis import Trellis
 from utils import flatten
-from functools import lru_cache
+
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
 def log_gamma(r, v, Es, N0): return Es / N0 * 2 * dot(r, v)
@@ -19,8 +21,9 @@ max_log_lookup = {}
 for key in keys:
     max_log_lookup[key] = np.log(1 + np.exp(-abs(key[0] - key[1])))
 
+
 @lru_cache(maxsize=256)
-def max_star(a, b):
+def max_star(a: float, b: float) -> float:
     if abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
         return max(a, b)
     elif a == -np.inf or b == -np.inf:
@@ -45,7 +48,8 @@ def calculate_alphas(trellis, alpha, log_bcjr=True, verbose=False):
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
-    It says something about the likelihood of being in that state, given the history of the received sequence up to that state.
+    It says something about the likelihood of being in that state,
+    given the history of the received sequence up to that state.
     Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. """
     if verbose:
         print('Calculating alphas')
@@ -96,7 +100,8 @@ def calculate_alpha_inner_SISO(trellis, gamma_primes, log_bcjr=True):
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
-    It says something about the likelihood of being in that state, given the history of the received sequence up to that state.
+    It says something about the likelihood of being in that state,
+    given the history of the received sequence up to that state.
     Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. """
     # print('Calculating alphas')
 
@@ -126,7 +131,8 @@ def calculate_beta_inner_SISO(trellis, gamma_primes, log_bcjr=True):
     """ Calculate the beta for each state in the trellis.
 
     Beta is a likelihood that has a forward recursion relation to next states.
-    It says something about the likelihood of being in that state, given the future of the received sequence up to that state.
+    It says something about the likelihood of being in that state,
+    given the future of the received sequence up to that state.
     Beta is calculated by taking each edge that is connected to the given state and weighing it with gamma. """
     # print('Calculating betas')
 
@@ -164,7 +170,6 @@ def calculate_betas(trellis, beta, log_bcjr=True, verbose=False):
     else:
         trellis.stages[-1].states[0].beta = 1
 
-    num_states = len(trellis.stages[0].states)
     time_steps = len(trellis.stages) - 1
 
     with tqdm(total=time_steps, leave=False) as pbar:
@@ -205,9 +210,6 @@ def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bc
     if verbose:
         print('Calculating gammas')
 
-    from fractions import Fraction
-    from encoder_functions import puncture
-
     # Gamma values are a certain weight coupled to each edge.
     for k, stage in tqdm(enumerate(trellis.stages[:-1]), leave=False):
         for state in stage.states:
@@ -233,7 +235,7 @@ def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, symbol_channel_LLRs):
                 # print(edge.from_state, edge.to_state, symbol_bit_LLRs[k], edge.edge_output, edge.gamma)
 
 
-def calculate_gamma_primes(trellis):
+def calculate_gamma_primes(trellis: Trellis):
     gamma_prime = np.zeros((2, 2, len(trellis.stages[:-1])))
     for k, stage in enumerate(trellis.stages[:-1]):
         combinations = list(itertools.product([0, 1], repeat=2))
@@ -248,7 +250,7 @@ def calculate_gamma_primes(trellis):
     return gamma_prime
 
 
-def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False):
+def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False) -> npt.NDArray[np.float_]:
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -260,7 +262,7 @@ def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False):
     if verbose:
         print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
-    LLR = np.zeros(time_steps)
+    LLR = np.zeros(time_steps, dtype=float)
 
     # The last stage has no edges
     for t, stage in enumerate(trellis.stages[:-1]):
@@ -287,7 +289,7 @@ def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False):
 
         if not log_bcjr:
             LLR[t] = np.log(numerator / denomenator)
-            return
+            continue
 
         # When leaving from the first state in the first timestep, there's only two transitions possible
         if len(a) == 1 and len(b) == 1:
@@ -310,7 +312,8 @@ def calculate_inner_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bc
     To calculate this, you need to sum over all states that had a 0 as input for the numerator,
     While summing over all the states that had a 1 as input for the denominator.
 
-    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods for each k-th PPM symbol.
+    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods
+    for each k-th PPM symbol.
     """
     # print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
@@ -349,7 +352,8 @@ def calculate_outer_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bc
     To calculate this, you need to sum over all states that had a 0 as input for the numerator,
     While summing over all the states that had a 1 as input for the denominator.
 
-    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods for each k-th PPM symbol.
+    The `bit_log_likelihoods` variable is a vector of vectors that contains the bit log likelihoods
+    for each k-th PPM symbol.
     """
     # print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
@@ -394,23 +398,23 @@ def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=Fals
     beta = np.zeros((trellis.num_states, time_steps + 1))
 
     # Calculate alphas, betas, gammas and LLRs
-    gammas = calculate_gammas(trellis, received_sequence, trellis.num_output_bits, Es, N0, log_bcjr=LOG_BCJR)
+    calculate_gammas(trellis, received_sequence, trellis.num_output_bits, Es, N0, log_bcjr=LOG_BCJR)
     alpha = calculate_alphas(trellis, alpha, log_bcjr=LOG_BCJR)
     beta = calculate_betas(trellis, beta, log_bcjr=LOG_BCJR)
-    LLR = calculate_LLRs(trellis, alpha, beta, log_bcjr=LOG_BCJR)
+    LLRs = calculate_LLRs(trellis, alpha, beta, log_bcjr=LOG_BCJR)
 
     if verbose:
         print('Message decoded')
-    u_hat = np.array([1 if l >= 0 else 0 for l in LLR])
+    u_hat = np.array([1 if llr >= 0 else 0 for llr in LLRs])
 
     return u_hat
 
 
-def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt.NDArray[np.uint8]:
+def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt.NDArray[np.int_]:
     """Map PPM symbols back to bit array. """
     received_symbols = np.array(received_symbols)
     reshaped_ppm_symbols = received_symbols.astype(np.uint8).reshape(received_symbols.shape[0], 1)
-    bits_array = np.unpackbits(reshaped_ppm_symbols, axis=1)
-    received_sequence = bits_array[:, -m:].reshape(-1)
+    bits_array = np.unpackbits(reshaped_ppm_symbols, axis=1).astype(int)
+    received_sequence: npt.NDArray[np.int_] = bits_array[:, -m:].reshape(-1)
 
     return received_sequence

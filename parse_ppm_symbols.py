@@ -1,79 +1,96 @@
 import numpy as np
+import numpy.typing as npt
 
 from ppm_parameters import M
 
 
-def check_darkcount(bin_time, symbol_start, symbol_end, bin_length, symbol):
-    guard_slot_darkcount = False
-    jitter_darkcount = False
-    # Then, check if the bin time falls within the 10% RMS slot width requirement
-    time_offset = (symbol - round(symbol)) * bin_length
-    sigma = 0.1 * bin_length
-    if abs(time_offset) > 3*sigma:
-        jitter_darkcount = True
-        return guard_slot_darkcount, jitter_darkcount
+def find_pulses_within_symbol_frame(
+    i: int,
+    symbol_length: float,
+    bin_times: npt.NDArray[np.float_],
+    start_time: float
+) -> tuple[npt.NDArray[np.float_], float, float]:
+    """Find all time events (pulses) within the given symbol frame, defined by i and the symbol length.
 
-    # First, check if the symbol was present in a guard slot
-    if bin_time < symbol_start - 0.5 * bin_length or bin_time > symbol_end - (M // 4) * bin_length:
-        guard_slot_darkcount = True
-        return guard_slot_darkcount, jitter_darkcount
+    Returns a list of time events within the frame, as well as the symbol start and end time.
+    """
+    symbol_start: float = start_time + i * symbol_length
+    symbol_end: float = start_time + (i + 1) * symbol_length
 
-    return guard_slot_darkcount, jitter_darkcount
+    symbol_frame_pulses: npt.NDArray[np.float_] = bin_times[np.logical_and(
+        bin_times >= symbol_start, bin_times <= symbol_end)]
+
+    return symbol_frame_pulses, symbol_start, symbol_end
 
 
-def parse_ppm_symbols(bin_times, bin_length, symbol_length, **kwargs):
-    symbols = []
+def check_timing_requirement(pulse: float, symbol_start: float, slot_length: float) -> bool:
+    """Check whether a pulse is within the CCSDS timing requirement of 10% RMS of the slot length. """
+    timing_requirement: bool = True
 
-    symbol_idx = 0
-    i = 0
-    guard_slot_darkcounts = 0
-    jitter_darkcounts = 0
+    A: int = int((pulse - symbol_start) / slot_length)
+    slot_start: float = A * slot_length
+    slot_end: float = (A + 1) * slot_length
+    center: float = slot_start + (slot_end - slot_start) / 2
+    sigma: float = 0.1 * slot_length
+    off_center_time = center - (pulse - symbol_start)
 
-    while i < len(bin_times):
-        symbol_start = symbol_idx * symbol_length
-        symbol_end = (symbol_idx + 1) * symbol_length
+    # Pulse time does not comply with the timing requirement
+    if abs(off_center_time) > sigma:
+        timing_requirement = False
 
-        # If this is the case, a symbol did not get properly sent, received or parsed.
-        # Assume a 0 and continue to the next symbol, while keeping i the same.
-        if bin_times[i] > symbol_end:
+    return timing_requirement
+
+
+def parse_ppm_symbols(
+        pulse_times: npt.NDArray[np.float_],
+        codeword_start_time: float,
+        stop_time: float,
+        slot_length: float,
+        symbol_length: float,
+        num_darkcounts: int = 0,
+        **kwargs) -> tuple[list[float], int]:
+
+    symbols: list[float] = []
+    num_symbol_frames = int(round((stop_time - codeword_start_time) / symbol_length))
+
+    for i in range(num_symbol_frames):
+        symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(
+            i, symbol_length, pulse_times, codeword_start_time)
+
+        # No symbol detected in this symbol frame
+        if symbol_frame_pulses.size == 0:
             symbols.append(0)
-            symbol_idx += 1
             continue
 
-        # First estimate
-        symbol = (bin_times[i] - symbol_start) / bin_length
+        j = 0
+        if len(symbol_frame_pulses) > 1:
+            num_darkcounts += len(symbol_frame_pulses) - 1
 
-        guard_slot_darkcount, jitter_darkcount = check_darkcount(
-            bin_times[i], symbol_start, symbol_end, bin_length, symbol)
+        for pulse in symbol_frame_pulses:
+            symbol = (pulse - symbol_start - 0.5 * slot_length) / slot_length
 
-        if guard_slot_darkcount:
-            guard_slot_darkcounts += 1
-            i += 1
-            continue
+            # Symbols cannot be in guard slots
+            if round(symbol) > M:
+                continue
 
-        if jitter_darkcount:
-            jitter_darkcounts += 1
-            i += 1
-            continue
+            # If the symbol is too far off the bin center, it is most likely a darkcount
+            # Uncomment to enforce the CCSDS timing requirement. It is commented
+            # because it seems to make the error rate slightly worse.
 
-        if i < len(bin_times) - 1 and (0 <= (bin_times[i + 1] - symbol_start) / bin_length <= M):
-            symbol = (bin_times[i + 1] - symbol_start) / bin_length
+            # timing_requirement = check_timing_requirement(pulse, symbol_start, slot_length)
+            # if not timing_requirement:
+            #     continue
+
             symbols.append(symbol)
-            i += 1
-            symbol_idx += 1
-            continue
+            j += 1
+            break
 
-        if symbol <= -1:
-            print('symbol in guard slot?')
+        # If there were pulses detected in the symbol frame, but none of them were valid symbols, use a 0 instead.
+        # This makes sure that there will always be a symbol in each symbol frame.
+        if j == 0:
+            symbols.append(0)
 
-        symbols.append(symbol)
-
-        i += 1
-        symbol_idx += 1
-
-    if len(bin_times) > 100:
-        print('jitter darkcounts', jitter_darkcounts, i, symbol_idx)
-    return symbols, (i, symbol_idx)
+    return symbols, num_darkcounts
 
 
 def rolling_window(a, size):

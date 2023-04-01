@@ -1,8 +1,8 @@
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 
 
 class Edge:
-    
+
     __slots__ = ('from_state', 'to_state', 'edge_input', 'edge_output', 'gamma', 'lmbda', 'hamming_distance')
 
     def __init__(self):
@@ -23,7 +23,7 @@ class Edge:
             to_state: int,
             edge_input: int | list[int],
             edge_output: tuple,
-            gamma: float):
+            gamma: float | None):
 
         self.from_state = from_state
         self.to_state = to_state
@@ -41,12 +41,12 @@ class Edge:
 
 class State:
     __slots__ = ('label', 'edges', 'alpha', 'beta')
+
     def __init__(self, label: int, num_edges: int):
-        self.label = label
-        # self.edges = [Edge() for _ in range(num_edges)]
-        self.edges = []
-        self.alpha = None
-        self.beta = None
+        self.label: int = label
+        self.edges: list[Edge] = []
+        self.alpha: None | float = None
+        self.beta: None | float = None
 
     def __str__(self):
         return self.label
@@ -86,13 +86,18 @@ class Trellis:
         self.num_output_bits = num_output_bits
         self.edge_model = edges
 
-    def set_edges(self, edges, zero_initiated=True, zero_terminated=True):
+    def set_edges(self,
+                  edges: list[list[Edge]],
+                  zero_initiated: bool = True,
+                  zero_terminated: bool = True
+                  ) -> None:
         """Add edges to each state, as specified by the edges tuple. """
         if zero_initiated:
-            starting_state_labels = {0}
+            starting_state_labels: set[int] = {0}
 
+            state: State
             for i in range(self.memory_size):
-                stage = self.stages[i]
+                stage: Stage = self.stages[i]
                 for state_label in starting_state_labels:
                     state = stage.states[state_label]
                     state.edges = deepcopy(edges[state.label])
@@ -114,12 +119,12 @@ class Trellis:
             return
 
         starting_state_labels = set({s.label for s in self.stages[end].states})
-        ending_state_labels = set()
+        ending_state_labels: set[int] = set()
         # Since there is one more stage than time steps, the last stage has no
         # edges. There is only one state with beta value.
         for stage in self.stages[end:-1]:
             for state_label in starting_state_labels:
-                state_edges = list(filter(lambda e: e.edge_input == 0, edges[state_label]))
+                state_edges: list[Edge] = list(filter(lambda e: e.edge_input == 0, edges[state_label]))
                 stage.states[state_label].edges = deepcopy(state_edges)
                 ending_state_labels = ending_state_labels.union({e.to_state for e in state_edges})
 

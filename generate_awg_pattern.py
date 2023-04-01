@@ -3,13 +3,15 @@ import math
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
-from data_converter import DataConverter
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CSM, GREYSCALE,
-                            IMG_SHAPE, PAYLOAD_TYPE, M, bin_length, m,
-                            num_samples_per_slot, num_symbols_per_slice,
-                            sample_size_awg, slot_factor, symbols_per_codeword, CODE_RATE)
+from data_converter import message_from_payload
+from encoder_functions import slot_map
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
+                            GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, M, bin_length,
+                            m, num_samples_per_slot, num_symbols_per_slice,
+                            sample_size_awg, slot_factor, symbols_per_codeword)
 from scppm_encoder import encoder
 
 ADD_ASM: bool = True
@@ -21,30 +23,23 @@ memory_size: int = 2         # Memory size of the convolutional encoder
 # 1 means: no guard slot, 5/4 means: M/4 guard slots
 num_bins_per_symbol = int(slot_factor * M)
 
-match PAYLOAD_TYPE:
-    case 'string':
-        d = DataConverter("Hello World!")
-        sent_message = d.bit_array
-    case 'image':
-        file = Path("sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
-        d = DataConverter(file)
-        sent_message = d.bit_array
-
-
-num_bits_sent = len(sent_message)
-
+msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
+num_PPM_symbols: int
+num_bits_sent: int
+slot_mapped_sequence: npt.NDArray[np.int_]
+sent_symbol: int | None = None
 
 match PAYLOAD_TYPE:
     case 'calibration':
-        sent_symbol = 0
-        msg_PPM_symbols = [sent_symbol] * (num_symbols_per_slice - 1)
+        sent_symbol = 1
+        msg_PPM_symbols = np.array([sent_symbol] * (num_symbols_per_slice - 1))
         # Zero terminate
-        msg_PPM_symbols.append(0)
-        num_slices = 1
+        msg_PPM_symbols = np.append(msg_PPM_symbols, 0)
+        num_slices: int = 1
 
         # Insert CSMs
-        len_codeword = num_symbols_per_slice // m
-        num_codewords = msg_PPM_symbols.shape[0] // len_codeword
+        len_codeword: int = num_symbols_per_slice // m
+        num_codewords: int = msg_PPM_symbols.shape[0] // len_codeword
 
         if ADD_ASM:
             ppm_mapped_message_with_csm = np.zeros(len(msg_PPM_symbols) + len(CSM) * num_codewords, dtype=int)
@@ -60,12 +55,19 @@ match PAYLOAD_TYPE:
 
         message_time_microseconds = sample_size_awg * 1E-12 * num_samples_per_slot * \
             num_bins_per_symbol * msg_PPM_symbols.shape[0] * 1E6
+        num_PPM_symbols = msg_PPM_symbols.shape[0]
+        num_bits_sent = num_PPM_symbols * m
+        slot_mapped_sequence = slot_map(msg_PPM_symbols, M)
+
     case _:
+        sent_message: npt.NDArray[np.int_] = message_from_payload(PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
+        num_bits_sent = len(sent_message)
+
         slot_mapped_sequence = encoder(sent_message)
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
-        num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword+len(CSM)))
+        num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword + len(CSM)))
         num_slots = slot_mapped_sequence.flatten().shape[0]
         message_time_microseconds = num_slots * bin_length * 1E6
 
@@ -73,6 +75,7 @@ match PAYLOAD_TYPE:
 if PAYLOAD_TYPE == 'image':
     print(f'Sending image with shape {IMG_SHAPE[0]}x{IMG_SHAPE[1]}')
 print(f'num symbols sent: {num_PPM_symbols}')
+print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols}')
 print(f'Number of codewords: {num_codewords}')
 print(f'Datarate: {1000*num_bits_sent/(message_time_microseconds*1000):.2f} Mbps')
 print(f'Message time span: {message_time_microseconds:.3f} microseconds')
@@ -83,7 +86,7 @@ print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microsecon
 # Generate AWG pattern file
 num_samples_per_symbol: int = num_bins_per_symbol * num_samples_per_slot
 
-pulse_width: int = 1
+pulse_width: int = 3
 
 pulse = np.zeros(num_samples_per_symbol * num_PPM_symbols)
 print(f'Multiple of 256? {len(pulse)/256}')
@@ -117,19 +120,26 @@ df = pd.DataFrame(pulse)
 # %%
 interleave_code = f'c{int(CHANNEL_INTERLEAVE)}b{int(BIT_INTERLEAVE)}'
 
-# '/' is not allowed in filenames. 
+# '/' is not allowed in filenames.
 cr = str(CODE_RATE).replace('/', '-')
+
+filepath: str = ''
 
 match PAYLOAD_TYPE:
     case 'image' if GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv'
+        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
+            f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv'
     case 'image' if not GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1_{cr}-code-rate.csv'
+        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
+            f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1_{cr}-code-rate.csv'
     case 'string':
-        filepath = f'ppm_message_Hello_World_no_ASM.csv'
+        filepath = 'ppm_message_Hello_World_no_ASM.csv'
     case 'calibration':
-        filepath = f'ppm_calibration_message_{len(msg_PPM_symbols)}_symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM.csv'
+        filepath = f'ppm_calibration_message_{len(msg_PPM_symbols)}_' +\
+            f'symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM.csv'
+    case _:
+        raise ValueError("Payload type not recognized. Should be one of ['image', 'string', 'calibration']")
 
 print(f'Writing data to file {filepath}')
-df.to_csv(filepath, index=False, header=None)
+df.to_csv(filepath, index=False, header=False)
 print(f'Wrote data to file {filepath}')

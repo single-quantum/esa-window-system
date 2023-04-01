@@ -2,6 +2,7 @@ import pickle
 from fractions import Fraction
 
 import numpy as np
+import numpy.typing as npt
 
 from encoder_functions import (bit_interleave, channel_interleave, convolve,
                                get_csm, map_PPM_symbols, puncture, randomize,
@@ -16,13 +17,13 @@ def preprocess_bit_stream(bit_stream):
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
     information_blocks = slicer(bit_stream, CODE_RATE, include_crc=False)
-    information_blocks = randomize(information_blocks)
+    # information_blocks = randomize(information_blocks)
     information_blocks = zero_terminate(information_blocks)
 
     return information_blocks
 
 
-def SCPPM_encoder(information_blocks, save_encoded_sequence_to_file=True):
+def SCPPM_encoder(information_blocks: npt.NDArray, save_encoded_sequence_to_file: bool = True):
     """The SCPPM encoder consists of the convolutional encoder, code interleaver, accumulator and PPM symbol mapper.
 
     Returns a sequence of PPM symbols.
@@ -37,7 +38,7 @@ def SCPPM_encoder(information_blocks, save_encoded_sequence_to_file=True):
         convoluted_bit_sequence[i], _ = convolve(row)
 
     if CODE_RATE != Fraction(1, 3):
-        convolutional_codewords = puncture(convoluted_bit_sequence, CODE_RATE)
+        convolutional_codewords: npt.NDArray = puncture(convoluted_bit_sequence, CODE_RATE)
     else:
         convolutional_codewords = convoluted_bit_sequence
 
@@ -50,7 +51,9 @@ def SCPPM_encoder(information_blocks, save_encoded_sequence_to_file=True):
     # The encoded message can be saved to a file, to compare the BER before
     # and after decoding
     if save_encoded_sequence_to_file:
-        with open(f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence', 'wb') as f:
+        filename: str = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}' +\
+            '-PPM_interleaved_sent_bit_sequence'
+        with open(filename, 'wb') as f:
             pickle.dump(encoded_message, f)
 
     # Map the encoded message bit stream to PPM symbols
