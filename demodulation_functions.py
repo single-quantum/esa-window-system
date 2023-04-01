@@ -1,13 +1,14 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 from scipy.signal import find_peaks
 
 from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import (CSM, M, num_bins_per_symbol,
-                            symbol_length, symbols_per_codeword)
+from ppm_parameters import CSM, M
 from ppm_parameters import bin_length as slot_length
+from ppm_parameters import (num_bins_per_symbol, symbol_length,
+                            symbols_per_codeword)
 from utils import flatten, moving_average
-import matplotlib.pyplot as plt
 
 
 def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) -> npt.NDArray[np.int_]:
@@ -72,7 +73,7 @@ def find_csm_times(
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
     # where_corr: npt.NDArray[np.int_] = np.where(corr >= 10)[0]
-    where_corr = find_peaks(corr, height=9, distance=symbols_per_codeword*num_bins_per_symbol)[0]
+    where_corr = find_peaks(corr, height=9, distance=symbols_per_codeword * num_bins_per_symbol)[0]
 
     if where_corr.shape[0] == 0:
         raise ValueError("Could not find any CSM. ")
@@ -117,7 +118,6 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
         fraction_lost: float = (stop - start) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-
         symbols, num_darkcounts, off_center_times = parse_ppm_symbols(
             peak_locations[peak_locations > csm_times[i]],
             csm_times[i],
@@ -136,7 +136,7 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
 
         if num_codewords_lost == 0 and len(symbols) > len_codeword:
             symbols = symbols[:len_codeword]
-        
+
         if num_codewords_lost >= 1:
             diff = (num_codewords_lost + 1) * len_codeword_no_CSM - (len(symbols) - len(CSM))
             if diff > 0:
@@ -145,54 +145,46 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
         msg_symbols.append(np.round(symbols).astype(int))
 
     # Take the last CSM and parse until the end of the message.
-    symbols, num_darkcounts, off_center_times = parse_ppm_symbols(
+    symbols, num_darkcounts = parse_ppm_symbols(
         peak_locations[peak_locations > csm_times[-1]],
         csm_times[-1],
         csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length,
         slot_length,
         symbol_length,
-        num_darkcounts,
-        **{'off_center_times': off_center_times}
+        num_darkcounts
     )
     msg_symbols.append(np.round(symbols).astype(int))
-
-    plt.figure()
-    plt.hist(np.array(off_center_times)*1E12, bins=20)
-    plt.axvline(slot_length/2*1E12, 0, 2800, linestyle='--', color='r')
-    plt.axvline(-slot_length/2*1E12, 0, 2800, linestyle='--', color='r')
-    plt.axvline(0.3*slot_length/2*1E12, 0, 2800, linestyle='--', color='g')
-    plt.axvline(-0.3*slot_length/2*1E12, 0, 2800, linestyle='--', color='g')
-    plt.show()
-
 
     print(f'Estimated number of darkcounts in message frame: {num_darkcounts}')
     return msg_symbols
 
+
 def get_num_events_per_slot(csm_times, peak_locations):
     # Timespan of the entire message
-    msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM))*symbol_length
-    msg_start_idx = np.where(peak_locations>=csm_times[0])[0][0]
+    msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
+    msg_start_idx = np.where(peak_locations >= csm_times[0])[0][0]
     msg_timespan = msg_end_time - csm_times[0]
-    num_slots = int(round(msg_timespan/slot_length))
+    num_slots = int(round(msg_timespan / slot_length))
 
     num_events_per_slot = np.zeros(num_slots)
 
-    for i in range(num_events_per_slot.shape[0]-1):
-        slot_start = peak_locations[msg_start_idx]+i*slot_length
-        slot_end = peak_locations[msg_start_idx]+(i+1)*slot_length
+    for i in range(num_events_per_slot.shape[0] - 1):
+        slot_start = peak_locations[msg_start_idx] + i * slot_length
+        slot_end = peak_locations[msg_start_idx] + (i + 1) * slot_length
 
-        num_events = peak_locations[(peak_locations>=slot_start)&(peak_locations<slot_end)].shape[0]
+        num_events = peak_locations[(peak_locations >= slot_start) & (peak_locations < slot_end)].shape[0]
         num_events_per_slot[i] = num_events
 
     return num_events_per_slot
 
+
 def demodulate(peak_locations: npt.NDArray) -> npt.NDArray[np.int_]:
 
     csm_times: npt.NDArray[np.float_] = find_csm_times(peak_locations, CSM, slot_length, symbol_length)
-    
+
     # For now, this function is only used to compare results to simulations
-    msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM))*symbol_length
-    msg_peak_locations = peak_locations[(peak_locations >= csm_times[0])&(peak_locations<= msg_end_time)]
+    msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
+    msg_peak_locations = peak_locations[(peak_locations >= csm_times[0]) & (peak_locations <= msg_end_time)]
     events_per_slot = get_num_events_per_slot(csm_times, msg_peak_locations)
 
     num_detection_events: int = np.where((peak_locations >= csm_times[0]) & (
@@ -204,11 +196,10 @@ def demodulate(peak_locations: npt.NDArray) -> npt.NDArray[np.int_]:
 
     msg_symbols = find_and_parse_codewords(csm_times, peak_locations)
 
-    
     # It seems a bit backwards to first flatten it and then reshape the msg_symbols array,
     # But if a CSM is missed, it could be that one entry in the array is twice as long, in
-    # which case numpy doesn't want to cast the ragged list to an array. 
-    msg_symbols = np.array(flatten(msg_symbols)).reshape((-1, symbols_per_codeword+len(CSM)))
+    # which case numpy doesn't want to cast the ragged list to an array.
+    msg_symbols = np.array(flatten(msg_symbols)).reshape((-1, symbols_per_codeword + len(CSM)))
     msg_symbols = msg_symbols[:, len(CSM):].reshape(-1)
     print('Number of demodulated symbols: ', len(msg_symbols))
 

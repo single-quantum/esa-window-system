@@ -93,7 +93,7 @@ num_photons_per_pulse = 5
 darkcounts_factor: float = 0.01
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = True
+use_test_file: bool = False
 use_latest_tt_file: bool = False
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
@@ -235,7 +235,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             peak_locations = np.sort(peak_locations)
 
         try:
-            ppm_mapped_message = demodulate(peak_locations)
+            ppm_mapped_message = demodulate(peak_locations[:200000])
         except ValueError as e:
             irrecoverable += 1
             print(e)
