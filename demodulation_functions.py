@@ -3,6 +3,8 @@ import numpy as np
 import numpy.typing as npt
 from scipy.signal import find_peaks
 
+from encoder_functions import slot_map
+
 from parse_ppm_symbols import parse_ppm_symbols
 from ppm_parameters import CSM, M
 from ppm_parameters import bin_length as slot_length
@@ -110,7 +112,6 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
     num_darkcounts: int = 0
     symbols: list[float] | npt.NDArray[np.float_]
 
-    off_center_times = []
     for i in range(len(csm_times) - 1):
         start: float = csm_times[i]
         stop: float = csm_times[i + 1]
@@ -118,14 +119,13 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
         fraction_lost: float = (stop - start) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, num_darkcounts, off_center_times = parse_ppm_symbols(
+        symbols, num_darkcounts = parse_ppm_symbols(
             peak_locations[peak_locations > csm_times[i]],
             csm_times[i],
             csm_times[i + 1],
             slot_length,
             symbol_length,
             num_darkcounts,
-            **{'off_center_times': off_center_times}
         )
 
         # If `parse_ppm_symbols` did not manage to parse enough symbols from the
@@ -196,11 +196,8 @@ def demodulate(peak_locations: npt.NDArray) -> npt.NDArray[np.int_]:
 
     msg_symbols = find_and_parse_codewords(csm_times, peak_locations)
 
-    # It seems a bit backwards to first flatten it and then reshape the msg_symbols array,
-    # But if a CSM is missed, it could be that one entry in the array is twice as long, in
-    # which case numpy doesn't want to cast the ragged list to an array.
-    msg_symbols = np.array(flatten(msg_symbols)).reshape((-1, symbols_per_codeword + len(CSM)))
-    msg_symbols = msg_symbols[:, len(CSM):].reshape(-1)
     print('Number of demodulated symbols: ', len(msg_symbols))
 
-    return msg_symbols
+    slot_mapped_message = slot_map(flatten(msg_symbols), M)
+
+    return slot_mapped_message

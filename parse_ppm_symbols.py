@@ -70,7 +70,7 @@ def parse_ppm_symbols(
             symbol = (pulse - symbol_start - 0.5 * slot_length) / slot_length
 
             # Symbols cannot be in guard slots
-            if round(symbol) > M:
+            if round(symbol) >= M:
                 continue
 
             # If the symbol is too far off the bin center, it is most likely a darkcount

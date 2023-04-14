@@ -14,6 +14,9 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             sample_size_awg, slot_factor, symbols_per_codeword)
 from scppm_encoder import encoder
 
+B_interleaver = 2520
+N_interleaver = 2
+
 ADD_ASM: bool = True
 
 num_output_bits: int = 3     # number of output bits from the convolutional encoder
@@ -60,10 +63,12 @@ match PAYLOAD_TYPE:
         slot_mapped_sequence = slot_map(msg_PPM_symbols, M)
 
     case _:
-        sent_message: npt.NDArray[np.int_] = message_from_payload(PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
+        sent_message: npt.NDArray[np.int_] = message_from_payload(
+            PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
         num_bits_sent = len(sent_message)
 
-        slot_mapped_sequence = encoder(sent_message)
+        slot_mapped_sequence = encoder(sent_message, M, CODE_RATE, **
+                                       {'user_settings': {'B_interleaver': B_interleaver, 'N_interleaver': N_interleaver}})
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol

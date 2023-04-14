@@ -25,7 +25,7 @@ def decode(
 ) -> tuple[npt.NDArray[np.int_], float]:
     user_settings = kwargs.get('user_settings', {})
 
-    # The decode message takes an array of PPM symbols, to the slot mapped message
+    # The decode message takes an array of PPM symbols, so the slot mapped message
     # Should be converted to a ppm mapped message first.
     ppm_mapped_message = np.nonzero(slot_mapped_sequence)[1]
 
