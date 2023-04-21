@@ -3,13 +3,10 @@ import numpy as np
 import numpy.typing as npt
 from scipy.signal import find_peaks
 
-from encoder_functions import slot_map
-
+from encoder_functions import get_csm, slot_map
 from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import CSM, M
 from ppm_parameters import bin_length as slot_length
-from ppm_parameters import (num_bins_per_symbol, symbol_length,
-                            symbols_per_codeword)
+from ppm_parameters import num_bins_per_symbol, symbol_length
 from utils import flatten, moving_average
 
 
@@ -36,11 +33,13 @@ def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) ->
 def determine_CSM_time_shift(
         csm_times: npt.NDArray[np.float_],
         time_stamps: npt.NDArray[np.float_],
-        slot_length: float) -> float:
+        slot_length: float,
+        CSM: npt.NDArray[np.int_]) -> float:
     """ Determine the time shift that is needed to shift the CSM times to the beginning of a slot.
 
     Because the CSM times are found with a correlation relative to a random time event,
     a time shift needs to be determined to find the true CSM time. """
+
     shifts = []
     csm_slot_times = np.arange(
         csm_times[0],
@@ -60,7 +59,8 @@ def find_csm_times(
         time_stamps: npt.NDArray[np.float_],
         CSM: npt.NDArray[np.int_],
         slot_length: float,
-        symbol_length: float
+        symbol_length: float,
+        symbols_per_codeword: int
 ) -> npt.NDArray[np.float_]:
     """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
 
@@ -98,13 +98,18 @@ def find_csm_times(
     # I don't know why the -1 slot length is needed
     csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr - 1 * slot_length
 
-    time_shift: float = determine_CSM_time_shift(csm_times, time_stamps, slot_length)
+    time_shift: float = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM)
     csm_times += time_shift - 0.5 * slot_length
 
     return csm_times
 
 
-def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: npt.NDArray[np.float_]):
+def find_and_parse_codewords(
+        csm_times: npt.NDArray[np.float_],
+        pulse_timestamps: npt.NDArray[np.float_],
+        CSM: npt.NDArray[np.int_],
+        symbols_per_codeword: int):
+    """Using the CSM times, find and parse (demodulate) PPM codewords from the given PPM pulse timestamps. """
     len_codeword: int = symbols_per_codeword + len(CSM)
     len_codeword_no_CSM: int = symbols_per_codeword
 
@@ -115,12 +120,12 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
     for i in range(len(csm_times) - 1):
         start: float = csm_times[i]
         stop: float = csm_times[i + 1]
-        # t0_codeword = peak_locations[start] - 0.5 * slot_length
+        # t0_codeword = pulse_timestamps[start] - 0.5 * slot_length
         fraction_lost: float = (stop - start) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
         symbols, num_darkcounts = parse_ppm_symbols(
-            peak_locations[peak_locations > csm_times[i]],
+            pulse_timestamps[pulse_timestamps > csm_times[i]],
             csm_times[i],
             csm_times[i + 1],
             slot_length,
@@ -132,7 +137,7 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
         # peak locations, add random PPM symbols at the end of the codeword.
         if len(symbols) < len_codeword:
             diff = len_codeword - len(symbols)
-            symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
+            symbols = np.hstack((symbols, 0))
 
         if num_codewords_lost == 0 and len(symbols) > len_codeword:
             symbols = symbols[:len_codeword]
@@ -140,13 +145,13 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
         if num_codewords_lost >= 1:
             diff = (num_codewords_lost + 1) * len_codeword_no_CSM - (len(symbols) - len(CSM))
             if diff > 0:
-                symbols = np.hstack((symbols, np.random.randint(0, M, diff)))
+                symbols = np.hstack((symbols, 0))
 
         msg_symbols.append(np.round(symbols).astype(int))
 
     # Take the last CSM and parse until the end of the message.
     symbols, num_darkcounts = parse_ppm_symbols(
-        peak_locations[peak_locations > csm_times[-1]],
+        pulse_timestamps[pulse_timestamps > csm_times[-1]],
         csm_times[-1],
         csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length,
         slot_length,
@@ -159,7 +164,12 @@ def find_and_parse_codewords(csm_times: npt.NDArray[np.float_], peak_locations: 
     return msg_symbols
 
 
-def get_num_events_per_slot(csm_times, peak_locations):
+def get_num_events_per_slot(
+        csm_times,
+        peak_locations: npt.NDArray[np.int_],
+        CSM: npt.NDArray[np.int_],
+        symbols_per_codeword: int):
+
     # Timespan of the entire message
     msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
     msg_start_idx = np.where(peak_locations >= csm_times[0])[0][0]
@@ -178,23 +188,30 @@ def get_num_events_per_slot(csm_times, peak_locations):
     return num_events_per_slot
 
 
-def demodulate(peak_locations: npt.NDArray) -> npt.NDArray[np.int_]:
+def demodulate(pulse_timestamps: npt.NDArray, M: int) -> npt.NDArray[np.int_]:
+    """Demodulate the PPM pulse time stamps (convert the time stamps to PPM symbols).
 
-    csm_times: npt.NDArray[np.float_] = find_csm_times(peak_locations, CSM, slot_length, symbol_length)
+    First, the Codeword Synchronisation Marker (CSM) is derived from the timestamps, then
+    all the codewords (collection of PPM symbols) are parsed from the timestamps, for a given PPM order (M). """
+
+    CSM: npt.NDArray[np.int_] = get_csm(M)
+    symbols_per_codeword = int(15120 / np.log2(M))
+    csm_times: npt.NDArray[np.float_] = find_csm_times(
+        pulse_timestamps, CSM, slot_length, symbol_length, symbols_per_codeword)
 
     msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
-    msg_peak_locations = peak_locations[(peak_locations >= csm_times[0]) & (peak_locations <= msg_end_time)]
+    msg_pulse_timestamps = pulse_timestamps[(pulse_timestamps >= csm_times[0]) & (pulse_timestamps <= msg_end_time)]
     # For now, this function is only used to compare results to simulations
-    # events_per_slot = get_num_events_per_slot(csm_times, msg_peak_locations)
+    # events_per_slot = get_num_events_per_slot(csm_times, msg_pulse_timestamps, CSM)
 
-    num_detection_events: int = np.where((peak_locations >= csm_times[0]) & (
-        peak_locations <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]
+    num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
+        pulse_timestamps <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]
 
     print(f'Found {len(csm_times)} codewords. ')
     print(f'Number of detection events in message frame: {num_detection_events}')
     print()
 
-    msg_symbols = find_and_parse_codewords(csm_times, peak_locations)
+    msg_symbols = find_and_parse_codewords(csm_times, pulse_timestamps, CSM, symbols_per_codeword)
 
     print('Number of demodulated symbols: ', len(msg_symbols))
 
