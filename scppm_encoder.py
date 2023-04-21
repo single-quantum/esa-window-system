@@ -120,11 +120,11 @@ def encoder(
     """
 
     user_settings: dict = kwargs.get('user_settings', {})
-    try:
-        check_user_settings(user_settings)
-    except KeyError as e:
-        print(e)
-        raise KeyError("User settings is missing required parameters. ")
+    # try:
+    #     check_user_settings(user_settings)
+    # except KeyError as e:
+    #     print(e)
+    #     raise KeyError("User settings is missing required parameters. ")
 
     B_interleaver: int | None = user_settings.get('B_interleaver')
     # If no number of parallel shift registers is defined, use the minimum of 2
