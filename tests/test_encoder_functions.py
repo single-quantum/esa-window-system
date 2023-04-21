@@ -25,19 +25,19 @@ def test_map_PPM_symbols_6_bits():
 def test_map_PP_symbols_array_too_small():
     input_arr = [1, 1]
     with pytest.raises(ValueError):
-        output = map_PPM_symbols(input_arr, 3)
+        _ = map_PPM_symbols(input_arr, 3)
 
 
 def test_map_PPM_symbols_array_too_large():
     input_arr = [1, 0, 0, 1]
     with pytest.raises(ValueError):
-        output = map_PPM_symbols(input_arr, 3)
+        _ = map_PPM_symbols(input_arr, 3)
 
 
 def test_map_PPM_symbols_non_bit_inputs():
     input_arr = [1, 0, 2, 0]
     with pytest.raises(ValueError):
-        output = map_PPM_symbols(input_arr, 3)
+        _ = map_PPM_symbols(input_arr, 3)
 
 
 def test_slot_map_no_guard_slots():
@@ -63,4 +63,4 @@ def test_slot_map_PPM_symbol_too_large():
     # but I want this error to handle it gracefully.
     input_symbols = [8]
     with pytest.raises(ValueError):
-        output_arr = slot_map(input_symbols, 4)
+        _ = slot_map(input_symbols, 4)
