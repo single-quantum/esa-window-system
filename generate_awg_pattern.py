@@ -67,8 +67,14 @@ match PAYLOAD_TYPE:
             PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
         num_bits_sent = len(sent_message)
 
-        slot_mapped_sequence = encoder(sent_message, M, CODE_RATE, **
-                                       {'user_settings': {'B_interleaver': B_interleaver, 'N_interleaver': N_interleaver}})
+        slot_mapped_sequence = encoder(sent_message, M, CODE_RATE,
+                                       **{'user_settings': {
+                                           'B_interleaver': B_interleaver,
+                                           'N_interleaver': N_interleaver},
+                                           'save_encoded_sequence_to_file': True,
+                                           'reference_file_prefix': 'jupiter_greyscale',
+                                           'num_samples_per_slot': 8}
+                                       )
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
