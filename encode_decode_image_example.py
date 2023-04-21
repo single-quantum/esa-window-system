@@ -44,6 +44,8 @@ user_settings = {
 sent_bits = message_from_payload(payload_type, filepath=payload_file_path)
 
 # Put the payload through the encoder
+# Some extra settings can be passed through the encoder and decoder, like the length of the channel interleaver
+# or whether or not to save the encoded bit sequence to a file for reference.
 slot_mapped_sequence = encoder(
     sent_bits,
     M,
@@ -55,9 +57,16 @@ slot_mapped_sequence = encoder(
         'num_samples_per_slot': 16
     })
 
-decoded_message = decode(slot_mapped_sequence, M, code_rate, **{'user_settings': user_settings})
+decoded_message = decode(
+    slot_mapped_sequence,
+    M,
+    code_rate,
+    **{'user_settings': user_settings}
+)
 
 if payload_type == 'image':
+    # Although `map_PPM_symbols` was meant to map bits to PPM symbols, it can conveniently also be used
+    # to map bit values to 1-byte greyscale values.
     pixel_values = map_PPM_symbols(decoded_message[0], 8)
     img_arr = pixel_values[:IMG_SIZE[0] * IMG_SIZE[1]].reshape((IMG_SIZE[1], IMG_SIZE[0]))
 
