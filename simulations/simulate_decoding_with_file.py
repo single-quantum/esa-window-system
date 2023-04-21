@@ -89,11 +89,11 @@ simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
 detection_efficiency: float = 0.8
-num_photons_per_pulse = 5
+num_photons_per_pulse = 4.5
 darkcounts_factor: float = 0.01
 detector_jitter = 5 * 25E-12
 
-use_test_file: bool = False
+use_test_file: bool = True
 use_latest_tt_file: bool = False
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
@@ -185,7 +185,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
     BERS_before = []
     SNRs = []
 
-    for z in range(0, 10):
+    for z in range(0, 20):
         print(f'num irrecoverable messages: {irrecoverable}')
         if irrecoverable > 3:
             raise StopIteration("Too many irrecoverable messages. ")
@@ -235,7 +235,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             peak_locations = np.sort(peak_locations)
 
         try:
-            ppm_mapped_message = demodulate(peak_locations[:200000])
+            slot_mapped_message = demodulate(peak_locations[:200000])
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -247,11 +247,12 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
         try:
             information_blocks, BER_before_decoding = decode(
-                ppm_mapped_message, B_interleaver, N_interleaver, m, reference_file_path, CHANNEL_INTERLEAVE, BIT_INTERLEAVE, CODE_RATE,
+                slot_mapped_message, M, CODE_RATE,
                 **{
                     'use_cached_trellis': True,
                     'cached_trellis_file_path': cached_trellis_file_path,
-                    'cached_trellis': cached_trellis
+                    'cached_trellis': cached_trellis,
+                    'user_settings': {'reference_file_path': reference_file_path}
                 })
         except DecoderError as e:
             print(e)
