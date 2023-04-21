@@ -1,10 +1,7 @@
-import copy
-
 import numpy as np
 import pytest
 from numpy.random import default_rng
 
-from demodulation_functions import find_csm_idxs
 from parse_ppm_symbols import parse_ppm_symbols
 from ppm_parameters import CSM, M, num_bins_per_symbol
 
