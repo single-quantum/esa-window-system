@@ -182,10 +182,10 @@ def demodulate(peak_locations: npt.NDArray) -> npt.NDArray[np.int_]:
 
     csm_times: npt.NDArray[np.float_] = find_csm_times(peak_locations, CSM, slot_length, symbol_length)
 
-    # For now, this function is only used to compare results to simulations
     msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
     msg_peak_locations = peak_locations[(peak_locations >= csm_times[0]) & (peak_locations <= msg_end_time)]
-    events_per_slot = get_num_events_per_slot(csm_times, msg_peak_locations)
+    # For now, this function is only used to compare results to simulations
+    # events_per_slot = get_num_events_per_slot(csm_times, msg_peak_locations)
 
     num_detection_events: int = np.where((peak_locations >= csm_times[0]) & (
         peak_locations <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]
