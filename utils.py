@@ -1,6 +1,5 @@
 import itertools
 from datetime import datetime
-from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
