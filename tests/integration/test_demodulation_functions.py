@@ -118,3 +118,35 @@ def test_demodulate_happy_path(pulse_timestamps_with_csm):
     # The decoder is responsible for stripping off the CSM.
     assert slot_mapped_sequence.shape[0] == num_symbols + len(CSM)
     assert slot_mapped_sequence.shape[1] == int(5 / 4 * M)
+
+
+def test_demodulate_with_lost_first_symbols_in_csm(pulse_timestamps_with_csm):
+    pulse_timestamps, ppm_params = pulse_timestamps_with_csm
+    M, symbol_length, slot_length, num_symbols, CSM = ppm_params.values()
+
+    pulse_timestamps = np.delete(pulse_timestamps, [0])
+
+    # This is quite the edge case, and it is known that the message can be demodulated when the first symbol of the CSM is lost.
+    # But this can only be properly done when there are some extra noise / dummy symbols at the start of the message.
+    # Maybe I'll fix it, but for now, this is so marginally realistic that I don't feel the need to work on it.
+    pulse_timestamps = np.hstack(
+        (
+            np.sort(np.random.uniform(-2 * len(CSM) * symbol_length, 0, len(CSM))),
+            pulse_timestamps
+        )
+    )
+
+    slot_mapped_sequence = demodulate(pulse_timestamps, M, slot_length, symbol_length)
+    assert slot_mapped_sequence.shape[0] == num_symbols + len(CSM)
+    assert slot_mapped_sequence.shape[1] == int(5 / 4 * M)
+
+
+def test_demodulate_with_few_lost_symbols_in_csm(pulse_timestamps_with_csm):
+    pulse_timestamps, ppm_params = pulse_timestamps_with_csm
+    M, symbol_length, slot_length, num_symbols, CSM = ppm_params.values()
+
+    pulse_timestamps = np.delete(pulse_timestamps, [1, 2, 3])
+
+    slot_mapped_sequence = demodulate(pulse_timestamps, M, slot_length, symbol_length)
+    assert slot_mapped_sequence.shape[0] == num_symbols + len(CSM)
+    assert slot_mapped_sequence.shape[1] == int(5 / 4 * M)
