@@ -194,6 +194,9 @@ def demodulate(pulse_timestamps: npt.NDArray, M: int) -> npt.NDArray[np.int_]:
     First, the Codeword Synchronisation Marker (CSM) is derived from the timestamps, then
     all the codewords (collection of PPM symbols) are parsed from the timestamps, for a given PPM order (M). """
 
+    if len(pulse_timestamps) == 0:
+        raise IndexError("Pulse timestamps array cannot be empty. ")
+
     CSM: npt.NDArray[np.int_] = get_csm(M)
     symbols_per_codeword = int(15120 / np.log2(M))
     csm_times: npt.NDArray[np.float_] = find_csm_times(
