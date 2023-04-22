@@ -4,16 +4,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import TimeTagger
-
 from PIL import Image
 
+from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
                             GREYSCALE, IMG_SHAPE, B_interleaver, N_interleaver,
-                            m)
-
-from BCJR_decoder_functions import ppm_symbols_to_bit_array
+                            bin_length, symbol_length)
 from scppm_decoder import DecoderError, decode
 from utils import flatten
 
@@ -22,7 +20,7 @@ https://www.swabianinstruments.com/time-tagger/downloads/ . """
 
 
 def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
-    """Open the `time_events_filename` with the TimeTagger.FileReader class and retrieve events. 
+    """Open the `time_events_filename` with the TimeTagger.FileReader class and retrieve events.
 
     Can either read out the entire buffer or read out a given number of events. """
     fr = TimeTagger.FileReader(time_events_filename)
@@ -75,7 +73,7 @@ time_events = get_time_events_from_tt_file(time_tagger_filename)
 
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message = demodulate(time_events[800000:1200000])
+slot_mapped_message = demodulate(time_events[800000:1200000], M, bin_length, symbol_length)
 
 information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
