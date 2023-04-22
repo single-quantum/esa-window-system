@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from numpy.random import default_rng
 
+from demodulation_functions import demodulate
 from parse_ppm_symbols import parse_ppm_symbols
 from ppm_parameters import CSM, M, num_bins_per_symbol
 
@@ -54,3 +55,8 @@ def test_parse_ppm_symbols_multiple_symbols_with_jitter():
 
     assert num_non_zero == num_symbols
     assert len(symbols) == len(timestamps)
+
+
+def test_demodulate_empty_array_raises_exception():
+    with pytest.raises(IndexError):
+        _ = demodulate([], 16)
