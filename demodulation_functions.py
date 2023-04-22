@@ -73,8 +73,17 @@ def find_csm_times(
 
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
-    # where_corr: npt.NDArray[np.int_] = np.where(corr >= 10)[0]
-    where_corr = find_peaks(corr, height=9, distance=symbols_per_codeword * num_bins_per_symbol)[0]
+    where_corr: npt.NDArray[np.int_]
+    correlation_threshold: int = int(len(CSM) * 0.6)
+    where_corr = find_peaks(
+        corr,
+        height=correlation_threshold,
+        distance=symbols_per_codeword * num_bins_per_symbol)[0]
+
+    # There is an edge case that if the CSM appears right at the start of the timestamps, that find_peaks cannot find it, even if the correlation is high enough.
+    # In that case, try a simple threshold check.
+    if where_corr.shape[0] == 0:
+        where_corr = np.where(corr >= correlation_threshold)[0]
 
     if where_corr.shape[0] == 0:
         raise ValueError("Could not find any CSM. ")
@@ -89,8 +98,18 @@ def find_csm_times(
     if message_start_idxs.shape[0] == 0:
         raise ValueError("Could not find message start / end. ")
 
-    where_csm_corr: npt.NDArray[np.int_] = where_corr[(
-        where_corr >= message_start_idxs[0]) & (where_corr <= message_start_idxs[1])]
+    # If there is only one codeword, assume there is only one CSM, so the end
+    # of the message is equal to the end of the timestamps.
+    where_csm_corr: npt.NDArray[np.int_]
+    if message_start_idxs.shape[0] == 1:
+        where_csm_corr = where_corr[where_corr >= message_start_idxs[0]]
+    else:
+        where_csm_corr = where_corr[(
+            where_corr >= message_start_idxs[0]) & (where_corr <= message_start_idxs[1])]
+
+    # If where_csm_corr is empty, but where_corr is not empty, use that value for the CSM
+    if where_csm_corr.shape[0] == 0 and where_corr.shape[0] != 0:
+        where_csm_corr = where_corr
 
     t0: float = time_stamps[0]
 
@@ -220,7 +239,7 @@ def demodulate(pulse_timestamps: npt.NDArray, M: int, slot_length: float, symbol
     msg_symbols = find_and_parse_codewords(csm_times, pulse_timestamps, CSM,
                                            symbols_per_codeword, slot_length, symbol_length)
 
-    print('Number of demodulated symbols: ', len(msg_symbols))
+    print('Number of demodulated symbols: ', len(flatten(msg_symbols)))
 
     slot_mapped_message = slot_map(flatten(msg_symbols), M)
 

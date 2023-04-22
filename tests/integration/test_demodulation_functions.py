@@ -3,8 +3,9 @@ import pytest
 from numpy.random import default_rng
 
 from demodulation_functions import demodulate
+from encoder_functions import get_csm
 from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import CSM, M, num_bins_per_symbol
+from ppm_parameters import CSM, num_bins_per_symbol
 
 
 def test_parse_ppm_symbols_single_noise_symbol():
@@ -59,4 +60,98 @@ def test_parse_ppm_symbols_multiple_symbols_with_jitter():
 
 def test_demodulate_empty_array_raises_exception():
     with pytest.raises(IndexError):
-        _ = demodulate([], 16)
+        _ = demodulate([], 16, 1, 1)
+
+
+@pytest.fixture
+def pulse_timestamps_no_csm():
+    M = 8
+    symbol_length = 5 / 4 * M * 0.1E-6
+    slot_length = 0.1E-6
+    num_symbols = 10
+
+    pulse_timestamps = np.arange(0.5 * slot_length, num_symbols * symbol_length + 0.5 * slot_length, symbol_length)
+    ppm_params = {'M': M, 'symbol_length': symbol_length,
+                  'slot_length': slot_length, 'num_symbols': num_symbols, 'CSM': CSM}
+
+    return pulse_timestamps, ppm_params
+
+
+@pytest.fixture
+def pulse_timestamps_with_csm():
+    M = 8
+    slot_length = 0.1E-6
+    symbol_length = 5 / 4 * M * slot_length
+    num_symbols = 5040
+    CSM = get_csm(M)
+    ppm_params = {'M': M, 'symbol_length': symbol_length,
+                  'slot_length': slot_length, 'num_symbols': num_symbols, 'CSM': CSM}
+
+    CSM_timestamps = []
+    for i, symbol in enumerate(CSM):
+        timestamp = i * symbol_length + symbol * slot_length + 0.5 * slot_length
+        CSM_timestamps.append(timestamp)
+
+    msg_pulse_timestamps = np.arange(
+        start=len(CSM) * symbol_length + 0.5 * slot_length,
+        stop=len(CSM) * symbol_length + num_symbols * symbol_length + 0.5 * slot_length,
+        step=symbol_length)
+
+    pulse_timestamps = np.hstack((CSM_timestamps, msg_pulse_timestamps))
+
+    return pulse_timestamps, ppm_params
+
+
+def test_demodulate_no_csm_raises_value_error(pulse_timestamps_no_csm):
+    pulse_timestamps, ppm_params = pulse_timestamps_no_csm
+    M, symbol_length, slot_length, _, _ = ppm_params.values()
+    with pytest.raises(ValueError):
+        _ = demodulate(pulse_timestamps, M, slot_length, symbol_length)
+
+
+def test_demodulate_happy_path(pulse_timestamps_with_csm):
+    pulse_timestamps, ppm_params = pulse_timestamps_with_csm
+    M, symbol_length, slot_length, num_symbols, CSM = ppm_params.values()
+
+    slot_mapped_sequence = demodulate(pulse_timestamps, M, slot_length, symbol_length)
+    # The demodulate function demodulates all timestamps, including the CSM.
+    # The decoder is responsible for stripping off the CSM.
+    assert slot_mapped_sequence.shape[0] == num_symbols + len(CSM)
+    assert slot_mapped_sequence.shape[1] == int(5 / 4 * M)
+
+
+def demodulate_happy_path():
+    M = 8
+    slot_length = 0.1E-6
+    symbol_length = 5 / 4 * M * slot_length
+    num_symbols = 5040
+    CSM = get_csm(M)
+    ppm_params = {'M': M, 'symbol_length': symbol_length,
+                  'slot_length': slot_length, 'num_symbols': num_symbols, 'CSM': CSM}
+
+    CSM_timestamps = []
+    for i, symbol in enumerate(CSM):
+        timestamp = i * symbol_length + symbol * slot_length + 0.5 * slot_length
+        CSM_timestamps.append(timestamp)
+
+    msg_pulse_timestamps = np.arange(
+        start=len(CSM) * symbol_length + 0.5 * slot_length,
+        stop=len(CSM) * symbol_length + num_symbols * symbol_length + 0.5 * slot_length,
+        step=symbol_length)
+
+    pulse_timestamps = np.hstack(
+        (
+            CSM_timestamps,
+            msg_pulse_timestamps
+        )
+    )
+
+    M, symbol_length, slot_length, num_symbols, _ = ppm_params.values()
+
+    print(pulse_timestamps)
+
+    slot_mapped_sequence = demodulate(pulse_timestamps, M, slot_length, symbol_length)
+    print(slot_mapped_sequence)
+
+
+demodulate_happy_path()
