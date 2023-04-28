@@ -80,7 +80,7 @@ def find_csm_times(
     where_corr = find_peaks(
         corr,
         height=correlation_threshold,
-        distance=symbols_per_codeword * num_bins_per_symbol)[0]
+        distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
     # There is an edge case that if the CSM appears right at the start of the timestamps, that find_peaks cannot find it, even if the correlation is high enough.
     # In that case, try a simple threshold check.
@@ -95,7 +95,7 @@ def find_csm_times(
     message_start_idxs: npt.NDArray[np.int_] = find_peaks(
         -(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1,
         height=(0.6, 1),
-        distance=symbols_per_codeword * num_bins_per_symbol)[0]
+        distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
     if message_start_idxs.shape[0] == 0:
         raise ValueError("Could not find message start / end. ")
@@ -248,7 +248,7 @@ def demodulate(
     print()
 
     msg_symbols = find_and_parse_codewords(csm_times, pulse_timestamps, CSM,
-                                           symbols_per_codeword, slot_length, symbol_length)
+                                           symbols_per_codeword, slot_length, symbol_length, M)
 
     print('Number of demodulated symbols: ', len(flatten(msg_symbols)))
 
