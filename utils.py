@@ -10,7 +10,7 @@ from tabulate import tabulate
 
 from encoder_functions import convolve
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
-                            M, N_interleaver, num_bins_per_symbol,
+                            M, N_interleaver, num_slots_per_symbol,
                             num_samples_per_slot)
 from trellis import Edge
 
@@ -19,7 +19,7 @@ def print_ppm_parameters():
     var_names = [
         'M',
         'num_samples_per_slot',
-        'num_bins_per_symbol',
+        'num_slots_per_symbol',
         'BIT_INTERLEAVE',
         'CHANNEL_INTERLEAVE',
         'B_interleaver',
@@ -29,7 +29,7 @@ def print_ppm_parameters():
     var_values = [
         M,
         num_samples_per_slot,
-        num_bins_per_symbol,
+        num_slots_per_symbol,
         BIT_INTERLEAVE,
         CHANNEL_INTERLEAVE,
         B_interleaver,
