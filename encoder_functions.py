@@ -137,12 +137,9 @@ def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction) -> n
 
     j = 0
     for i in range(len(unpunctured_sequence) - 1):
-        if P[i % 6] == 1:
+        if P[i % len(P)] == 1:
             unpunctured_sequence[i] = encoded_sequence[j]
             j += 1
-        if (i + 1) % (15120 / 6) == 0:
-            unpunctured_sequence[i] = encoded_sequence[j]
-            # j += 1
 
     return unpunctured_sequence
 
