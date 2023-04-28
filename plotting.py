@@ -2,14 +2,14 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
-from parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import symbol_length, bin_length
 
-def plot_timing_corrections(timing_corrections, symbol_length, bin_length, subtitle, twiny_ticks=True):
+from ppm_parameters import symbol_length, slot_length
+
+def plot_timing_corrections(timing_corrections, symbol_length, slot_length, subtitle, twiny_ticks=True):
     symbol_ticks = np.arange(0, len(timing_corrections), 2000)
     time_ticks = np.round(np.array(symbol_ticks)*symbol_length*1E3, 2)
     time_correction_ticks = np.flip(np.round(np.arange(0, timing_corrections[-1]-20E-9, 20E-9)*1E9, 1))
-    time_correction_bins = [i*bin_length*1E9 for i in range(1, len(time_correction_ticks)+1)]
+    time_correction_bins = [i*slot_length*1E9 for i in range(1, len(time_correction_ticks)+1)]
     time_correction_bins_tick_labels = [str(i) for i in range(1, len(time_correction_ticks)+1)]
 
 
@@ -28,8 +28,8 @@ def plot_timing_corrections(timing_corrections, symbol_length, bin_length, subti
     ax_t.set_xlabel('Time (ms)')
 
     ax.plot(np.array(timing_corrections)*1E9)
-    # ax.hlines(bin_length*1E9, 0, len(timing_corrections), color='r', linestyles='--', linewidth=1)
-    # ax.hlines(8*bin_length*1E9, 0, len(timing_corrections), color='r', linestyles='--', linewidth=1)
+    # ax.hlines(slot_length*1E9, 0, len(timing_corrections), color='r', linestyles='--', linewidth=1)
+    # ax.hlines(8*slot_length*1E9, 0, len(timing_corrections), color='r', linestyles='--', linewidth=1)
 
     # ax.set_xticks(symbol_ticks)
     # ax.set_xticklabels(symbol_ticks)
@@ -80,8 +80,8 @@ def plot_hello_world_message():
     bin_factor: float = 5/4
     num_bins_per_symbol: int = int(bin_factor*M)
     sample_size_awg: float = 1/8.84736E9*1E12
-    bin_length: float = sample_size_awg*1E-12*num_samples_per_slot # Length of 1 bin in time
-    symbol_length: float = bin_length*num_bins_per_symbol          # Length of 1 symbol in time
+    slot_length: float = sample_size_awg*1E-12*num_samples_per_slot # Length of 1 bin in time
+    symbol_length: float = slot_length*num_bins_per_symbol          # Length of 1 symbol in time
     samples_per_symbol = num_samples_per_slot*num_bins_per_symbol
 
     ymin = -0.05
@@ -91,10 +91,10 @@ def plot_hello_world_message():
     symbol_y_data = y_data[peaks[0]-margin:peaks[num_symbols+1]-margin]
 
     fig, axs = plt.subplots(num_symbols, 1, sharex=True, sharey=True)
-    xticks = np.arange(0, num_bins_per_symbol*bin_length*1E6, bin_length*1E6)
+    xticks = np.arange(0, num_bins_per_symbol*slot_length*1E6, slot_length*1E6)
     xlabels = [str(i) for i in range(len(xticks))]
     for i in range(num_symbols):
-        start_idx = np.where((x_data >= x_data[peaks[0]]+i*symbol_length*1E6) & (x_data <= x_data[peaks[0]]+i*symbol_length*1E6 + bin_length*1E6))[0][0]
+        start_idx = np.where((x_data >= x_data[peaks[0]]+i*symbol_length*1E6) & (x_data <= x_data[peaks[0]]+i*symbol_length*1E6 + slot_length*1E6))[0][0]
         stop_idx = np.where((x_data >= x_data[peaks[0]]+i*symbol_length*1E6) & (x_data <= x_data[peaks[0]]+(i+1)*symbol_length*1E6))[0][-1]
         
         # Shift the start index by a little bit to have a bit of margin around the start
@@ -107,9 +107,9 @@ def plot_hello_world_message():
 
         axs[i].vlines(x_data[start_idx]-x0, ymin, ymax, linestyles='--', color='r', linewidth=1)
         # Make the guard slots shaded
-        axs[i].axvspan(x_data[start_idx]-x0+16*bin_length*1E6, x_data[start_idx]-x0+20*bin_length*1E6, color='grey', alpha=0.5)
+        axs[i].axvspan(x_data[start_idx]-x0+16*slot_length*1E6, x_data[start_idx]-x0+20*slot_length*1E6, color='grey', alpha=0.5)
         for k in range(1, 16):
-            axs[i].vlines(x_data[start_idx]-x0+k*bin_length*1E6, ymin, ymax, linestyles='--', color='g', linewidth=1)
+            axs[i].vlines(x_data[start_idx]-x0+k*slot_length*1E6, ymin, ymax, linestyles='--', color='g', linewidth=1)
         
         axs[i].set_xticks(xticks)
         axs[i].set_xticklabels(xlabels)
@@ -137,7 +137,7 @@ def plot_hello_world_message():
     for i in range(num_symbols+1):
         plt.vlines(x_data[peaks[0]]+i*symbol_length*1E6, ymin, ymax, linestyles='--', color='r', linewidth=1)
         for j in range(1, 16):
-            plt.vlines(x_data[peaks[0]]+i*symbol_length*1E6+j*bin_length*1E6, ymin, ymax, linestyles='--', color='g', linewidth=1)
+            plt.vlines(x_data[peaks[0]]+i*symbol_length*1E6+j*slot_length*1E6, ymin, ymax, linestyles='--', color='g', linewidth=1)
     
     plt.vlines(x_data[peaks[0]]+(i+1)*symbol_length*1E6, ymin, ymax, linestyles='--', color='r', linewidth=1)
     

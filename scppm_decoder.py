@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
-from encoder_functions import (bit_deinterleave, channel_deinterleave,
+from encoder_functions import (bit_deinterleave, channel_deinterleave, get_csm,
                                randomize, unpuncture)
 from trellis import Trellis
 from utils import bpsk_encoding, generate_outer_code_edges
@@ -16,21 +16,39 @@ class DecoderError(Exception):
 
 
 def decode(
-    ppm_mapped_message: npt.NDArray[np.int_],
-    B_interleaver: int,
-    N_interleaver: int,
-    m: int,
-    reference_file_path: str,
-    CHANNEL_INTERLEAVE: bool = True,
-    BIT_INTERLEAVE: bool = True,
-    CODE_RATE: Fraction = Fraction(1, 3),
+    slot_mapped_sequence: npt.NDArray[np.int_],
+    M: int,
+    CODE_RATE: Fraction,
+    CHANNEL_INTERLEAVE=True,
+    BIT_INTERLEAVE=True,
     **kwargs
 ) -> tuple[npt.NDArray[np.int_], float]:
+    user_settings = kwargs.get('user_settings', {})
+
+    # The decode message takes an array of PPM symbols, so the slot mapped message
+    # Should be converted to a ppm mapped message first.
+    ppm_mapped_message = np.nonzero(slot_mapped_sequence)[1]
+
+    # The ppm mapped message still includes the synchronisation marker.
+    # Remove CSMs
+    CSM = get_csm(M)
+    m = int(np.log2(M))
+    symbols_per_codeword: int = int(15120 / m)
+
+    ppm_mapped_message = ppm_mapped_message.reshape((-1, symbols_per_codeword + len(CSM)))
+    ppm_mapped_message = ppm_mapped_message[:, len(CSM):]
+    ppm_mapped_message = ppm_mapped_message.flatten()
 
     convoluted_bit_sequence: npt.NDArray[np.int_]
 
     # Deinterleave
     if CHANNEL_INTERLEAVE:
+        B_interleaver = user_settings.get('B_interleaver')
+        N_interleaver = user_settings.get('N_interleaver', 2)
+        if B_interleaver is None:
+            m = int(np.log2(M))
+            B_interleaver = int(15120 / m / N_interleaver)
+
         print('Deinterleaving PPM symbols')
         ppm_mapped_message = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
         num_zeros_interleaver: int = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
@@ -39,26 +57,31 @@ def decode(
     else:
         convoluted_bit_sequence = ppm_symbols_to_bit_array(ppm_mapped_message, m)
 
+    BER_before_decoding: float | None = None
+
     # Get the BER before decoding
-    with open(reference_file_path, 'rb') as f:
-        sent_bit_sequence: list = pickle.load(f)
+    if reference_file_path := user_settings.get('reference_file_path'):
+        with open(reference_file_path, 'rb') as f:
+            sent_bit_sequence: list = pickle.load(f)
 
-    if len(convoluted_bit_sequence) > len(sent_bit_sequence):
-        BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence[:len(sent_bit_sequence)] -
-                                            sent_bit_sequence)) / len(sent_bit_sequence)
-    else:
-        BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence -
-                                            sent_bit_sequence[:len(convoluted_bit_sequence)])) / len(sent_bit_sequence)
+        if len(convoluted_bit_sequence) > len(sent_bit_sequence):
+            BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence[:len(sent_bit_sequence)] -
+                                                sent_bit_sequence)) / len(sent_bit_sequence)
+        else:
+            num_wrong_bits = np.sum(
+                np.abs(convoluted_bit_sequence - sent_bit_sequence[:len(convoluted_bit_sequence)])
+            )
+            BER_before_decoding = num_wrong_bits / len(sent_bit_sequence)
 
-    print(f'BER before decoding: {BER_before_decoding}')
-    # if BER_before_decoding > 0.25:
-    #     raise DecoderError("Could not properly decode message. ")
+        print(f'BER before decoding: {BER_before_decoding}')
+        # if BER_before_decoding > 0.25:
+        #     raise DecoderError("Could not properly decode message. ")
 
     num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
     if (diff := 15120 - num_leftover_symbols) < 100:
         convoluted_bit_sequence = np.hstack((convoluted_bit_sequence, np.zeros(diff)))
         num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
-    # num_leftover_symbols = 0
+
     symbols_to_deinterleave = convoluted_bit_sequence.shape[0] - num_leftover_symbols
 
     received_sequence_interleaved = convoluted_bit_sequence[:symbols_to_deinterleave].reshape((-1, 15120))
@@ -72,7 +95,6 @@ def decode(
         received_sequence = received_sequence_interleaved
 
     deinterleaved_received_sequence = received_sequence.flatten()
-    # deinterleaved_received_sequence = np.hstack((deinterleaved_received_sequence, [0, 0]))
 
     print('Setting up trellis')
 
@@ -95,11 +117,6 @@ def decode(
     else:
         tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
         tr.set_edges(edges)
-        # df = 0
-
-        # if df == 0 and z == 0:
-        #     with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
-        #         pickle.dump(tr, f)
 
     Es = 5
 

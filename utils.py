@@ -10,7 +10,7 @@ from tabulate import tabulate
 
 from encoder_functions import convolve
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
-                            M, N_interleaver, num_bins_per_symbol,
+                            M, N_interleaver, num_slots_per_symbol,
                             num_samples_per_slot)
 from trellis import Edge
 
@@ -19,7 +19,7 @@ def print_ppm_parameters():
     var_names = [
         'M',
         'num_samples_per_slot',
-        'num_bins_per_symbol',
+        'num_slots_per_symbol',
         'BIT_INTERLEAVE',
         'CHANNEL_INTERLEAVE',
         'B_interleaver',
@@ -29,7 +29,7 @@ def print_ppm_parameters():
     var_values = [
         M,
         num_samples_per_slot,
-        num_bins_per_symbol,
+        num_slots_per_symbol,
         BIT_INTERLEAVE,
         CHANNEL_INTERLEAVE,
         B_interleaver,
@@ -109,6 +109,7 @@ def generate_outer_code_edges(memory_size, bpsk_encoding=True):
 
 
 def AWGN(input_sequence, sigma=0.8):
+    """Superimpose Additive White Gaussian Noise on the input sequence. """
     rng = default_rng()
     input_sequence = input_sequence.astype(float)
     input_sequence += rng.normal(0, sigma, size=len(input_sequence))
@@ -117,6 +118,7 @@ def AWGN(input_sequence, sigma=0.8):
 
 
 def flatten(list_of_lists):
+    """Convert a list of lists to a flat (1D) list. """
     return [i for sublist in list_of_lists for i in sublist]
 
 
@@ -128,3 +130,17 @@ def moving_average(arr: npt.NDArray[Any], n: int = 3) -> npt.NDArray[Any]:
     ret: npt.NDArray[np.float_] = np.cumsum(arr, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
+
+
+def check_user_settings(user_settings: dict) -> None:
+    B_interleaver: int | None = user_settings.get('B_interleaver')
+    if B_interleaver is None:
+        raise KeyError("B_interleaver not found in `user_settings`")
+    if not isinstance(B_interleaver, int):
+        raise ValueError("B_interleaver should be an integer. ")
+
+    N_interleaver: int | None = user_settings.get('N_interleaver')
+    if N_interleaver is None:
+        raise KeyError("N_interleaver not found in `user_settings`")
+    if not isinstance(N_interleaver, int):
+        raise ValueError("N_interleaver should be an integer. ")

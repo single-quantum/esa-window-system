@@ -9,19 +9,17 @@ import pandas as pd
 from data_converter import message_from_payload
 from encoder_functions import slot_map
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
-                            GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, M, bin_length,
+                            GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, M, slot_length,
                             m, num_samples_per_slot, num_symbols_per_slice,
-                            sample_size_awg, slot_factor, symbols_per_codeword)
+                            sample_size_awg, num_slots_per_symbol, symbols_per_codeword, B_interleaver, N_interleaver)
 from scppm_encoder import encoder
+
 
 ADD_ASM: bool = True
 
 num_output_bits: int = 3     # number of output bits from the convolutional encoder
 num_input_bits: int = 1
 memory_size: int = 2         # Memory size of the convolutional encoder
-
-# 1 means: no guard slot, 5/4 means: M/4 guard slots
-num_bins_per_symbol = int(slot_factor * M)
 
 msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
 num_PPM_symbols: int
@@ -54,22 +52,30 @@ match PAYLOAD_TYPE:
             msg_PPM_symbols = np.append(msg_PPM_symbols, 0)
 
         message_time_microseconds = sample_size_awg * 1E-12 * num_samples_per_slot * \
-            num_bins_per_symbol * msg_PPM_symbols.shape[0] * 1E6
+            num_slots_per_symbol * msg_PPM_symbols.shape[0] * 1E6
         num_PPM_symbols = msg_PPM_symbols.shape[0]
         num_bits_sent = num_PPM_symbols * m
         slot_mapped_sequence = slot_map(msg_PPM_symbols, M)
 
     case _:
-        sent_message: npt.NDArray[np.int_] = message_from_payload(PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
+        sent_message: npt.NDArray[np.int_] = message_from_payload(
+            PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
         num_bits_sent = len(sent_message)
 
-        slot_mapped_sequence = encoder(sent_message)
+        slot_mapped_sequence = encoder(sent_message, M, CODE_RATE,
+                                       **{'user_settings': {
+                                           'B_interleaver': B_interleaver,
+                                           'N_interleaver': N_interleaver},
+                                           'save_encoded_sequence_to_file': True,
+                                           'reference_file_prefix': 'jupiter_greyscale',
+                                           'num_samples_per_slot': num_samples_per_slot}
+                                       )
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
         num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword + len(CSM)))
         num_slots = slot_mapped_sequence.flatten().shape[0]
-        message_time_microseconds = num_slots * bin_length * 1E6
+        message_time_microseconds = num_slots * slot_length * 1E6
 
 
 if PAYLOAD_TYPE == 'image':
@@ -84,7 +90,7 @@ print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microsecon
 # %%
 
 # Generate AWG pattern file
-num_samples_per_symbol: int = num_bins_per_symbol * num_samples_per_slot
+num_samples_per_symbol: int = num_slots_per_symbol * num_samples_per_slot
 
 pulse_width: int = 3
 

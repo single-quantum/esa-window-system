@@ -1,32 +1,27 @@
 # %%
 import itertools
 import math
-from copy import deepcopy
+from fractions import Fraction
 
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.random import default_rng
 from PIL import Image
 
-from BCJR_decoder_functions import (calculate_alpha_inner_SISO,
-                                    calculate_alphas,
-                                    calculate_beta_inner_SISO, calculate_betas,
-                                    calculate_gamma_inner_SISO,
-                                    calculate_gamma_primes, calculate_gammas,
-                                    calculate_inner_SISO_LLRs, calculate_LLRs,
-                                    calculate_outer_SISO_LLRs,
-                                    ppm_symbols_to_bit_array)
+from BCJR_decoder_functions import (calculate_alphas, calculate_betas,
+                                    calculate_gammas, calculate_LLRs, ppm_symbols_to_bit_array)
 from encoder_functions import (accumulate, bit_deinterleave, bit_interleave,
                                channel_deinterleave, channel_interleave,
                                convolve, map_PPM_symbols, prepend_asm, slicer,
                                zero_terminate, get_csm)
 from parse_ppm_symbols import rolling_window
-from ppm_parameters import GREYSCALE
+
 from trellis import Edge, Trellis
 from utils import (AWGN, bpsk, bpsk_encoding, frombits,
                    generate_outer_code_edges, tobits)
 from viterbi import viterbi
 
+GREYSCALE = True
 PAYLOAD_TYPE = 'image'
 LOG_BCRJ = True
 SIMULATE_BURST_ERRORS = False
@@ -45,7 +40,7 @@ else:
 
 match PAYLOAD_TYPE:
     case 'image':
-        file = "JWST_2022-07-27_Jupiter_small.png"
+        file = "sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
         img = Image.open(file)
         img = img.convert(IMG_MODE)
         img_array = np.asarray(img).astype(int)
@@ -118,10 +113,11 @@ memory_size = 2
 edges = generate_outer_code_edges(memory_size, bpsk_encoding=False)
 
 
-information_blocks = slicer(sent_message)
+information_blocks = slicer(sent_message, code_rate=Fraction(1, 3))
 information_blocks = zero_terminate(information_blocks)
 
 print('Number of slices: ', information_blocks.shape[0])
+
 
 # The convolutional encoder is a 1/3 code rate encoder.
 convoluted_bit_sequence = np.zeros((information_blocks.shape[0], information_blocks.shape[1] * 3), dtype=int)
@@ -140,7 +136,7 @@ time_steps = len(convoluted_bit_sequence) // num_output_bits
 
 S = len(convoluted_bit_sequence) // m
 
-ppm_mapped_message = map_PPM_symbols(convoluted_bit_sequence, S, m)
+ppm_mapped_message = map_PPM_symbols(convoluted_bit_sequence, m)
 ppm_mapped_message = channel_interleave(ppm_mapped_message, B_interleaver, N_interleaver)
 
 # Insert CSMs
@@ -235,7 +231,7 @@ for Es, N0 in list(zip(E, N)):
 
     alpha = np.zeros((num_states, time_steps + 1))
     beta = np.zeros((num_states, time_steps + 1))
-    
+
     predicted_msg_viterbi = viterbi(num_output_bits, encoded_sequence, tr)
 
     # Calculate alphas, betas, gammas and LLRs
@@ -253,7 +249,6 @@ for Es, N0 in list(zip(E, N)):
 
     predicted_msg_viterbi = predicted_msg_viterbi.reshape((-1, 5040))
     predicted_msg_viterbi = predicted_msg_viterbi[:, 0:-2].flatten()
-
 
     match PAYLOAD_TYPE:
         case 'image':
@@ -279,7 +274,7 @@ for Es, N0 in list(zip(E, N)):
     error_ratio = error_percentage / 100
     BER_BCJR.append(error_ratio)
 
-    # For some reason, Viterbi is shifted by one bit. 
+    # For some reason, Viterbi is shifted by one bit.
     predicted_msg_viterbi = predicted_msg_viterbi[1:1+len(sent_message)]
     num_errors_viterbi = sum(abs(np.array(sent_message) - np.array(predicted_msg_viterbi)))
     error_percentage_viterbi = 100 * num_errors_viterbi / len(sent_message)
@@ -295,10 +290,10 @@ for Es, N0 in list(zip(E, N)):
         INTERPOLATION = None
         CMAP = "binary"
         if GREYSCALE:
-            pixel_values = map_PPM_symbols(predicted_msg, predicted_msg.shape[0] // 8, 8)
+            pixel_values = map_PPM_symbols(predicted_msg, 8)
             bcjr_picture = pixel_values[:original_shape[0] * original_shape[1]].reshape(original_shape)
 
-            pixel_values = map_PPM_symbols(predicted_msg_viterbi, predicted_msg_viterbi.shape[0] // 8, 8)
+            pixel_values = map_PPM_symbols(predicted_msg_viterbi, 8)
             viterbi_picture = pixel_values[:original_shape[0] * original_shape[1]].reshape(original_shape)
             CMAP = 'Greys'
             MODE = "L"
@@ -307,11 +302,11 @@ for Es, N0 in list(zip(E, N)):
             viterbi_picture = predicted_msg_viterbi[:original_shape[0] * original_shape[1]].reshape(original_shape)
             CMAP = 'binary'
             MODE = '1'
-        
 
         if GREYSCALE:
-            sent_picture = map_PPM_symbols(sent_message, sent_message.shape[0]//8, 8).reshape(original_shape)
-            noisy_picture = map_PPM_symbols(noisy_sent_message, noisy_sent_message.shape[0]//8, 8).reshape(original_shape)
+            sent_picture = map_PPM_symbols(sent_message, 8).reshape(original_shape)
+            noisy_picture = map_PPM_symbols(
+                noisy_sent_message, 8).reshape(original_shape)
         else:
             sent_picture = sent_message.reshape(original_shape)
             noisy_picture = noisy_sent_message.reshape(original_shape)

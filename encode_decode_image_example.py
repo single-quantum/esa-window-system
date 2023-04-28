@@ -1,36 +1,78 @@
-import numpy as np
-from data_converter import message_from_payload
-from scppm_encoder import encoder
-from scppm_decoder import decode
-from ppm_parameters import B_interleaver, N_interleaver, m, CODE_RATE, CSM, symbols_per_codeword
 from fractions import Fraction
-from encoder_functions import map_PPM_symbols
+
 import matplotlib.pyplot as plt
+from PIL import Image
 
-from utils import flatten
+from data_converter import message_from_payload
+from encoder_functions import map_PPM_symbols
+from scppm_decoder import decode
+from scppm_encoder import encoder
 
-# Convert image to bit array
-reference_file_path = 'jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
-sent_bits = message_from_payload('image', filepath='sample_payloads/pillars-of-creation-tiny.png')
+# Definitions:
+# - M: PPM order, should be increment of 2**m with m in [2, 3, 4, ...]
+# - CODE_RATE: code rate of the encoder, should be one of [1/3, 2/3, 1/2]
+# - B_interleaver: base length of the shift register of the channel interleaver
+# - N_interleaver: number of parallel shift registers in the channel interleaver
+#   Note: the product B*N should be a multiple of 15120/m with m np.log2(M)
+# - reference_file_path: file path to the pickle file of the encoded bit sequence.
+#   This file is used to determine the bit error ratio (BER) before decoding.
+
+M: int = 8
+code_rate: Fraction = Fraction(2, 3)
+payload_type = 'image'
+payload_file_path = 'sample_payloads/pillars-of-creation-tiny.png'
+
+IMG_SIZE: tuple[int, ...] = tuple((0, 0))
+
+if payload_type == 'image':
+    img = Image.open(payload_file_path)
+    IMG_SIZE = img.size
+
+# Additional settings that are not strictly necessary.
+# If B and N are not provided, N is assumed to be 2
+user_settings = {
+    'B_interleaver': 2520,
+    'N_interleaver': 2,
+    'reference_file_path': 'pillars_greyscale_16_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
+}
+
+# 1. Convert payload to bit sequence
+# 2. Encode
+# 3. Decode
+
+# Convert payload (in this case an image) to bit array
+sent_bits = message_from_payload(payload_type, filepath=payload_file_path)
 
 # Put the payload through the encoder
-slot_mapped_sequence = encoder(sent_bits)
+# Some extra settings can be passed through the encoder and decoder, like the length of the channel interleaver
+# or whether or not to save the encoded bit sequence to a file for reference.
+slot_mapped_sequence = encoder(
+    sent_bits,
+    M,
+    code_rate,
+    **{
+        'user_settings': user_settings,
+        'save_encoded_sequence_to_file': True,
+        'reference_file_prefix': 'pillars_greyscale',
+        'num_samples_per_slot': 16
+    })
 
-# The decode message takes an array of PPM symbols, to the slot mapped message
-# Should be converted to a ppm mapped message first.
-ppm_mapped_message = np.nonzero(slot_mapped_sequence)[1]
+decoded_message = decode(
+    slot_mapped_sequence,
+    M,
+    code_rate,
+    **{'user_settings': user_settings}
+)
 
-# The ppm mapped message still includes the synchronisation marker. 
-# Remove CSMs
+if payload_type == 'image':
+    # Although `map_PPM_symbols` was meant to map bits to PPM symbols, it can conveniently also be used
+    # to map bit values to 1-byte greyscale values.
+    pixel_values = map_PPM_symbols(decoded_message[0], 8)
+    img_arr = pixel_values[:IMG_SIZE[0] * IMG_SIZE[1]].reshape((IMG_SIZE[1], IMG_SIZE[0]))
 
-ppm_mapped_message = ppm_mapped_message.reshape((-1, symbols_per_codeword+len(CSM)))
-ppm_mapped_message = ppm_mapped_message[:, len(CSM):]
+    plt.figure()
+    plt.imshow(img_arr)
+    plt.show()
 
-decoded_message = decode(ppm_mapped_message, B_interleaver, N_interleaver, m, reference_file_path, CHANNEL_INTERLEAVE=True, BIT_INTERLEAVE=True, CODE_RATE=CODE_RATE)
-
-pixel_values = map_PPM_symbols(decoded_message[0], 8)
-img_arr = pixel_values[:100*101].reshape((101, 100))
-
-plt.figure()
-plt.imshow(img_arr)
-plt.show()
+else:
+    print('Decoded message', decoded_message)

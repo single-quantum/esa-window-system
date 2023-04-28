@@ -1,8 +1,6 @@
 import numpy as np
 import numpy.typing as npt
 
-from ppm_parameters import M
-
 
 def find_pulses_within_symbol_frame(
     i: int,
@@ -47,6 +45,7 @@ def parse_ppm_symbols(
         stop_time: float,
         slot_length: float,
         symbol_length: float,
+        M: int,
         num_darkcounts: int = 0,
         **kwargs) -> tuple[list[float], int]:
 
@@ -70,7 +69,7 @@ def parse_ppm_symbols(
             symbol = (pulse - symbol_start - 0.5 * slot_length) / slot_length
 
             # Symbols cannot be in guard slots
-            if round(symbol) > M:
+            if round(symbol) >= M:
                 continue
 
             # If the symbol is too far off the bin center, it is most likely a darkcount
