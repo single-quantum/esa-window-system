@@ -1,8 +1,9 @@
 import numpy as np
 
-from encoder_functions import channel_deinterleave, channel_interleave, bit_interleave, bit_deinterleave
+from encoder_functions import (bit_deinterleave, bit_interleave,
+                               channel_deinterleave, channel_interleave)
+from ppm_parameters import B_interleaver, M, N_interleaver
 
-from ppm_parameters import M, B_interleaver, N_interleaver
 
 def test_channel_interleaving():
     rng = np.random.default_rng()
@@ -10,16 +11,17 @@ def test_channel_interleaving():
     interleaved_symbols = channel_interleave(input_symbols, B_interleaver, N_interleaver)
     deinterleaved_symbols = channel_deinterleave(interleaved_symbols, B_interleaver, N_interleaver)
     deinterleaved_symbols = np.array(deinterleaved_symbols)
-    
-    # Number of zeros added due to interleaving
-    interleaver_overhead = B_interleaver*N_interleaver*(N_interleaver-1)
 
-    assert len(interleaved_symbols) - interleaver_overhead == len(input_symbols) 
+    # Number of zeros added due to interleaving
+    interleaver_overhead = B_interleaver * N_interleaver * (N_interleaver - 1)
+
+    assert len(interleaved_symbols) - interleaver_overhead == len(input_symbols)
     # The last 2*interleaver_overhead symbols should all be zeros due to interleaving
-    assert np.all(deinterleaved_symbols[(len(deinterleaved_symbols)-2*interleaver_overhead):] == 0)
-    
+    assert np.all(deinterleaved_symbols[(len(deinterleaved_symbols) - 2 * interleaver_overhead):] == 0)
+
     # After deinterleaving, all symbols should be the same
-    assert np.all(input_symbols == deinterleaved_symbols[:(len(deinterleaved_symbols)-2*interleaver_overhead)])
+    assert np.all(input_symbols == deinterleaved_symbols[:(len(deinterleaved_symbols) - 2 * interleaver_overhead)])
+
 
 def test_bit_interleaving():
     rng = np.random.default_rng()

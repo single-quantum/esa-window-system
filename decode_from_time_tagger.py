@@ -4,9 +4,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import TimeTagger
-
 from PIL import Image
 
+from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
@@ -22,7 +22,7 @@ https://www.swabianinstruments.com/time-tagger/downloads/ . """
 
 
 def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
-    """Open the `time_events_filename` with the TimeTagger.FileReader class and retrieve events. 
+    """Open the `time_events_filename` with the TimeTagger.FileReader class and retrieve events.
 
     Can either read out the entire buffer or read out a given number of events. """
     fr = TimeTagger.FileReader(time_events_filename)
