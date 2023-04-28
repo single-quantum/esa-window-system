@@ -109,6 +109,7 @@ def generate_outer_code_edges(memory_size, bpsk_encoding=True):
 
 
 def AWGN(input_sequence, sigma=0.8):
+    """Superimpose Additive White Gaussian Noise on the input sequence. """
     rng = default_rng()
     input_sequence = input_sequence.astype(float)
     input_sequence += rng.normal(0, sigma, size=len(input_sequence))
@@ -117,6 +118,7 @@ def AWGN(input_sequence, sigma=0.8):
 
 
 def flatten(list_of_lists):
+    """Convert a list of lists to a flat (1D) list. """
     return [i for sublist in list_of_lists for i in sublist]
 
 
