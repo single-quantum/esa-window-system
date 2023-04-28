@@ -35,10 +35,10 @@ if CHANNEL_INTERLEAVE:
 BIT_INTERLEAVE = True
 
 
-num_bins_per_symbol: int = int(slot_factor * M)
+num_slots_per_symbol: int = int(slot_factor * M)
 
 CSM = get_csm(M)
 
 sample_size_awg: float = 1 / DAC_DATA_RATE * 1E12       # Time duration of 1 DAC sample in ps
-bin_length: float = sample_size_awg * 1E-12 * num_samples_per_slot  # Length of 1 bin in time
-symbol_length: float = bin_length * num_bins_per_symbol          # Length of 1 symbol in time
+slot_length: float = sample_size_awg * 1E-12 * num_samples_per_slot  # Length of 1 bin in time
+symbol_length: float = slot_length * num_slots_per_symbol          # Length of 1 symbol in time

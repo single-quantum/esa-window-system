@@ -1,8 +1,6 @@
 import numpy as np
 import numpy.typing as npt
 
-from ppm_parameters import M
-
 
 def find_pulses_within_symbol_frame(
     i: int,
@@ -47,6 +45,7 @@ def parse_ppm_symbols(
         stop_time: float,
         slot_length: float,
         symbol_length: float,
+        M: int,
         num_darkcounts: int = 0,
         **kwargs) -> tuple[list[float], int]:
 
