@@ -23,7 +23,7 @@ For the curious, or to bring you up to speed, I'd like to present a few basic co
 
 ## How to use the code
 For convenience, there are three high level functions that can be used to encode and decode user data. To see how they work, one can refer to `encode_decode_image_example.py`. The three functions are:
-- `encode`: Encodes the bit sequence to a slot mapped sequence. 
+- `encode`: Encodes the bit sequence to a slot mapped sequence. To do this, two input parameters need to be known, `M` and the `code_rate` (should be one of 1/3, 1/2, 2/3)
 - `decode`
 - `demodulate`
 
