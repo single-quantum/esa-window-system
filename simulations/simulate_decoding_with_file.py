@@ -214,9 +214,6 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             # timestamps = np.hstack((timestamps, rng.random(size=15) * timestamps[0]))
             # timestamps = np.sort(timestamps)
 
-            n0 = 0
-            t0 = timestamps[n0]
-
             if simulate_jitter:
                 sigma = detector_jitter / 2.355
                 timestamps += rng.normal(0, sigma, size=len(timestamps))
