@@ -82,12 +82,12 @@ def simulate_darkcounts_timestamps(rng, lmbda):
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = True
 simulate_darkcounts: bool = False
-simulate_jitter: bool = False
+simulate_jitter: bool = True
 
-detection_efficiency: float = 0.9
+detection_efficiency: float = 0.8
 num_photons_per_pulse = 5
-darkcounts_factor: float = 0.01
-detector_jitter = 5 * 25E-12
+darkcounts_factor: float = 0.05
+detector_jitter = 125E-12
 
 use_test_file: bool = True
 use_latest_tt_file: bool = False
@@ -95,7 +95,7 @@ compare_with_original: bool = False
 plot_BER_distribution: bool = False
 
 time_events_filename: str
-reference_file_path = 'jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
+reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
 
 if use_test_file:
     time_events_filename = f'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_{M}-PPM_{num_samples_per_slot}_3_c1b1_2-3-code-rate.csv'
@@ -167,7 +167,7 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-detection_efficiencies = np.arange(0.70, 0.80, 0.05)
+detection_efficiencies = np.arange(0.50, 0.80, 0.05)
 cached_trellis: Trellis | None = None
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')

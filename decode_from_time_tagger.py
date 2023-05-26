@@ -11,7 +11,7 @@ from demodulation_functions import demodulate
 from encoder_functions import map_PPM_symbols
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE,
                             GREYSCALE, IMG_SHAPE, B_interleaver, N_interleaver,
-                            m, num_slots_per_symbol, slot_length, symbol_length)
+                            m, num_slots_per_symbol, slot_length, symbol_length, M, num_samples_per_slot)
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
 from scppm_decoder import DecoderError, decode
@@ -59,16 +59,17 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
 M = 8
 use_latest_tt_file: bool = False
 time_tagger_files_dir: str = 'time tagger files/'
-reference_file_path = 'jupiter_greyscale_8_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
+reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
 
-if use_latest_tt_file:
+# You can choose to manually put in the time tagger filename below, or use the last added file to the directory. 
+if not use_latest_tt_file:
+    time_tagger_filename = time_tagger_files_dir + 'jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-29-15.ttbin'
+else:
     time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
     tt_files = time_tagger_files_path.rglob('*.ttbin')
     files: list[Path] = [x for x in tt_files if x.is_file()]
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
     time_tagger_filename = time_tagger_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
-else:
-    time_tagger_filename = time_tagger_files_dir + 'jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-29-15.ttbin'
 
 
 time_events = get_time_events_from_tt_file(time_tagger_filename)
@@ -120,7 +121,7 @@ print(f'BER after decoding: {BER_after_decoding }. ')
 
 plt.figure()
 plt.imshow(img_arr, cmap=CMAP)
-plt.title('Decoded image of Jupiter')
+plt.title('Decoded payload')
 plt.xlabel('Pixel number (x)')
 plt.ylabel('Pixel number (y)')
 plt.show()
