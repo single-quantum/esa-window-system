@@ -98,7 +98,7 @@ time_events_filename: str
 reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
 
 if use_test_file:
-    time_events_filename = f'ppm_message_Jupiter_tiny_greyscale_95x100_pixels_{M}-PPM_{num_samples_per_slot}_3_c1b1_2-3-code-rate.csv'
+    time_events_filename = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_3_c1b1_2-3-code-rate.csv'
 elif not use_test_file and use_latest_tt_file:
     tt_files_dir = 'time tagger files/'
     tt_files_path = Path(__file__).parent.absolute() / tt_files_dir
@@ -167,7 +167,7 @@ else:
 
     print(f'Number of events: {len(time_stamps)}')
 
-detection_efficiencies = np.arange(0.50, 0.80, 0.05)
+detection_efficiencies = np.arange(0.90, 1.00, 0.05)
 cached_trellis: Trellis | None = None
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
@@ -228,7 +228,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
             peak_locations = np.sort(peak_locations)
 
         try:
-            slot_mapped_message = demodulate(peak_locations[:200000], M, slot_length, symbol_length, num_slots_per_symbol)
+            slot_mapped_message = demodulate(peak_locations[:200000], M, slot_length, symbol_length, num_slots_per_symbol, debug_mode=True)
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -256,10 +256,14 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
         if GREYSCALE:
             pixel_values = map_PPM_symbols(information_blocks, 8)
-            img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
-            CMAP = 'Greys'
-            MODE = "L"
-            IMG_MODE = 'L'
+            try:
+                img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+                CMAP = 'Greys'
+                MODE = "L"
+                IMG_MODE = 'L'
+            except ValueError as e:
+                print(e)
+                continue
         else:
             img_arr = information_blocks.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
             CMAP = 'binary'
