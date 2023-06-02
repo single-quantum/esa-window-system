@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from scipy.ndimage import shift
 
 from shift_register import CRC
 
@@ -41,7 +40,7 @@ def generate_pseudo_randomized_sequence(seed: list = [1] * 8):
     addition_2 = seed[2] ^ addition_1
     addition_3 = seed[0] ^ addition_2
 
-    output = shift(seed, 1).tolist()
+    output = np.roll(seed, 1).tolist()
     output[0] = addition_3
 
     sequence.append(output[-1])
@@ -53,7 +52,7 @@ def generate_pseudo_randomized_sequence(seed: list = [1] * 8):
         addition_2 = output[2] ^ addition_1
         addition_3 = output[0] ^ addition_2
 
-        output = shift(output, 1).tolist()
+        output = np.roll(output, 1).tolist()
         output[0] = addition_3
 
         sequence.append(output[-1])
