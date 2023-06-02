@@ -44,10 +44,7 @@ class DataConverter:
         if filepath.suffix not in IMG_SUFFIXES:
             raise ValueError("File does not have the correct filetype. Should be one of .png, .jpg, or .jpeg")
 
-        if greyscale:
-            img_mode = "L"
-        else:
-            img_mode = "1"
+        img_mode = "L" if greyscale else "1"
 
         img = Image.open(filepath)
         img = img.convert(img_mode)

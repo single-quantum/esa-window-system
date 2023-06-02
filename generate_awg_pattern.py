@@ -1,6 +1,5 @@
 # %%
 import math
-from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
@@ -8,7 +7,7 @@ import pandas as pd
 
 from data_converter import payload_to_bit_sequence
 from encoder_functions import slot_map
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM, IMG_FILE_PATH,
                             GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, M, slot_length,
                             m, num_samples_per_slot, num_symbols_per_slice,
                             sample_size_awg, num_slots_per_symbol, symbols_per_codeword, B_interleaver, N_interleaver)
@@ -59,7 +58,7 @@ match PAYLOAD_TYPE:
 
     case _:
         sent_message: npt.NDArray[np.int_] = payload_to_bit_sequence(
-            PAYLOAD_TYPE, filepath="sample_payloads/JWST_2022-07-27_Jupiter_tiny.png")
+            PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
         num_bits_sent = len(sent_message)
 
         slot_mapped_sequence = encoder(sent_message, M, CODE_RATE,

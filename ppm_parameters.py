@@ -1,19 +1,23 @@
 from fractions import Fraction
 
 from numpy import log2
+from PIL import Image
 
 from encoder_functions import get_csm
 
-DAC_DATA_RATE: float = 8.82091E9        # DAC data rate in Hz
-num_samples_per_slot: int = 8           # Number of samples per bin
+num_samples_per_slot: int = 8           # Number of DAC samples in one slot
 M: int = 8                              # each m = 4 bits are mapped from 0 to M = 16
 CODE_RATE = Fraction(2, 3)
 
+PAYLOAD_TYPE: str = 'image'
+IMG_FILE_PATH = "sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
+img = Image.open(IMG_FILE_PATH)
+IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
+GREYSCALE: bool = True
+
 # No neEd to change the parameters below, unless you know what you're doing!
 # Note: The fraction type is needed for proper match casing
-PAYLOAD_TYPE: str = 'image'
-GREYSCALE: bool = True
-IMG_SHAPE: tuple[int, int] = (95, 100)
+DAC_DATA_RATE: float = 8.82091E9        # DAC data rate in Hz
 
 # PPM parameters
 m: int = int(log2(M))
@@ -34,7 +38,6 @@ if CHANNEL_INTERLEAVE:
         raise ValueError("The product of B and N should be a multiple of 15120/m")
 
 BIT_INTERLEAVE = True
-
 
 num_slots_per_symbol: int = int(slot_factor * M)
 
