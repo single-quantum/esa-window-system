@@ -14,11 +14,8 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM, 
 from scppm_encoder import encoder
 
 
+pulse_width: int = 3        # number of DAC samples for 1 symbol
 ADD_ASM: bool = True
-
-num_output_bits: int = 3     # number of output bits from the convolutional encoder
-num_input_bits: int = 1
-memory_size: int = 2         # Memory size of the convolutional encoder
 
 msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
 num_PPM_symbols: int
@@ -90,8 +87,6 @@ print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microsecon
 
 # Generate AWG pattern file
 num_samples_per_symbol: int = num_slots_per_symbol * num_samples_per_slot
-
-pulse_width: int = 3
 
 pulse = np.zeros(num_samples_per_symbol * num_PPM_symbols)
 print(f'Multiple of 256? {len(pulse)/256}')
