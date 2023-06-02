@@ -66,7 +66,7 @@ class DataConverter:
         pass
 
 
-def message_from_payload(payload_type: str, **kwargs) -> npt.NDArray[np.int_]:
+def payload_to_bit_sequence(payload_type: str, **kwargs) -> npt.NDArray[np.int_]:
     """Convert an image or string to a bit sequence. """
     d: DataConverter
 

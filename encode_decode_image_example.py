@@ -3,7 +3,7 @@ from fractions import Fraction
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from data_converter import message_from_payload
+from data_converter import payload_to_bit_sequence
 from encoder_functions import map_PPM_symbols
 from scppm_decoder import decode
 from scppm_encoder import encoder
@@ -41,7 +41,7 @@ user_settings = {
 # 3. Decode
 
 # Convert payload (in this case an image) to bit array
-sent_bits = message_from_payload(payload_type, filepath=payload_file_path)
+sent_bits = payload_to_bit_sequence(payload_type, filepath=payload_file_path)
 
 # Put the payload through the encoder
 # Some extra settings can be passed through the encoder and decoder, like the length of the channel interleaver
