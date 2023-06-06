@@ -59,7 +59,7 @@ def simulate_symbol_loss(
     return peaks
 
 
-def simulate_darkcounts_timestamps(rng, lmbda):
+def simulate_darkcounts_timestamps(rng, lmbda: float, msg_peaks: npt.NDArray[np.int_]):
     num_slots = int((time_series[msg_peaks][-1] - time_series[msg_peaks][0]) / slot_length)
     p = rng.poisson(lmbda, num_slots)
 
@@ -98,7 +98,8 @@ time_events_filename: str
 reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
 
 if use_test_file:
-    time_events_filename = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}-PPM_{num_samples_per_slot}_3_c1b1_2-3-code-rate.csv'
+    time_events_filename = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_{M}' + \
+        '-PPM_{num_samples_per_slot}_3_c1b1_2-3-code-rate.csv'
 elif not use_test_file and use_latest_tt_file:
     tt_files_dir = 'time tagger files/'
     tt_files_path = Path(__file__).parent.absolute() / tt_files_dir
@@ -107,7 +108,8 @@ elif not use_test_file and use_latest_tt_file:
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
     time_events_filename = tt_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
 else:
-    time_events_filename = "time tagger files/jupiter_tiny_greyscale_16_samples_per_slot_CSM_0_interleaved_15-56-53.ttbin"
+    time_events_filename = 'time tagger files/jupiter_tiny_greyscale' + \
+        '_16_samples_per_slot_CSM_0_interleaved_15-56-53.ttbin'
 
 slot_width_ns = num_samples_per_slot * sample_size_awg / 1000
 symbol_length_ns = num_slots_per_symbol * slot_width_ns
@@ -208,7 +210,7 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 
             timestamps = time_series[peaks]
             if simulate_darkcounts:
-                darkcounts_timestamps = simulate_darkcounts_timestamps(rng, 0.01)
+                darkcounts_timestamps = simulate_darkcounts_timestamps(rng, 0.01, peaks)
                 timestamps = np.sort(np.hstack((timestamps, darkcounts_timestamps)))
 
             # timestamps = np.hstack((timestamps, rng.random(size=15) * timestamps[0]))
@@ -224,11 +226,11 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
                 print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
 
             peak_locations = timestamps
-            # peak_locations = np.hstack((peak_locations, peak_locations[:len(peak_locations) // 2] + 0.1 * slot_length))
             peak_locations = np.sort(peak_locations)
 
         try:
-            slot_mapped_message = demodulate(peak_locations[:200000], M, slot_length, symbol_length, num_slots_per_symbol, debug_mode=True)
+            slot_mapped_message = demodulate(
+                peak_locations[:200000], M, slot_length, symbol_length, num_slots_per_symbol, debug_mode=True)
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -349,8 +351,10 @@ for df, detection_efficiency in enumerate(detection_efficiencies):
 print(f'Average BER before decoding: {bit_error_ratios_before} (std: {bit_error_ratios_before_std})')
 print(f'Average BER after decoding: {bit_error_ratios_after} (std: {bit_error_ratios_after_std})')
 
-fig, axs = plt.subplots(1)
-axs.errorbar(
+axs2: plt.Axes
+
+fig, axs2 = plt.subplots(1)
+axs2.errorbar(
     detection_efficiencies, bit_error_ratios_before,
     bit_error_ratios_after_std, 0,
     capsize=2,
@@ -358,7 +362,7 @@ axs.errorbar(
     marker='o',
     markersize=5)
 
-axs.errorbar(
+axs2.errorbar(
     detection_efficiencies, bit_error_ratios_after,
     bit_error_ratios_before_std, 0,
     capsize=2,
@@ -366,9 +370,9 @@ axs.errorbar(
     marker='o',
     markersize=5)
 
-axs.set_yscale('log')
-axs.set_ylabel('Bit Error Ratio (-)')
-axs.set_xlabel('Signal to Noise Ratio (-)')
+axs2.set_yscale('log')
+axs2.set_ylabel('Bit Error Ratio (-)')
+axs2.set_xlabel('Signal to Noise Ratio (-)')
 plt.title('BER as function of SNR')
 plt.legend()
 plt.show()
