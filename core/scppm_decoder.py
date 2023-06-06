@@ -22,7 +22,7 @@ def decode(
     CHANNEL_INTERLEAVE=True,
     BIT_INTERLEAVE=True,
     **kwargs
-) -> tuple[npt.NDArray[np.int_], float]:
+) -> tuple[npt.NDArray[np.int_], float | None]:
     user_settings = kwargs.get('user_settings', {})
 
     # The decode message takes an array of PPM symbols, so the slot mapped message
@@ -79,7 +79,7 @@ def decode(
 
     num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
     if (diff := 15120 - num_leftover_symbols) < 100:
-        convoluted_bit_sequence = np.hstack((convoluted_bit_sequence, np.zeros(diff)))
+        convoluted_bit_sequence = np.hstack((convoluted_bit_sequence, np.zeros(diff, dtype=int)))
         num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
 
     symbols_to_deinterleave = convoluted_bit_sequence.shape[0] - num_leftover_symbols
@@ -124,7 +124,7 @@ def decode(
 
     encoded_sequence = unpuncture(encoded_sequence, CODE_RATE)
 
-    predicted_msg = predict(tr, encoded_sequence, Es=Es)
+    predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
     information_block_sizes = {
         Fraction(1, 3): 5040,
         Fraction(1, 2): 7560,
@@ -132,7 +132,7 @@ def decode(
     }
 
     num_bits = information_block_sizes[CODE_RATE]
-    information_blocks = predicted_msg.reshape((-1, num_bits))[:, :-2].flatten()
+    information_blocks: npt.NDArray[np.int_] = predicted_msg.reshape((-1, num_bits))[:, :-2].flatten()
 
     # information_blocks = predicted_msg.reshape((-1, 5040)).flatten()
     # Derandomize
