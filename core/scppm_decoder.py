@@ -6,7 +6,7 @@ import numpy.typing as npt
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
 from core.encoder_functions import (bit_deinterleave, channel_deinterleave, get_csm,
-                               randomize, unpuncture)
+                                    randomize, unpuncture)
 from core.trellis import Trellis
 from core.utils import bpsk_encoding, generate_outer_code_edges
 
