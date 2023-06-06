@@ -51,7 +51,7 @@ def viterbi(num_output_bits, received_sequence, tr):
 
     # predict the input sequence, based on the edges with a minimum hamming distance
     input_sequence = np.zeros(int(len(received_sequence) / (num_output_bits / num_input_bits)))
-    
+
     # The final stage has no edges
     edges_to_state = flatten(list(map(lambda s: s.edges, tr.stages[-2].states)))
     edge = min(edges_to_state, key=lambda e: e.hamming_distance)

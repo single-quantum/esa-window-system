@@ -10,16 +10,16 @@ from PIL import Image
 
 from BCJR_decoder_functions import (calculate_alphas, calculate_betas,
                                     calculate_gammas, calculate_LLRs, ppm_symbols_to_bit_array)
-from encoder_functions import (accumulate, bit_deinterleave, bit_interleave,
+from encoder_functions import (bit_deinterleave, bit_interleave,
                                channel_deinterleave, channel_interleave,
-                               convolve, map_PPM_symbols, prepend_asm, slicer,
+                               convolve, map_PPM_symbols, slicer,
                                zero_terminate, get_csm)
 from parse_ppm_symbols import rolling_window
 
 from trellis import Edge, Trellis
-from utils import (AWGN, bpsk, bpsk_encoding, frombits,
-                   generate_outer_code_edges, tobits)
-from viterbi import viterbi
+from utils import (AWGN, bpsk, bpsk_encoding,
+                   generate_outer_code_edges)
+from simulations.viterbi import viterbi
 
 GREYSCALE = True
 PAYLOAD_TYPE = 'image'
