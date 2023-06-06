@@ -6,14 +6,14 @@ import numpy as np
 import TimeTagger
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
-from demodulation_functions import demodulate
-from encoder_functions import map_PPM_symbols
+from core.demodulation_functions import demodulate
+from core.encoder_functions import map_PPM_symbols
 from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, IMG_FILE_PATH,
                             num_slots_per_symbol, slot_length, symbol_length, M, num_samples_per_slot)
 
-from scppm_decoder import decode
-from utils import flatten
-from data_converter import payload_to_bit_sequence
+from core.scppm_decoder import decode
+from core.utils import flatten
+from core.data_converter import payload_to_bit_sequence
 
 """Read time tagger files from the Swabian Time Tagger Ultra. Required software for the time tagger can be found here:
 https://www.swabianinstruments.com/time-tagger/downloads/ . """

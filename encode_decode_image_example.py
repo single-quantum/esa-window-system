@@ -3,10 +3,10 @@ from fractions import Fraction
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from data_converter import payload_to_bit_sequence
-from encoder_functions import map_PPM_symbols
-from scppm_decoder import decode
-from scppm_encoder import encoder
+from core.data_converter import payload_to_bit_sequence
+from core.encoder_functions import map_PPM_symbols
+from core.scppm_decoder import decode
+from core.scppm_encoder import encoder
 
 # Definitions:
 # - M: PPM order, should be increment of 2**m with m in [2, 3, 4, ...]

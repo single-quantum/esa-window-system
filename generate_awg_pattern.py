@@ -5,13 +5,13 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from data_converter import payload_to_bit_sequence
-from encoder_functions import slot_map
+from core.data_converter import payload_to_bit_sequence
+from core.encoder_functions import slot_map
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM, IMG_FILE_PATH,
                             GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, M, slot_length,
                             m, num_samples_per_slot, num_symbols_per_slice,
                             sample_size_awg, num_slots_per_symbol, symbols_per_codeword, B_interleaver, N_interleaver)
-from scppm_encoder import encoder
+from core.scppm_encoder import encoder
 
 
 pulse_width: int = 3        # number of DAC samples for 1 symbol

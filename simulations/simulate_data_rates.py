@@ -4,12 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tabulate import tabulate
 
-from encoder_functions import get_csm, slicer, zero_terminate
+from core.encoder_functions import get_csm, slicer, zero_terminate
 from ppm_parameters import (CHANNEL_INTERLEAVE, CODE_RATE, GREYSCALE,
                             num_symbols_per_slice, sample_size_awg,
                             slot_factor)
-from scppm_encoder import encoder
-from utils import print_ppm_parameters, save_figure
+from core.scppm_encoder import encoder
+from core.utils import print_ppm_parameters, save_figure
 
 print_ppm_parameters()
 print(f'Code rate = {str(CODE_RATE)}')

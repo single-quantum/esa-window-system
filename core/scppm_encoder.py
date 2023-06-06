@@ -4,10 +4,10 @@ from fractions import Fraction
 import numpy as np
 import numpy.typing as npt
 
-from encoder_functions import (bit_interleave, channel_interleave, convolve,
+from core.encoder_functions import (bit_interleave, channel_interleave, convolve,
                                get_csm, map_PPM_symbols, puncture, randomize,
                                slicer, slot_map, zero_terminate)
-from utils import check_user_settings
+from core.utils import check_user_settings
 
 
 def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction) -> npt.NDArray[np.int_]:

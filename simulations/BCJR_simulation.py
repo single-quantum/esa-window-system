@@ -10,14 +10,14 @@ from PIL import Image
 
 from BCJR_decoder_functions import (calculate_alphas, calculate_betas,
                                     calculate_gammas, calculate_LLRs, ppm_symbols_to_bit_array)
-from encoder_functions import (bit_deinterleave, bit_interleave,
+from core.encoder_functions import (bit_deinterleave, bit_interleave,
                                channel_deinterleave, channel_interleave,
                                convolve, map_PPM_symbols, slicer,
                                zero_terminate, get_csm)
-from parse_ppm_symbols import rolling_window
+from core.parse_ppm_symbols import rolling_window
 
-from trellis import Edge, Trellis
-from utils import (AWGN, bpsk, bpsk_encoding,
+from core.trellis import Edge, Trellis
+from core.utils import (AWGN, bpsk, bpsk_encoding,
                    generate_outer_code_edges)
 from simulations.viterbi import viterbi
 

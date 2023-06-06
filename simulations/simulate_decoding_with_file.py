@@ -14,13 +14,13 @@ from PIL import Image
 from scipy.signal import find_peaks
 
 from BCJR_decoder_functions import ppm_symbols_to_bit_array
-from demodulation_functions import demodulate
-from encoder_functions import map_PPM_symbols
+from core.demodulation_functions import demodulate
+from core.encoder_functions import map_PPM_symbols
 from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, M, slot_length, num_samples_per_slot,
                             sample_size_awg, num_slots_per_symbol, symbol_length)
-from scppm_decoder import DecoderError, decode
-from trellis import Trellis
-from utils import flatten
+from core.scppm_decoder import DecoderError, decode
+from core.trellis import Trellis
+from core.utils import flatten
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):

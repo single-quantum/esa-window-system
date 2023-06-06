@@ -8,8 +8,8 @@ import numpy.typing as npt
 from numpy import dot
 from tqdm import tqdm
 
-from trellis import Trellis
-from utils import flatten
+from core.trellis import Trellis
+from core.utils import flatten
 
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))

@@ -3,14 +3,15 @@ from fractions import Fraction
 from numpy import log2
 from PIL import Image
 
-from encoder_functions import get_csm
+from core.encoder_functions import get_csm
 
 num_samples_per_slot: int = 8           # Number of DAC samples in one slot
 M: int = 8                              # each m = 4 bits are mapped from 0 to M = 16
 CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
-IMG_FILE_PATH = "sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
+# IMG_FILE_PATH = "sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
+IMG_FILE_PATH = "sample_payloads/pillars-of-creation-tiny.png"
 img = Image.open(IMG_FILE_PATH)
 IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
 GREYSCALE: bool = True

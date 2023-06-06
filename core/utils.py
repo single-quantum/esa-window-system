@@ -8,11 +8,11 @@ import numpy.typing as npt
 from numpy.random import default_rng
 from tabulate import tabulate
 
-from encoder_functions import convolve
+from core.encoder_functions import convolve
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
                             M, N_interleaver, num_slots_per_symbol,
                             num_samples_per_slot)
-from trellis import Edge
+from core.trellis import Edge
 
 
 def print_ppm_parameters():

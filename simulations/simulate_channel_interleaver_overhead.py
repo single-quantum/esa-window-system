@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tabulate import tabulate
 
-from encoder_functions import get_csm, slicer, zero_terminate
+from core.encoder_functions import get_csm, slicer, zero_terminate
 from ppm_parameters import (CHANNEL_INTERLEAVE, GREYSCALE, B_interleaver, M,
                             N_interleaver, bin_factor, m, num_samples_per_slot,
                             num_symbols_per_slice, sample_size_awg,
                             symbols_per_codeword)
-from utils import print_ppm_parameters, save_figure
+from core.utils import print_ppm_parameters, save_figure
 
 print_ppm_parameters()
 ADD_ASM: bool = True

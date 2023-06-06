@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 from numpy.random import default_rng
 
-from demodulation_functions import demodulate
-from encoder_functions import get_csm
-from parse_ppm_symbols import parse_ppm_symbols
+from core.demodulation_functions import demodulate
+from core.encoder_functions import get_csm
+from core.parse_ppm_symbols import parse_ppm_symbols
 from ppm_parameters import CSM, num_bins_per_symbol
 
 

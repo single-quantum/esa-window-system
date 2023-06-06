@@ -1,6 +1,6 @@
 import numpy as np
 
-from encoder_functions import (bit_deinterleave, bit_interleave,
+from core.encoder_functions import (bit_deinterleave, bit_interleave,
                                channel_deinterleave, channel_interleave)
 from ppm_parameters import B_interleaver, M, N_interleaver
 

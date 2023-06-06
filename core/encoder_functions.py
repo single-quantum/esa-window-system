@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from shift_register import CRC
+from core.shift_register import CRC
 
 
 def validate_PPM_order(M: int):
