@@ -8,7 +8,7 @@ import numpy as np
 from numpy.random import default_rng
 from PIL import Image
 
-from BCJR_decoder_functions import (calculate_alphas, calculate_betas,
+from core.BCJR_decoder_functions import (calculate_alphas, calculate_betas,
                                     calculate_gammas, calculate_LLRs, ppm_symbols_to_bit_array)
 from core.encoder_functions import (bit_deinterleave, bit_interleave,
                                channel_deinterleave, channel_interleave,

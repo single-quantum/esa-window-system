@@ -13,7 +13,7 @@ from numpy.random import default_rng
 from PIL import Image
 from scipy.signal import find_peaks
 
-from BCJR_decoder_functions import ppm_symbols_to_bit_array
+from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.demodulation_functions import demodulate
 from core.encoder_functions import map_PPM_symbols
 from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, M, slot_length, num_samples_per_slot,

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import TimeTagger
 
-from BCJR_decoder_functions import ppm_symbols_to_bit_array
+from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.demodulation_functions import demodulate
 from core.encoder_functions import map_PPM_symbols
 from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, IMG_FILE_PATH,

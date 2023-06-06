@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
-from BCJR_decoder_functions import ppm_symbols_to_bit_array
+from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.utils import tobits
 
 IMG_SUFFIXES: list[str] = [".png", ".jpg", ".jpeg"]

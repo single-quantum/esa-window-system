@@ -1,6 +1,6 @@
 from pytest import approx
 
-from BCJR_decoder_functions import max_star
+from core.BCJR_decoder_functions import max_star
 
 
 def test_max_star():
