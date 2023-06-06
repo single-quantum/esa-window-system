@@ -10,6 +10,7 @@ from core.demodulation_functions import demodulate
 from core.encoder_functions import map_PPM_symbols
 from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, IMG_FILE_PATH,
                             num_slots_per_symbol, slot_length, symbol_length, M, num_samples_per_slot)
+import numpy.typing as npt
 
 from core.scppm_decoder import decode
 from core.utils import flatten
@@ -80,6 +81,10 @@ information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
     **{'use_cached_trellis': False, })
 
+sent_img_array: npt.NDArray[np.int_] = np.array([])
+img_arr: npt.NDArray[np.int_] = np.array([])
+CMAP = ''
+
 if PAYLOAD_TYPE == 'image':
     # compare to original image
     sent_img_array = payload_to_bit_sequence(PAYLOAD_TYPE, filpath=IMG_FILE_PATH)
@@ -109,11 +114,12 @@ else:
 
 print(f'BER after decoding: {BER_after_decoding }. ')
 
-plt.figure()
-plt.imshow(img_arr, cmap=CMAP)
-plt.title('Decoded payload')
-plt.xlabel('Pixel number (x)')
-plt.ylabel('Pixel number (y)')
-plt.show()
+if PAYLOAD_TYPE == 'image':
+    plt.figure()
+    plt.imshow(img_arr, cmap=CMAP)
+    plt.title('Decoded payload')
+    plt.xlabel('Pixel number (x)')
+    plt.ylabel('Pixel number (y)')
+    plt.show()
 
 print('Done')
