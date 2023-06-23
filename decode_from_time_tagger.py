@@ -4,6 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import TimeTagger
+import pint
 
 from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.demodulation_functions import demodulate
@@ -25,11 +26,12 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
 
     Can either read out the entire buffer or read out a given number of events. """
     fr = TimeTagger.FileReader(time_events_filename)
+    ureg = pint.UnitRegistry()
 
     if num_events := kwargs.get('num_events'):
         data = fr.getData(num_events)
-        time_stamps = data.getTimestamps()
-        time_events = time_stamps * 1E-12
+        time_stamps = data.getTimestamps() * ureg('picoseconds')
+        time_events = time_stamps.to('seconds')
 
         return time_events
 
@@ -48,9 +50,9 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
             time_stamps.append(events)
 
     time_stamps = flatten(time_stamps)
-    time_stamps = np.array(time_stamps)
-
-    time_events = time_stamps * 1E-12
+    # Time stamps from the time tagger are in picoseconds, but the rest of the code uses seconds as the base unit
+    time_stamps = np.array(time_stamps) * ureg('picoseconds')
+    time_events = time_stamps.to('seconds')
 
     return time_events
 
@@ -75,7 +77,7 @@ time_events = get_time_events_from_tt_file(time_tagger_filename)
 
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message = demodulate(time_events[800000:1200000], M, slot_length, symbol_length, num_slots_per_symbol)
+slot_mapped_message = demodulate(time_events, M, slot_length, symbol_length, num_slots_per_symbol)
 
 information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
