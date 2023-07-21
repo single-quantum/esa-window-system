@@ -65,6 +65,7 @@ def parse_ppm_symbols(
         if len(symbol_frame_pulses) > 1:
             num_darkcounts += len(symbol_frame_pulses) - 1
 
+        symbol_frame_symbols = []
         for pulse in symbol_frame_pulses:
             symbol = (pulse - symbol_start - 0.5 * slot_length) / slot_length
 
@@ -79,15 +80,25 @@ def parse_ppm_symbols(
             # timing_requirement = check_timing_requirement(pulse, symbol_start, slot_length)
             # if not timing_requirement:
             #     continue
-
-            symbols.append(symbol)
+            symbol_frame_symbols.append(symbol)
+            # symbols.append(symbol)
             j += 1
-            break
+            # break
 
         # If there were pulses detected in the symbol frame, but none of them were valid symbols, use a 0 instead.
         # This makes sure that there will always be a symbol in each symbol frame.
         if j == 0:
             symbols.append(0)
+            continue
+        rounded_symbols = np.round(symbol_frame_symbols)
+        occurences = []
+
+        for symbol in np.unique(rounded_symbols):
+            occurences.append(np.count_nonzero(rounded_symbols == symbol))
+
+        best_symbol = np.unique(rounded_symbols[np.argmax(occurences)])[0]
+        symbols.append(best_symbol)
+
 
     return symbols, num_darkcounts
 
