@@ -2,12 +2,15 @@ import pathlib
 from pathlib import Path
 from typing import Any
 
+import cv2
+
 import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
 from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.utils import tobits
+from ppm_parameters import GREYSCALE
 
 IMG_SUFFIXES: list[str] = [".png", ".jpg", ".jpeg"]
 
@@ -25,7 +28,7 @@ class DataConverter:
             case str():
                 self.bit_array = self.from_string(user_data)
             case pathlib.Path() if user_data.suffix in IMG_SUFFIXES:
-                self.bit_array = self.from_image(user_data)
+                self.bit_array = self.from_image(user_data, greyscale=GREYSCALE)
             # CSV not yet implemented
             # case pathlib.Path() if user_data.suffix == '.csv':
             #     self.bit_array = []
@@ -46,16 +49,19 @@ class DataConverter:
 
         img_mode = "L" if greyscale else "1"
 
-        img = Image.open(filepath)
-        img = img.convert(img_mode)
-        img_array = np.asarray(img).astype(int)
-
         # In the case of greyscale, each pixel has a value from 0 to 255.
         # This would be the same as saying that each pixel is a symbol, which should be mapped to an 8 bit sequence.
         if greyscale:
-            bit_array = ppm_symbols_to_bit_array(img_array.flatten(), 8)
+            img_arr = np.asarray(Image.open(filepath).convert(img_mode))
+            bit_array = ppm_symbols_to_bit_array(img_arr.flatten(), 8)
         else:
-            bit_array = img_array.flatten()
+            img = cv2.imread(str(filepath), 2)
+            ret, bw_img = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
+            bw_img = np.asarray(bw_img/255, dtype=int)
+            
+            # converting to its binary form
+            bw = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
+            bit_array = bw_img.flatten()
 
         return bit_array
 
