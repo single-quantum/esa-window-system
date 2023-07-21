@@ -11,7 +11,7 @@ from core.utils import flatten, moving_average
 
 def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) -> npt.NDArray[np.int_]:
     """Digitize/discretize the array of time_stamps, so that it becomes a time series of zeros and ones. """
-    time_vec: npt.NDArray[np.float_] = np.arange(time_stamps[0], time_stamps[-1], slot_length, dtype=float)
+    time_vec: npt.NDArray[np.float_] = np.arange(time_stamps[0], time_stamps[-1]+slot_length, slot_length, dtype=float)
 
     # The time series vector is a vector of ones and zeros with a one if there is a pulse in that slot
     time_series: npt.NDArray[np.int_] = np.zeros(len(time_vec), dtype=np.int_)
@@ -106,8 +106,13 @@ def find_csm_times(
     moving_avg_corr: npt.NDArray[np.int_] = moving_average(corr, n=1000)
     message_start_idxs: npt.NDArray[np.int_] = find_peaks(
         -(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1,
-        height=(0.6, 1),
+        height=(0.8, 1),
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
+
+    if debug_mode:
+        plt.figure()
+        plt.plot(-(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1)
+        plt.show()
 
     if message_start_idxs.shape[0] == 0:
         raise ValueError("Could not find message start / end. ")
@@ -119,7 +124,7 @@ def find_csm_times(
         where_csm_corr = where_corr[where_corr >= message_start_idxs[0]]
     else:
         where_csm_corr = where_corr[(
-            where_corr >= message_start_idxs[0]) & (where_corr <= message_start_idxs[1])]
+            where_corr >= message_start_idxs[2]) & (where_corr <= message_start_idxs[3])]
 
     # If where_csm_corr is empty, but where_corr is not empty, use that value for the CSM
     if where_csm_corr.shape[0] == 0 and where_corr.shape[0] != 0:
@@ -251,7 +256,7 @@ def demodulate(
     # For now, this function is only used to compare results to simulations
     # msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
     # msg_pulse_timestamps = pulse_timestamps[(pulse_timestamps >= csm_times[0]) & (pulse_timestamps <= msg_end_time)]
-    # events_per_slot = get_num_events_per_slot(csm_times, msg_pulse_timestamps, CSM)
+    # events_per_slot = get_num_events_per_slot(csm_times, msg_pulse_timestamps, CSM, symbols_per_codeword, slot_length, symbol_length)
 
     num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
         pulse_timestamps <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]
