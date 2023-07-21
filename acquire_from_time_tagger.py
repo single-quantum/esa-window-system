@@ -3,6 +3,7 @@ from datetime import datetime
 from time import sleep
 
 import TimeTagger
+import pint
 
 from ppm_parameters import CODE_RATE, M, num_samples_per_slot
 

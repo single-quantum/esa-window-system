@@ -20,6 +20,7 @@ opencv-python = "^4.7.0.72"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.0.2"
+flake8 = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]
