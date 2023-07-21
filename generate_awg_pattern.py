@@ -14,7 +14,7 @@ from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM, 
 from core.scppm_encoder import encoder
 
 
-pulse_width: int = 3        # number of DAC samples for 1 symbol
+pulse_width: int = 4        # number of DAC samples for 1 symbol
 ADD_ASM: bool = True
 
 msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
@@ -77,7 +77,7 @@ match PAYLOAD_TYPE:
 if PAYLOAD_TYPE == 'image':
     print(f'Sending image with shape {IMG_SHAPE[0]}x{IMG_SHAPE[1]}')
 print(f'num symbols sent: {num_PPM_symbols}')
-print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols}')
+print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols:.3e}')
 print(f'Number of codewords: {num_codewords}')
 print(f'Datarate: {1000*num_bits_sent/(message_time_microseconds*1000):.2f} Mbps')
 print(f'Message time span: {message_time_microseconds:.3f} microseconds')
@@ -127,10 +127,10 @@ filepath: str = ''
 
 match PAYLOAD_TYPE:
     case 'image' if GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
+        filepath = f'ppm_message_SQ_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
             f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv'
     case 'image' if not GREYSCALE:
-        filepath = f'ppm_message_Jupiter_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
+        filepath = f'ppm_message_SQ_tiny_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
             f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1_{cr}-code-rate.csv'
     case 'string':
         filepath = 'ppm_message_Hello_World_no_ASM.csv'
