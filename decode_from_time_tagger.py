@@ -25,6 +25,7 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
 
     Can either read out the entire buffer or read out a given number of events. """
     fr = TimeTagger.FileReader(time_events_filename)
+    
 
     if num_events := kwargs.get('num_events'):
         data = fr.getData(num_events)
@@ -55,14 +56,14 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
     return time_events
 
 
-use_latest_tt_file: bool = False
+use_latest_tt_file: bool = True
 time_tagger_files_dir: str = 'time tagger files/'
 reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
 
 # You can choose to manually put in the time tagger filename below, or use the last added file to the directory.
 if not use_latest_tt_file:
     time_tagger_filename = time_tagger_files_dir + \
-        'jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-29-15.ttbin'
+        'jupiter_tiny_greyscale_256-sps_16-PPM_2-3-code-rate_14-34-18.ttbin'
 else:
     time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
     tt_files = time_tagger_files_path.rglob('*.ttbin')
@@ -72,10 +73,12 @@ else:
 
 
 time_events = get_time_events_from_tt_file(time_tagger_filename)
+# Remove duplicate timing events
+time_events = np.unique(time_events)
 
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message = demodulate(time_events[800000:1200000], M, slot_length, symbol_length, num_slots_per_symbol)
+slot_mapped_message = demodulate(time_events, M, slot_length, symbol_length, num_slots_per_symbol, debug_mode=True)
 
 information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
@@ -87,7 +90,7 @@ CMAP = ''
 
 if PAYLOAD_TYPE == 'image':
     # compare to original image
-    sent_img_array = payload_to_bit_sequence(PAYLOAD_TYPE, filpath=IMG_FILE_PATH)
+    sent_img_array = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
 
     if GREYSCALE:
         pixel_values = map_PPM_symbols(information_blocks, 8)
@@ -115,11 +118,16 @@ else:
 print(f'BER after decoding: {BER_after_decoding }. ')
 
 if PAYLOAD_TYPE == 'image':
-    plt.figure()
-    plt.imshow(img_arr, cmap=CMAP)
-    plt.title('Decoded payload')
-    plt.xlabel('Pixel number (x)')
-    plt.ylabel('Pixel number (y)')
+    fig, axs = plt.subplots(1, 2)
+    plt.suptitle('Sent / decoded payload comparison')
+    axs[0].imshow(sent_img_array.reshape(IMG_SHAPE[0], IMG_SHAPE[1]), cmap=CMAP)
+    axs[0].set_title('Sent image')
+    axs[0].set_xlabel('Pixel number (x)')
+    axs[0].set_ylabel('Pixel number (y)')
+
+    axs[1].imshow(img_arr, cmap=CMAP)
+    axs[1].set_xlabel('Pixel number (x)')
+    axs[1].set_title('Decoded image using SQ cam')
     plt.show()
 
 print('Done')
