@@ -5,7 +5,7 @@ from PIL import Image
 
 from core.encoder_functions import get_csm
 
-num_samples_per_slot: int = 8           # Number of DAC samples in one slot
+num_samples_per_slot: int = 16           # Number of DAC samples in one slot
 M: int = 8                              # each m = 4 bits are mapped from 0 to M = 16
 CODE_RATE = Fraction(2, 3)
 
