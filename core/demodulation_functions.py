@@ -21,7 +21,7 @@ def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) ->
 
     while m < len(time_stamps) - 1:
         if time_vec[n] <= time_stamps[m] <= time_vec[n + 1]:
-            time_series[n] = 1
+            time_series[n] += 1
             m += 1
         else:
             n += 1
@@ -73,8 +73,8 @@ def find_csm_times(
     A = make_time_series(time_stamps, slot_length)
     B = make_time_series(csm_time_stamps, slot_length)
 
-    correlation_threshold: int = int(len(CSM) * csm_correlation_threshold)
     corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
+    correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
     if debug_mode:
         plt.figure()
         plt.plot(corr, label='CSM correlation')
@@ -124,7 +124,7 @@ def find_csm_times(
         where_csm_corr = where_corr[where_corr >= message_start_idxs[0]]
     else:
         where_csm_corr = where_corr[(
-            where_corr >= message_start_idxs[2]) & (where_corr <= message_start_idxs[3])]
+            where_corr >= message_start_idxs[0]) & (where_corr <= message_start_idxs[1])]
 
     # If where_csm_corr is empty, but where_corr is not empty, use that value for the CSM
     if where_csm_corr.shape[0] == 0 and where_corr.shape[0] != 0:
