@@ -25,12 +25,11 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
 
     Can either read out the entire buffer or read out a given number of events. """
     fr = TimeTagger.FileReader(time_events_filename)
-    
 
     if num_events := kwargs.get('num_events'):
         data = fr.getData(num_events)
-        time_stamps = data.getTimestamps() * 1E-12
-        time_events = time_stamps
+        time_stamps = data.getTimestamps()
+        time_events = time_stamps * 1E-12
 
         return time_events
 
@@ -50,8 +49,8 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
 
     time_stamps = flatten(time_stamps)
     # Time stamps from the time tagger are in picoseconds, but the rest of the code uses seconds as the base unit
-    time_stamps = np.array(time_stamps) * 1E-12
-    time_events = time_stamps
+    time_stamps = np.array(time_stamps)
+    time_events = time_stamps * 1E-12
 
     return time_events
 
