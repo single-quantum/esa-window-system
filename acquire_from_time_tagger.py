@@ -1,13 +1,14 @@
 """This script is used to acquire time tags from the Swabian time tagger ultra. """
 from datetime import datetime
 from time import sleep
+from pathlib import Path
 
 import TimeTagger
 import pint
 
-from ppm_parameters import CODE_RATE, M, num_samples_per_slot
+from ppm_parameters import CODE_RATE, M, num_samples_per_slot, IMG_FILE_PATH
 
-num_channels = 4
+# num_channels = 4
 # channels = [i+1 for i in range(num_channels)]
 channels = [1, 2, 3, 4]
 
@@ -31,9 +32,12 @@ window_size_ps = window_size_secs * 1E12  # Window time in ps
 
 cr = str(CODE_RATE).replace('/', '-')
 
+img_path = Path(IMG_FILE_PATH)
+img_name = img_path.name.rstrip(img_path.suffix)
+
 filewriter = TimeTagger.FileWriter(
     tagger,
-    f'time tagger files/jupiter_tiny_greyscale_{num_samples_per_slot}-sps_{M}-PPM_{cr}-code-rate_{formatted_time}',
+    f'time tagger files/{img_name}_{num_samples_per_slot}-sps_{M}-PPM_{cr}-code-rate_{formatted_time}',
     channels=channels)
 filewriter.startFor(int(window_size_ps), clear=True)
 filewriter.waitUntilFinished()
