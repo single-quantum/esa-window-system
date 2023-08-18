@@ -50,7 +50,7 @@ def parse_ppm_symbols(
         **kwargs) -> tuple[list[float], int]:
 
     symbols: list[float] = []
-    num_symbol_frames = int(round((stop_time - codeword_start_time) / symbol_length))
+    num_symbol_frames: int = int(round((stop_time - codeword_start_time) / symbol_length))
 
     for i in range(num_symbol_frames):
         symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(
@@ -98,7 +98,6 @@ def parse_ppm_symbols(
 
         best_symbol = np.unique(rounded_symbols[np.argmax(occurences)])[0]
         symbols.append(best_symbol)
-
 
     return symbols, num_darkcounts
 
