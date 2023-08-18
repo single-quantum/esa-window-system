@@ -63,7 +63,8 @@ def find_csm_times(
         symbols_per_codeword: int,
         num_slots_per_symbol: int,
         csm_correlation_threshold: float = 0.6,
-        debug_mode: bool = False
+        debug_mode: bool = False,
+        **kwargs
 ) -> npt.NDArray[np.float_]:
     """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
 
@@ -123,8 +124,9 @@ def find_csm_times(
     if message_start_idxs.shape[0] == 1:
         where_csm_corr = where_corr[where_corr >= message_start_idxs[0]]
     else:
+        (message_idx := kwargs.get('message_idx') if kwargs.get('message_idx') else [0, 1])
         where_csm_corr = where_corr[(
-            where_corr >= message_start_idxs[0]) & (where_corr <= message_start_idxs[1])]
+            where_corr >= message_start_idxs[message_idx[0]]) & (where_corr <= message_start_idxs[message_idx[1]])]
 
     # If where_csm_corr is empty, but where_corr is not empty, use that value for the CSM
     if where_csm_corr.shape[0] == 0 and where_corr.shape[0] != 0:

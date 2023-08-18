@@ -9,7 +9,8 @@ from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.demodulation_functions import demodulate
 from core.encoder_functions import map_PPM_symbols
 from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, IMG_FILE_PATH,
-                            num_slots_per_symbol, slot_length, symbol_length, M, num_samples_per_slot)
+                            num_slots_per_symbol, slot_length, symbol_length, M, num_samples_per_slot,
+                            DEBUG_MODE, CORRELATION_THRESHOLD, MESSAGE_IDX)
 import numpy.typing as npt
 
 from core.scppm_decoder import decode
@@ -55,14 +56,14 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
     return time_events
 
 
-use_latest_tt_file: bool = True
+use_latest_tt_file: bool = False
 time_tagger_files_dir: str = 'time tagger files/'
 reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
 
 # You can choose to manually put in the time tagger filename below, or use the last added file to the directory.
 if not use_latest_tt_file:
     time_tagger_filename = time_tagger_files_dir + \
-        'jupiter_tiny_greyscale_256-sps_16-PPM_2-3-code-rate_14-34-18.ttbin'
+        'jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-37-19.ttbin'
 else:
     time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
     tt_files = time_tagger_files_path.rglob('*.ttbin')
@@ -77,7 +78,10 @@ time_events = np.unique(time_events)
 
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message = demodulate(time_events, M, slot_length, symbol_length, num_slots_per_symbol, debug_mode=True)
+slot_mapped_message = demodulate(time_events[:100000], M, slot_length, symbol_length,
+                                 num_slots_per_symbol, debug_mode=DEBUG_MODE,
+                                 csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX)
+
 
 information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
