@@ -5,13 +5,13 @@ from PIL import Image
 
 from core.encoder_functions import get_csm
 
-num_samples_per_slot: int = 8           # Number of DAC samples in one slot
-M: int = 8                              # each m = 4 bits are mapped from 0 to M = 16
+num_samples_per_slot: int = 5           # Number of DAC samples in one slot
+M: int = 16                              # each m = 4 bits are mapped from 0 to M = 16
 CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
-# IMG_FILE_PATH = "sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
-IMG_FILE_PATH = "sample_payloads/pillars-of-creation-tiny.png"
+IMG_FILE_PATH = "sample_payloads/ESA_logo.png"
+# IMG_FILE_PATH = "sample_payloads/pillars-of-creation-tiny.png"
 img = Image.open(IMG_FILE_PATH)
 IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
 GREYSCALE: bool = True
@@ -28,10 +28,10 @@ slot_factor: float = 5 / 4  # 1 means: no guard slot, 5/4 means: M/4 guard slots
 # Channel interleaver parameters
 # The length of each shift register is B*N, with N going from 0 to N-1
 CHANNEL_INTERLEAVE = True
-B_interleaver = 2520            # The base length of each shift register
 N_interleaver = 2               # The number of parallel shift registers
 
 num_symbols_per_slice: int = 15120
+B_interleaver = int((num_symbols_per_slice/m)/2)            # The base length of each shift register
 symbols_per_codeword = num_symbols_per_slice // m
 
 if CHANNEL_INTERLEAVE:
