@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,9 +9,8 @@ import TimeTagger
 from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.demodulation_functions import demodulate
 from core.encoder_functions import map_PPM_symbols
-from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, PAYLOAD_TYPE, IMG_FILE_PATH,
-                            num_slots_per_symbol, slot_length, symbol_length, M, num_samples_per_slot,
-                            DEBUG_MODE, CORRELATION_THRESHOLD, MESSAGE_IDX)
+
+from ppm_parameters import DEBUG_MODE, CORRELATION_THRESHOLD, MESSAGE_IDX
 import numpy.typing as npt
 
 from core.scppm_decoder import decode
@@ -56,20 +56,43 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
     return time_events
 
 
-use_latest_tt_file: bool = False
+use_latest_tt_file: bool = True
 time_tagger_files_dir: str = 'time tagger files/'
-reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
+# reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
 
 # You can choose to manually put in the time tagger filename below, or use the last added file to the directory.
 if not use_latest_tt_file:
     time_tagger_filename = time_tagger_files_dir + \
         'jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-37-19.ttbin'
+    metadata_filepath = Path('')
 else:
     time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
     tt_files = time_tagger_files_path.rglob('*.ttbin')
     files: list[Path] = [x for x in tt_files if x.is_file()]
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
     time_tagger_filename = time_tagger_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
+    time_tagger_file_epoch = time_tagger_filename.split('_')[-1].rstrip('.ttbin')
+
+    # Get metadata files
+    files_list = time_tagger_files_path.rglob('*')
+    metadata_files = [f for f in files_list if not f.suffix]
+    metadata_filepath = list(filter(lambda f: time_tagger_file_epoch in f.name, metadata_files))[0]
+
+if not metadata_filepath.exists():
+    raise FileNotFoundError('Metadata file not found. Check path / filename.')
+
+with open(metadata_filepath, 'rb') as f:
+    metadata = pickle.load(f)
+    M = metadata.get('M')
+    num_samples_per_slot = metadata.get('num_samples_per_slot')
+    CODE_RATE = metadata.get('CODE_RATE')
+    GREYSCALE = metadata.get('GREYSCALE')
+    slot_length = metadata.get('slot_length')
+    symbol_length = metadata.get('symbol_length')
+    PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')
+    IMG_FILE_PATH = metadata.get('IMG_FILE_PATH')
+    IMG_SHAPE = metadata.get('IMG_SHAPE')
+    num_slots_per_symbol = int(5/4*M)
 
 
 time_events = get_time_events_from_tt_file(time_tagger_filename)

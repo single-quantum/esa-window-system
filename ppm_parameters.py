@@ -11,8 +11,7 @@ M: int = 16                              # each m = 4 bits are mapped from 0 to 
 CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
-IMG_FILE_PATH = "sample_payloads/ESA_logo.png"
-# IMG_FILE_PATH = "sample_payloads/pillars-of-creation-tiny.png"
+IMG_FILE_PATH = "sample_payloads/pillars-of-creation-tiny.png"
 img = Image.open(IMG_FILE_PATH)
 IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
 GREYSCALE: bool = True
@@ -23,7 +22,8 @@ GREYSCALE: bool = True
 CORRELATION_THRESHOLD: float = 0.6
 DEBUG_MODE: bool = True
 
-# Usually we record multiple copies of the same message. You can use this to select a particular copy of the message, as sometimes a certain copy of the message has too much noise to recover.
+# Usually we record multiple copies of the same message. You can use this to select a particular copy of the message,
+# as sometimes a certain copy of the message has too much noise to recover.
 MESSAGE_IDX: list[int] = [0, 1]
 
 # No need to change the parameters below, unless you know what you're doing!
