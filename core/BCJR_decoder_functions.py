@@ -16,7 +16,7 @@ def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
 def log_gamma(r, v, Es, N0): return Es / N0 * 2 * dot(r, v)
 
 
-keys = list(itertools.product(range(6), repeat=2))
+keys = list(itertools.product(range(-6, 6), repeat=2))
 max_log_lookup = {}
 for key in keys:
     max_log_lookup[key] = np.log(1 + np.exp(-abs(key[0] - key[1])))
@@ -24,12 +24,18 @@ for key in keys:
 
 @lru_cache(maxsize=256)
 def max_star(a: float, b: float) -> float:
+    """Calculate the max star of a and b, which is a modified max function.
+
+    This function is used mostly for optimization. The formal definition of max star is max*(a, b) = log(exp(a)+exp(b)).
+    Since this calculation comes up all the time in calculating LLRs and is relatively expensive, it is approximated by
+    max*(a, b) ~= max(a, b) + log(1+exp(-|a-b|)), where the second term serves as a correction to the max.
+    The second term is cached for optimization reasons.
+    """
+    # When a or b is > 5, the correction term is already so small that we can discard it.
     if abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
         return max(a, b)
     elif a == -np.inf or b == -np.inf:
         return max(a, b) + np.log(2)
-    elif a < 0 or b < 0:
-        return max_log_lookup[(int(abs(a - b)), 0)]
     else:
         return max(a, b) + max_log_lookup[(int(round(a)), int(round(b)))]
 
