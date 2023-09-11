@@ -241,7 +241,7 @@ def map_PPM_symbols(arr, m: int):
     return output_arr
 
 
-def bit_interleave(arr: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+def bit_interleave(arr: npt.NDArray[np.int_], dtype=float) -> npt.NDArray[np.int_]:
     """Shuffle some bits around to make a so-called bit-interleaved codeword.
 
     Note: works only with 15120 element arrays. The modulo 15120 is hard coded for a reason.
@@ -251,7 +251,7 @@ def bit_interleave(arr: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
     if arr.shape[0] != 15120:
         raise ValueError("Input array should have length 15120")
 
-    interleaved_output = np.zeros_like(arr).astype(int)
+    interleaved_output = np.zeros_like(arr).astype(dtype)
 
     # pi_j is the bit index from the original bit array
     for j in range(interleaved_output.shape[0]):
@@ -261,14 +261,14 @@ def bit_interleave(arr: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
     return interleaved_output
 
 
-def bit_deinterleave(arr: np.ndarray | list[float]) -> npt.NDArray[np.int_]:
+def bit_deinterleave(arr: np.ndarray | list[float], dtype=int) -> npt.NDArray[np.int_]:
     """De-interleave the interleaved array `arr`.
 
     Note: works only with 15120 element arrays. """
 
     assert len(arr) == 15120, "Input array should have length 15120"
 
-    deinterleaved_array: np.ndarray = np.zeros_like(arr).astype(int)
+    deinterleaved_array: np.ndarray = np.zeros_like(arr).astype(dtype)
 
     # pi_j is the new index for the interleaved array
     for j in range(deinterleaved_array.shape[0]):

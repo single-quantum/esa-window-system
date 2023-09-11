@@ -1,4 +1,5 @@
 import itertools
+from copy import deepcopy
 from functools import lru_cache
 from itertools import chain
 from math import exp
@@ -6,8 +7,10 @@ from math import exp
 import numpy as np
 import numpy.typing as npt
 from numpy import dot
+from numpy.random import default_rng
 from tqdm import tqdm
 
+from core.encoder_functions import map_PPM_symbols
 from core.trellis import Trellis
 from core.utils import flatten
 
@@ -50,7 +53,7 @@ def max_star_recursive(arr):
     return result
 
 
-def calculate_alphas(trellis, alpha, log_bcjr=True, verbose=False):
+def calculate_alphas(trellis, log_bcjr=True, verbose=False) -> None:
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
@@ -99,8 +102,6 @@ def calculate_alphas(trellis, alpha, log_bcjr=True, verbose=False):
             for state in trellis.stages[i].states:
                 state.alpha = state.alpha / sum_of_alphas
 
-    return alpha
-
 
 def calculate_alpha_inner_SISO(trellis, gamma_primes, log_bcjr=True):
     """ Calculate the alpha for each state in the trellis.
@@ -114,6 +115,7 @@ def calculate_alpha_inner_SISO(trellis, gamma_primes, log_bcjr=True):
     # Encoder is initiated in the all zeros state, so only alpha[0, 0] is non-zero for the first column
     if log_bcjr:
         trellis.stages[0].states[0].alpha = 0
+        trellis.stages[0].states[1].alpha = -np.inf
     else:
         trellis.stages[0].states[0].alpha = 1
 
@@ -127,10 +129,10 @@ def calculate_alpha_inner_SISO(trellis, gamma_primes, log_bcjr=True):
         for state in stage.states:
             a0 = previous_states[0].alpha + gamma_primes[0, state.label, k - 1]
             if k == 1:
-                state.alpha = max_star_recursive([a0, -np.infty])
+                state.alpha = max_star(a0, -np.infty)
             else:
                 a1 = previous_states[1].alpha + gamma_primes[1, state.label, k - 1]
-                state.alpha = max_star_recursive([a0, a1])
+                state.alpha = max_star(a0, a1)
 
 
 def calculate_beta_inner_SISO(trellis, gamma_primes, log_bcjr=True):
@@ -159,14 +161,11 @@ def calculate_beta_inner_SISO(trellis, gamma_primes, log_bcjr=True):
 
         for state in stage.states:
             b0 = next_states[0].beta + gamma_primes[state.label, 0, k]
-            # if k == 1:
-            #     state.alpha = max_star_recursive([b0, -np.infty])
-            # else:
             b1 = next_states[1].beta + gamma_primes[state.label, 1, k]
-            state.beta = max_star_recursive([b0, b1])
+            state.beta = max_star(b0, b1)
 
 
-def calculate_betas(trellis, beta, log_bcjr=True, verbose=False):
+def calculate_betas(trellis, log_bcjr=True, verbose=False) -> None:
     if verbose:
         print('Calculating betas')
     # Betas are also likelihoods, but unlike alpha, they have a forward recursion relation.
@@ -205,11 +204,9 @@ def calculate_betas(trellis, beta, log_bcjr=True, verbose=False):
                     state.beta = state.beta / sum_of_betas
             pbar.update(1)
 
-    return beta
 
-
-def pi_k(PPM_symbol_vector, bit_LLR):
-    return np.sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLR[i] for i in range(len(bit_LLR))])
+# def pi_k(PPM_symbol_vector, bit_LLR):
+#     return np.sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLR[i] for i in range(len(bit_LLR))])
 
 
 def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bcjr=True, verbose=False):
@@ -233,25 +230,30 @@ def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bc
                 edge.gamma = g
 
 
-def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, symbol_channel_LLRs):
+def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods):
     for k, stage in enumerate(trellis.stages[:-1]):
         for state in stage.states:
             for edge in state.edges:
-                edge.gamma = pi_k(edge.edge_input, symbol_bit_LLRs[k]) + pi_k(edge.edge_output, symbol_channel_LLRs[k])
+                # edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + \
+                #     pi_ak(slot_photon_number, channel_log_likelihoods[k])
                 # print(edge.from_state, edge.to_state, symbol_bit_LLRs[k], edge.edge_output, edge.gamma)
+
+                # I should probably use the edge output label instead, would be much faster
+                input_edge_label = map_PPM_symbols(edge.edge_input, 2)[0]
+                # edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + channel_log_likelihoods[k, input_edge_label]
+                edge.gamma = np.sum(edge.edge_input * symbol_bit_LLRs[k]) + channel_log_likelihoods[k, input_edge_label]
 
 
 def calculate_gamma_primes(trellis: Trellis):
     gamma_prime = np.zeros((2, 2, len(trellis.stages[:-1])))
+    combinations = list(itertools.product([0, 1], repeat=2))
     for k, stage in enumerate(trellis.stages[:-1]):
-        combinations = list(itertools.product([0, 1], repeat=2))
-        for state in stage.states:
-            for i, j in combinations:
-                edges = filter(lambda e: e.from_state == i and e.to_state == j, state.edges)
-                gammas = list(map(lambda e: e.gamma, edges))
-                if not gammas:
-                    continue
-                gamma_prime[i, j, k] = max_star_recursive(gammas)
+        for i, j in combinations:
+            edges = filter(lambda e: e.from_state == i and e.to_state == j, stage.states[i].edges)
+            gammas = list(map(lambda e: e.gamma, edges))
+            if not gammas:
+                continue
+            gamma_prime[i, j, k] = max_star_recursive(gammas)
 
     return gamma_prime
 
@@ -309,7 +311,7 @@ def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False) -> npt.ND
     return LLR
 
 
-def calculate_inner_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bcjr=True):
+def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -336,20 +338,19 @@ def calculate_inner_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bc
         edges = flatten(list(map(lambda s: s.edges, stage.states)))
 
         for i in range(trellis.num_input_bits):
-            input_bit = received_symbols[k, i]
-            if input_bit == 0:
-                zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == input_bit, edges)))
-                ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] != input_bit, edges)))
-            else:
-                ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == input_bit, edges)))
-                zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] != input_bit, edges)))
 
-            LLRs[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
+            zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
+            ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
+            try:
+                LLRs[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
+            except IndexError:
+                print('uh oh')
+                print('we empty')
 
     return LLRs
 
 
-def calculate_outer_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bcjr=True):
+def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -363,7 +364,9 @@ def calculate_outer_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bc
     """
     # print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
-    LLRs = np.zeros((time_steps, trellis.num_output_bits))
+    symbol_bit_LLRs = symbol_bit_LLRs.reshape((-1, 3))
+    p_xk_O = np.zeros((time_steps, trellis.num_output_bits))
+    p_uk_O = np.zeros(time_steps)
 
     for k, stage in enumerate(trellis.stages[:-1]):
         next_states = trellis.stages[k + 1].states
@@ -375,26 +378,32 @@ def calculate_outer_SISO_LLRs(trellis, received_symbols, symbol_bit_LLRs, log_bc
     for k, stage in enumerate(trellis.stages[:-1]):
         edges = flatten(list(map(lambda s: s.edges, stage.states)))
 
-        for i in range(len(received_symbols[0])):
-            input_bit = received_symbols[k, i]
-            if input_bit == 0:
-                zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == input_bit, edges)))
-                ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input != input_bit, edges)))
-            else:
-                ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == input_bit, edges)))
-                zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input != input_bit, edges)))
+        for i in range(3):
+            # Edge input or edge output?
+            zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
+            ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
 
             if len(zero_edges) == 1 and len(ones_edges) == 1:
-                LLRs[k, i] = max_star(zero_edges[0], -np.infty) - \
+                p_xk_O[k, i] = max_star(zero_edges[0], -np.infty) - \
                     max_star(zero_edges[0], -np.infty) - symbol_bit_LLRs[k, i]
                 continue
             if len(ones_edges) == 0 and len(zero_edges) != 0:
-                LLRs[k, i] = max_star_recursive(zero_edges) - symbol_bit_LLRs[k, i]
+                p_xk_O[k, i] = max_star_recursive(zero_edges) - symbol_bit_LLRs[k, i]
                 continue
 
-            LLRs[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
+            p_xk_O[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
 
-    return LLRs
+        zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
+        ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
+
+        if len(zero_edges) == 1 and len(ones_edges) == 1:
+            p_uk_O[k] = max_star(zero_edges[0], -np.infty) - max_star(zero_edges[0], -np.infty)
+        elif len(ones_edges) == 0 and len(zero_edges) != 0:
+            p_uk_O[k] = max_star_recursive(zero_edges)
+        else:
+            p_uk_O[k] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges)
+
+    return p_xk_O, p_uk_O
 
 
 def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=False):
@@ -424,3 +433,28 @@ def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt
     received_sequence: npt.NDArray[np.int_] = bits_array[:, -m:].reshape(-1)
 
     return received_sequence
+
+
+def pi_ck(input_sequence, ns, nb):
+    output_sequence = deepcopy(input_sequence)
+
+    for i, row in enumerate(output_sequence):
+        # output_sequence[i] = np.array([y_kj * np.log(1 + ns / nb) for y_kj in row])
+        output_sequence[i] = np.array([np.log(((ns + nb)**y_kj * np.exp(-ns)) / (nb**y_kj)) for y_kj in row])
+
+    return output_sequence
+
+
+def pi_ak(PPM_symbol_vector, bit_LLRs):
+    return np.sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
+
+
+def set_outer_code_gammas(trellis, symbol_log_likelihoods):
+    symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
+    for k, stage in enumerate(trellis.stages):
+        for state in stage.states:
+            for edge in state.edges:
+                # edge.gamma = np.sum([
+                #     0.5 * (-1)**edge.edge_input[0] * symbol_log_likelihoods[k, 0],
+                #     0.5 * (-1)**edge.edge_input[1] * symbol_log_likelihoods[k, 1]])
+                edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])

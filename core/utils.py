@@ -1,4 +1,5 @@
 import itertools
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -9,10 +10,10 @@ from numpy.random import default_rng
 from tabulate import tabulate
 
 from core.encoder_functions import convolve
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
-                            M, N_interleaver, num_slots_per_symbol,
-                            num_samples_per_slot)
 from core.trellis import Edge
+from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
+                            M, N_interleaver, num_samples_per_slot,
+                            num_slots_per_symbol)
 
 
 def print_ppm_parameters():
@@ -108,6 +109,33 @@ def generate_outer_code_edges(memory_size, bpsk_encoding=True):
     return edges
 
 
+def generate_inner_encoder_edges(num_input_bits, bpsk_encoding=True):
+    input_combinations = list(itertools.product([0, 1], repeat=num_input_bits))
+    edges = []
+    for initial_state in [0, 1]:
+        state_edges = []
+        for input_bits in input_combinations:
+            # initial_state = 1
+            current_state = initial_state
+            output = []
+
+            for bit in input_bits:
+                output_bit = current_state ^ bit
+                output.append(output_bit)
+                current_state = output_bit
+
+            if bpsk_encoding:
+                output = bpsk(output)
+
+            e = Edge()
+            e.set_edge(initial_state, current_state, input_bits, output, gamma=None)
+            state_edges.append(e)
+
+        edges.append(state_edges)
+
+    return edges
+
+
 def AWGN(input_sequence, sigma=0.8):
     """Superimpose Additive White Gaussian Noise on the input sequence. """
     rng = default_rng()
@@ -115,6 +143,17 @@ def AWGN(input_sequence, sigma=0.8):
     input_sequence += rng.normal(0, sigma, size=len(input_sequence))
 
     return input_sequence
+
+
+def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float):
+    output_sequence = deepcopy(input_sequence)
+    rng = default_rng(777)
+    for row in output_sequence:
+        i = np.where(row == 1)[0][0]
+        row += rng.poisson(nb, size=len(row))
+        row[i] = rng.poisson(ns + nb)
+
+    return output_sequence
 
 
 def flatten(list_of_lists):
