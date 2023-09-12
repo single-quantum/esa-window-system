@@ -19,16 +19,16 @@ from core.trellis import Trellis
 from core.utils import (generate_inner_encoder_edges,
                         generate_outer_code_edges, poisson_noise)
 
-ns = 3.0
-nb = 0.1
+ns = 2.0
+nb = 0.2
 
-N = 100
+N = 2000
 
 M = 4
 code_rate = Fraction(1, 3)
-bit_stream = np.zeros(5038, dtype=int)
-# bit_stream[500:500 + N] = np.random.randint(0, 2, N)
-bit_stream[10:20] = 1
+bit_stream = np.random.randint(0, 1, 5038, dtype=int)
+# bit_stream[10:10 + N] = np.random.randint(0, 2, N)
+# bit_stream[10:20] = 1
 
 slot_mapped_sequence = encoder(bit_stream, M, code_rate)
 channel_modulated_sequence = poisson_noise(slot_mapped_sequence[:, :M], ns, nb)
