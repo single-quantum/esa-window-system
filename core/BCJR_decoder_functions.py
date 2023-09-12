@@ -66,6 +66,10 @@ def calculate_alphas(trellis, log_bcjr=True, verbose=False) -> None:
     # Encoder is initiated in the all zeros state, so only alpha[0, 0] is non-zero for the first column
     if log_bcjr:
         trellis.stages[0].states[0].alpha = 0
+        trellis.stages[0].states[1].alpha = -np.inf
+        trellis.stages[0].states[2].alpha = -np.inf
+        trellis.stages[0].states[3].alpha = -np.inf
+
     else:
         trellis.stages[0].states[0].alpha = 1
 
@@ -172,6 +176,9 @@ def calculate_betas(trellis, log_bcjr=True, verbose=False) -> None:
     # Same here, but now zero terminated
     if log_bcjr:
         trellis.stages[-1].states[0].beta = 0
+        trellis.stages[-1].states[1].beta = -np.inf
+        trellis.stages[-1].states[2].beta = -np.inf
+        trellis.stages[-1].states[3].beta = -np.inf
     else:
         trellis.stages[-1].states[0].beta = 1
 
@@ -239,9 +246,10 @@ def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods
                 # print(edge.from_state, edge.to_state, symbol_bit_LLRs[k], edge.edge_output, edge.gamma)
 
                 # I should probably use the edge output label instead, would be much faster
-                input_edge_label = map_PPM_symbols(edge.edge_input, 2)[0]
-                # edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + channel_log_likelihoods[k, input_edge_label]
-                edge.gamma = np.sum(edge.edge_input * symbol_bit_LLRs[k]) + channel_log_likelihoods[k, input_edge_label]
+                edge_output_label = map_PPM_symbols(edge.edge_output, 2)[0]
+                edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + channel_log_likelihoods[k, edge_output_label]
+                # c = [channel_log_likelihoods[k, edge_output_label] for _ in range(len(edge.edge_output))]
+                # edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + pi_ak(edge.edge_output, c)
 
 
 def calculate_gamma_primes(trellis: Trellis):
@@ -325,7 +333,7 @@ def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
     """
     # print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
-    LLRs = np.zeros((time_steps, trellis.num_input_bits))
+    LLRs = np.zeros((time_steps, 2))
 
     for k, stage in enumerate(trellis.stages[:-1]):
         next_states = trellis.stages[k + 1].states
@@ -385,7 +393,7 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
 
             if len(zero_edges) == 1 and len(ones_edges) == 1:
                 p_xk_O[k, i] = max_star(zero_edges[0], -np.infty) - \
-                    max_star(zero_edges[0], -np.infty) - symbol_bit_LLRs[k, i]
+                    max_star(ones_edges[0], -np.infty) - symbol_bit_LLRs[k, i]
                 continue
             if len(ones_edges) == 0 and len(zero_edges) != 0:
                 p_xk_O[k, i] = max_star_recursive(zero_edges) - symbol_bit_LLRs[k, i]
@@ -397,7 +405,7 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
         ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
 
         if len(zero_edges) == 1 and len(ones_edges) == 1:
-            p_uk_O[k] = max_star(zero_edges[0], -np.infty) - max_star(zero_edges[0], -np.infty)
+            p_uk_O[k] = max_star(zero_edges[0], -np.infty) - max_star(ones_edges[0], -np.infty)
         elif len(ones_edges) == 0 and len(zero_edges) != 0:
             p_uk_O[k] = max_star_recursive(zero_edges)
         else:
@@ -439,8 +447,8 @@ def pi_ck(input_sequence, ns, nb):
     output_sequence = deepcopy(input_sequence)
 
     for i, row in enumerate(output_sequence):
-        # output_sequence[i] = np.array([y_kj * np.log(1 + ns / nb) for y_kj in row])
-        output_sequence[i] = np.array([np.log(((ns + nb)**y_kj * np.exp(-ns)) / (nb**y_kj)) for y_kj in row])
+        output_sequence[i] = np.array([y_kj * np.log(1 + ns / nb) for y_kj in row])
+        # output_sequence[i] = np.array([np.log(((ns + nb)**y_kj * np.exp(-ns)) / (nb**y_kj)) for y_kj in row])
 
     return output_sequence
 
@@ -454,7 +462,8 @@ def set_outer_code_gammas(trellis, symbol_log_likelihoods):
     for k, stage in enumerate(trellis.stages):
         for state in stage.states:
             for edge in state.edges:
-                # edge.gamma = np.sum([
-                #     0.5 * (-1)**edge.edge_input[0] * symbol_log_likelihoods[k, 0],
-                #     0.5 * (-1)**edge.edge_input[1] * symbol_log_likelihoods[k, 1]])
-                edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])
+                edge.gamma = np.sum([
+                    0.5 * (-1)**edge.edge_output[0] * symbol_log_likelihoods[k, 0],
+                    0.5 * (-1)**edge.edge_output[1] * symbol_log_likelihoods[k, 1],
+                    0.5 * (-1)**edge.edge_output[2] * symbol_log_likelihoods[k, 2]])
+                # edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])

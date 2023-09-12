@@ -19,13 +19,16 @@ from core.trellis import Trellis
 from core.utils import (generate_inner_encoder_edges,
                         generate_outer_code_edges, poisson_noise)
 
-ns = 1.9
-nb = 0.2
+ns = 3.0
+nb = 0.1
+
+N = 100
 
 M = 4
-code_rate = Fraction(2, 3)
-bit_stream = np.zeros(7560, dtype=int)
-
+code_rate = Fraction(1, 3)
+bit_stream = np.zeros(5038, dtype=int)
+# bit_stream[500:500 + N] = np.random.randint(0, 2, N)
+bit_stream[10:20] = 1
 
 slot_mapped_sequence = encoder(bit_stream, M, code_rate)
 channel_modulated_sequence = poisson_noise(slot_mapped_sequence[:, :M], ns, nb)
@@ -38,16 +41,14 @@ memory_size = 1
 num_output_bits = M // 2
 num_input_bits = M // 2
 
-time_steps = int(slot_mapped_sequence.shape[0] / (np.log2(M)))
+time_steps_inner = slot_mapped_sequence.shape[0]
 
 inner_edges = generate_inner_encoder_edges(M // 2, bpsk_encoding=False)
-inner_trellis = Trellis(memory_size, num_output_bits, time_steps, inner_edges, num_input_bits)
+inner_trellis = Trellis(memory_size, num_output_bits, time_steps_inner, inner_edges, num_input_bits)
 inner_trellis.set_edges(inner_edges, zero_terminated=False)
 
 
-def predict_inner_SISO(trellis, received_sequence, channel_log_likelihoods, symbol_bit_LLRs=None):
-    time_steps = len(received_sequence)
-
+def predict_inner_SISO(trellis, received_sequence, channel_log_likelihoods, time_steps, symbol_bit_LLRs=None):
     if symbol_bit_LLRs is None:
         symbol_bit_LLRs = np.zeros((time_steps, 2))
 
@@ -71,9 +72,9 @@ num_output_bits_outer = 3
 num_input_bits_outer = 1
 outer_edges = generate_outer_code_edges(memory_size_outer, bpsk_encoding=False)
 
-for _ in range(10):
+for _ in range(100):
     p_ak_O = predict_inner_SISO(inner_trellis, slot_mapped_sequence,
-                                channel_log_likelihoods, symbol_bit_LLRs=symbol_bit_LLRs)
+                                channel_log_likelihoods, time_steps_inner, symbol_bit_LLRs=symbol_bit_LLRs)
     p_xk_I = bit_deinterleave(p_ak_O.flatten(), dtype=float)
     # p_xk_I = p_ak_O.flatten()
 
@@ -89,5 +90,12 @@ for _ in range(10):
     LLRs = bit_interleave(LLRs.flatten(), dtype=float)
     llrs.append(LLRs[100])
     symbol_bit_LLRs = deepcopy(LLRs.reshape(-1, 2))
+
+    u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
+    ber = np.sum([abs(x - y) for x, y in zip(u_hat, bit_stream)]) / len(bit_stream)
+    print(f'ber: {ber:.5f} \t min likelihood: {np.min(LLRs_u):.2f} \t max likelihood: {np.max(LLRs_u):.2f}')
+    if ber == 0:
+        break
+
 
 print('done')
