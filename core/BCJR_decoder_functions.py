@@ -246,8 +246,9 @@ def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods
                 # print(edge.from_state, edge.to_state, symbol_bit_LLRs[k], edge.edge_output, edge.gamma)
 
                 # I should probably use the edge output label instead, would be much faster
-                edge_output_label = map_PPM_symbols(edge.edge_output, 2)[0]
-                edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + channel_log_likelihoods[k, edge_output_label]
+                # edge_output_label = map_PPM_symbols(edge.edge_output, len(edge.edge_output))[0]
+                edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + \
+                    channel_log_likelihoods[k, edge.edge_output_label]
                 # c = [channel_log_likelihoods[k, edge_output_label] for _ in range(len(edge.edge_output))]
                 # edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + pi_ak(edge.edge_output, c)
 
@@ -333,7 +334,8 @@ def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
     """
     # print('Calculate log likelihoods')
     time_steps = len(trellis.stages) - 1
-    LLRs = np.zeros((time_steps, 2))
+    m = symbol_bit_LLRs.shape[1]
+    LLRs = np.zeros((time_steps, m))
 
     for k, stage in enumerate(trellis.stages[:-1]):
         next_states = trellis.stages[k + 1].states
@@ -386,10 +388,10 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
     for k, stage in enumerate(trellis.stages[:-1]):
         edges = flatten(list(map(lambda s: s.edges, stage.states)))
 
-        for i in range(3):
+        for i in range(trellis.num_output_bits):
             # Edge input or edge output?
-            zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
-            ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
+            zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
+            ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
 
             if len(zero_edges) == 1 and len(ones_edges) == 1:
                 p_xk_O[k, i] = max_star(zero_edges[0], -np.infty) - \
@@ -447,7 +449,9 @@ def pi_ck(input_sequence, ns, nb):
     output_sequence = deepcopy(input_sequence)
 
     for i, row in enumerate(output_sequence):
-        output_sequence[i] = np.array([y_kj * np.log(1 + ns / nb) for y_kj in row])
+        output_sequence[i] = np.array([np.log((((ns + nb) ** x) *
+                                               np.exp(-ns)) / (nb ** x)) for x in row])
+        # output_sequence[i] = np.array([y_kj * np.log(1 + ns / nb) for y_kj in row])
         # output_sequence[i] = np.array([np.log(((ns + nb)**y_kj * np.exp(-ns)) / (nb**y_kj)) for y_kj in row])
 
     return output_sequence
