@@ -241,16 +241,8 @@ def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods
     for k, stage in enumerate(trellis.stages[:-1]):
         for state in stage.states:
             for edge in state.edges:
-                # edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + \
-                #     pi_ak(slot_photon_number, channel_log_likelihoods[k])
-                # print(edge.from_state, edge.to_state, symbol_bit_LLRs[k], edge.edge_output, edge.gamma)
-
-                # I should probably use the edge output label instead, would be much faster
-                # edge_output_label = map_PPM_symbols(edge.edge_output, len(edge.edge_output))[0]
                 edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + \
                     channel_log_likelihoods[k, edge.edge_output_label]
-                # c = [channel_log_likelihoods[k, edge_output_label] for _ in range(len(edge.edge_output))]
-                # edge.gamma = pi_ak(edge.edge_input, symbol_bit_LLRs[k]) + pi_ak(edge.edge_output, c)
 
 
 def calculate_gamma_primes(trellis: Trellis):
@@ -451,8 +443,6 @@ def pi_ck(input_sequence, ns, nb):
     for i, row in enumerate(output_sequence):
         output_sequence[i] = np.array([np.log((((ns + nb) ** x) *
                                                np.exp(-ns)) / (nb ** x)) for x in row])
-        # output_sequence[i] = np.array([y_kj * np.log(1 + ns / nb) for y_kj in row])
-        # output_sequence[i] = np.array([np.log(((ns + nb)**y_kj * np.exp(-ns)) / (nb**y_kj)) for y_kj in row])
 
     return output_sequence
 

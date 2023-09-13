@@ -43,11 +43,11 @@ def predict_inner_SISO(trellis, channel_log_likelihoods, time_steps, m, symbol_b
 ###################
 M: int = 8
 ns: float = 2      # Average number of photons in the signal slot
-nb: float = 0.01    # Average number of photons in the noise slot
+nb: float = 0.3    # Average number of photons in the noise slot
 code_rate = Fraction(1, 3)
 
 max_num_iterations: int = 20
-ber_stop_threshold: float = 1E-4
+ber_stop_threshold: float = 1E-3
 
 N = 100
 bit_stream = np.zeros(5038, dtype=int)
@@ -134,5 +134,6 @@ print('total ber', total_ber)
 
 img_shape = image.size
 plt.imshow(decoded_message[:img_shape[0] * img_shape[1]].reshape(img_shape[0], img_shape[1]))
+plt.show()
 
 print('done')
