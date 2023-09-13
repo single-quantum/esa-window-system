@@ -41,7 +41,7 @@ def predict_inner_SISO(trellis, channel_log_likelihoods, time_steps, m, symbol_b
 ###################
 # User parameters #
 ###################
-M: int = 8
+M: int = 16
 ns: float = 2      # Average number of photons in the signal slot
 nb: float = 0.3    # Average number of photons in the noise slot
 code_rate = Fraction(1, 3)
@@ -49,11 +49,8 @@ code_rate = Fraction(1, 3)
 max_num_iterations: int = 20
 ber_stop_threshold: float = 1E-3
 
-N = 100
-bit_stream = np.zeros(5038, dtype=int)
-# bit_stream[10:10 + N] = np.random.randint(0, 2, N)
 # bit_stream = np.random.randint(0, 2, 2 * 5038, dtype=int)
-image_path = Path.cwd() / 'sample_payloads' / 'pillars-of-creation-tiny.png'
+image_path = Path.cwd() / 'sample_payloads' / 'pillars-of-creation-small.png'
 image = Image.open(image_path).convert('1')
 bit_stream = np.asarray(image).astype(int).flatten()
 
