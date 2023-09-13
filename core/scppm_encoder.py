@@ -15,7 +15,7 @@ def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction)
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
     information_blocks = slicer(bit_stream, code_rate, include_crc=False)
-    # information_blocks = randomize(information_blocks)
+    information_blocks = randomize(information_blocks)
     information_blocks = zero_terminate(information_blocks)
 
     return information_blocks
