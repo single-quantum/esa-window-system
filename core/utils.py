@@ -1,4 +1,5 @@
 import itertools
+import pickle
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -108,6 +109,9 @@ def generate_outer_code_edges(memory_size, bpsk_encoding=True):
 
     return edges
 
+# Note to self: I could probably make one function for the inner/outer edge generation,
+# and then put it in the Trellis constructor.
+
 
 def generate_inner_encoder_edges(num_input_bits, bpsk_encoding=True):
     input_combinations = list(itertools.product([0, 1], repeat=num_input_bits))
@@ -145,13 +149,19 @@ def AWGN(input_sequence, sigma=0.8):
     return input_sequence
 
 
-def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float):
+def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float,
+                  simulate_lost_symbols=False, detection_efficiency: float = 0):
     output_sequence = deepcopy(input_sequence)
-    rng = default_rng(777)
-    for row in output_sequence:
-        i = np.where(row == 1)[0][0]
+    rng = default_rng()
+    if simulate_lost_symbols:
+        lost_symbols = np.array(rng.random(input_sequence.shape[0]) > detection_efficiency)
+    for i, row in enumerate(output_sequence):
+        j = np.where(row == 1)[0][0]
         row += rng.poisson(nb, size=len(row))
-        row[i] = rng.poisson(ns + nb)
+        if lost_symbols[i]:
+            row[j] = rng.poisson(nb)
+        else:
+            row[j] = rng.poisson(ns + nb)
 
     return output_sequence
 
@@ -183,3 +193,15 @@ def check_user_settings(user_settings: dict) -> None:
         raise KeyError("N_interleaver not found in `user_settings`")
     if not isinstance(N_interleaver, int):
         raise ValueError("N_interleaver should be an integer. ")
+
+
+def get_BER_before_decoding(bit_sequence_file_path, received_bits, sent_bit_sequence=None):
+    if sent_bit_sequence is None:
+        with open(bit_sequence_file_path, 'rb') as f:
+            sent_bits = pickle.load(f)
+    else:
+        sent_bits = sent_bit_sequence
+
+    BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)])
+
+    return BER_before_decoding

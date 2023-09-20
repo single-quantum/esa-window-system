@@ -4,11 +4,14 @@ from fractions import Fraction
 import numpy as np
 import numpy.typing as npt
 
-from core.BCJR_decoder_functions import ppm_symbols_to_bit_array, predict
+from core.BCJR_decoder_functions import ppm_symbols_to_bit_array, predict, pi_ck, predict_iteratively
 from core.encoder_functions import (bit_deinterleave, channel_deinterleave,
-                                    get_csm, randomize, unpuncture)
+                                    get_csm, randomize, unpuncture, slot_map)
 from core.trellis import Trellis
-from core.utils import bpsk_encoding, generate_outer_code_edges
+from core.utils import (bpsk_encoding, generate_outer_code_edges,
+                        get_BER_before_decoding)
+
+from utils import poisson_noise
 
 
 class DecoderError(Exception):
@@ -21,6 +24,7 @@ def decode(
     CODE_RATE: Fraction,
     CHANNEL_INTERLEAVE=True,
     BIT_INTERLEAVE=True,
+    use_inner_encoder=False,
     **kwargs
 ) -> tuple[npt.NDArray[np.int_], float | None]:
     user_settings = kwargs.get('user_settings', {})
@@ -42,12 +46,16 @@ def decode(
     convoluted_bit_sequence: npt.NDArray[np.int_]
 
     # Deinterleave
+    B_interleaver = user_settings.get('B_interleaver')
+    N_interleaver = user_settings.get('N_interleaver', 2)
+    if B_interleaver is None:
+        m = int(np.log2(M))
+        B_interleaver = int(15120 / m / N_interleaver)
+
+    deinterleaved_ppm_symbols = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
+    deinterleaved_slot_mapped_sequence = slot_map(deinterleaved_ppm_symbols, M, insert_guardslots=False)
+
     if CHANNEL_INTERLEAVE:
-        B_interleaver = user_settings.get('B_interleaver')
-        N_interleaver = user_settings.get('N_interleaver', 2)
-        if B_interleaver is None:
-            m = int(np.log2(M))
-            B_interleaver = int(15120 / m / N_interleaver)
 
         print('Deinterleaving PPM symbols')
         ppm_mapped_message = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
@@ -61,22 +69,11 @@ def decode(
 
     # Get the BER before decoding
     if reference_file_path := user_settings.get('reference_file_path'):
-        with open(reference_file_path, 'rb') as f:
-            sent_bit_sequence: list = pickle.load(f)
-
-        if len(convoluted_bit_sequence) > len(sent_bit_sequence):
-            BER_before_decoding = np.sum(np.abs(convoluted_bit_sequence[:len(sent_bit_sequence)] -
-                                                sent_bit_sequence)) / len(sent_bit_sequence)
-        else:
-            num_wrong_bits = np.sum(
-                np.abs(convoluted_bit_sequence - sent_bit_sequence[:len(convoluted_bit_sequence)])
-            )
-            BER_before_decoding = num_wrong_bits / len(sent_bit_sequence)
+        BER_before_decoding = get_BER_before_decoding(reference_file_path, convoluted_bit_sequence)
 
         print(f'BER before decoding: {BER_before_decoding}')
-        # if BER_before_decoding > 0.25:
-        #     raise DecoderError("Could not properly decode message. ")
 
+    # Double check if this is still needed
     num_leftover_symbols = convoluted_bit_sequence.shape[0] % 15120
     if (diff := 15120 - num_leftover_symbols) < 100:
         convoluted_bit_sequence = np.hstack((convoluted_bit_sequence, np.zeros(diff, dtype=int)))
@@ -123,8 +120,10 @@ def decode(
     encoded_sequence = bpsk_encoding(deinterleaved_received_sequence.astype(float))
 
     encoded_sequence = unpuncture(encoded_sequence, CODE_RATE)
-
-    predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
+    if not use_inner_encoder:
+        predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
+    else:
+        predicted_msg = predict_iteratively(deinterleaved_slot_mapped_sequence, M, CODE_RATE, max_num_iterations=5)
     information_block_sizes = {
         Fraction(1, 3): 5040,
         Fraction(1, 2): 7560,
@@ -142,3 +141,7 @@ def decode(
         information_blocks = np.hstack((information_blocks, 0))
 
     return information_blocks, BER_before_decoding
+
+
+def decode_iteratively(slot_mapped_sequence, m, code_rate, max_num_iterations=20, ns=2, nb=0.1):
+    return

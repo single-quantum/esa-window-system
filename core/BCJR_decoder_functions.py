@@ -3,6 +3,7 @@ from copy import deepcopy
 from functools import lru_cache
 from itertools import chain
 from math import exp
+from fractions import Fraction
 
 import numpy as np
 import numpy.typing as npt
@@ -13,6 +14,12 @@ from tqdm import tqdm
 from core.encoder_functions import map_PPM_symbols
 from core.trellis import Trellis
 from core.utils import flatten
+from core.scppm_encoder import puncture
+from core.encoder_functions import (bit_deinterleave, bit_interleave,
+                                    channel_deinterleave, randomize, slot_map,
+                                    unpuncture)
+from core.utils import (generate_inner_encoder_edges,
+                        generate_outer_code_edges, poisson_noise)
 
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
@@ -343,11 +350,8 @@ def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
 
             zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
             ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
-            try:
-                LLRs[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
-            except IndexError:
-                print('uh oh')
-                print('we empty')
+
+            LLRs[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
 
     return LLRs
 
@@ -409,6 +413,7 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
 
 
 def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=False):
+    """Use the BCJR algorithm to predict the sent message, based on the received sequence. """
     time_steps = len(received_sequence)
 
     alpha = np.zeros((trellis.num_states, time_steps + 1))
@@ -425,6 +430,21 @@ def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=Fals
     u_hat = np.array([1 if llr >= 0 else 0 for llr in LLRs])
 
     return u_hat
+
+
+def predict_inner_SISO(trellis, channel_log_likelihoods, time_steps, m, symbol_bit_LLRs=None):
+    if symbol_bit_LLRs is None:
+        symbol_bit_LLRs = np.zeros((time_steps, m))
+
+    # Calculate alphas, betas, gammas and LLRs
+    calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods)
+    gamma_primes = calculate_gamma_primes(trellis)
+
+    calculate_alpha_inner_SISO(trellis, gamma_primes)
+    calculate_beta_inner_SISO(trellis, gamma_primes)
+    LLRs = calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs)
+
+    return LLRs
 
 
 def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt.NDArray[np.int_]:
@@ -461,3 +481,94 @@ def set_outer_code_gammas(trellis, symbol_log_likelihoods):
                     0.5 * (-1)**edge.edge_output[1] * symbol_log_likelihoods[k, 1],
                     0.5 * (-1)**edge.edge_output[2] * symbol_log_likelihoods[k, 2]])
                 # edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])
+
+
+def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=20, ns=2, nb=0.1):
+    # Initialize outer trellis edges
+    memory_size_outer = 2
+    num_output_bits_outer = 3
+    num_input_bits_outer = 1
+    outer_edges = generate_outer_code_edges(memory_size_outer, bpsk_encoding=False)
+
+    # Initialize inner trellis edges
+    m = int(np.log2(M))
+    memory_size = 1
+    num_output_bits = m
+    num_input_bits = m
+    inner_edges = generate_inner_encoder_edges(m, bpsk_encoding=False)
+
+    information_block_sizes = {
+        Fraction(1, 3): 5040,
+        Fraction(1, 2): 7560,
+        Fraction(2, 3): 10080
+    }
+
+    num_bits_per_slice = information_block_sizes[code_rate]
+    num_symbols_per_slice = int(num_bits_per_slice * 1 / code_rate / m)
+    num_slices = int((slot_mapped_sequence.shape[0] * m * code_rate) / num_bits_per_slice)
+
+    channel_likelihoods = poisson_noise(
+        slot_mapped_sequence[:, :M], ns, nb, simulate_lost_symbols=True)
+
+    decoded_message = []
+    decoded_message_array = np.zeros((max_num_iterations, num_slices, num_bits_per_slice))
+
+    for i in range(num_slices):
+        print(f'Decoding slice {i+1}/{num_slices}')
+        # Generate a vector with a poisson distributed number of photons per slot
+        # Calculate the corresponding log likelihood
+        channel_log_likelihoods = pi_ck(
+            channel_likelihoods[i * num_symbols_per_slice:(i + 1) * num_symbols_per_slice], ns, nb)
+
+        time_steps_inner = num_symbols_per_slice
+
+        inner_trellis = Trellis(memory_size, num_output_bits, time_steps_inner, inner_edges, num_input_bits)
+        inner_trellis.set_edges(inner_edges, zero_terminated=False)
+
+        symbol_bit_LLRs = None
+        u_hat = []
+
+        for iteration in range(max_num_iterations):
+            p_ak_O = predict_inner_SISO(inner_trellis, channel_log_likelihoods,
+                                        time_steps_inner, m, symbol_bit_LLRs=symbol_bit_LLRs)
+            p_xk_I = bit_deinterleave(p_ak_O.flatten(), dtype=float)
+            # p_xk_I = p_ak_O.flatten()
+
+            p_xk_I = unpuncture(p_xk_I, code_rate, dtype=float)
+            time_steps_outer_trellis = int(len(p_xk_I) / 3)
+
+            outer_trellis = Trellis(memory_size_outer, num_output_bits_outer,
+                                    time_steps_outer_trellis, outer_edges, num_input_bits_outer)
+            outer_trellis.set_edges(outer_edges)
+            set_outer_code_gammas(outer_trellis, p_xk_I)
+            calculate_alphas(outer_trellis)
+            calculate_betas(outer_trellis)
+            p_xk_O, LLRs_u = calculate_outer_SISO_LLRs(outer_trellis, p_xk_I)
+            p_xk_O = puncture(np.array([p_xk_O.flatten()]), code_rate, dtype=float)
+            p_ak_I = bit_interleave(p_xk_O.flatten(), dtype=float)
+
+            symbol_bit_LLRs = deepcopy(p_ak_I.reshape(-1, m))
+
+            u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
+            # Derandomize
+            u_hat = randomize(np.array(u_hat, dtype=int))
+            # ber = np.sum(
+            #     [abs(x - y) for x, y in zip(
+            #         u_hat, bit_stream[i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)]
+            #     )]
+            # ) / len(bit_stream)
+            # print(
+            #     f"iteration = {iteration+1} ber: {ber:.5f} \t min likelihood: " +
+            #     f"{np.min(LLRs_u):.2f} \t max likelihood: {np.max(LLRs_u):.2f}")
+
+            decoded_message_array[iteration, i, :] = u_hat
+
+            # if ber < ber_stop_threshold:
+            #     break
+
+        decoded_message.append(u_hat)
+
+    # Flatten and cast to numpy array
+    decoded_message = np.array([bit for sublist in decoded_message for bit in sublist], dtype=int)
+
+    return decoded_message

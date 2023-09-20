@@ -86,26 +86,26 @@ def postprocess_ppm_symbols(
 ):
     """Takes the PPM symbols and interleaves them, adds the CSM and repeats the message q times. """
     # Note: repeater not yet implemented.
-    # if CHANNEL_INTERLEAVE:
-    #     PPM_symbols = channel_interleave(PPM_symbols, B_interleaver, N_interleaver)
+    if CHANNEL_INTERLEAVE:
+        PPM_symbols = channel_interleave(PPM_symbols, B_interleaver, N_interleaver)
 
-    # symbols_per_codeword = int(15120 / np.log2(M))
-    # num_codewords = int(PPM_symbols.shape[0] / symbols_per_codeword)
+    symbols_per_codeword = int(15120 / np.log2(M))
+    num_codewords = int(PPM_symbols.shape[0] / symbols_per_codeword)
 
     # # Attach Codeword Synchronisation Markerk (CSM) to each codeword of
     # # 15120/m PPM symbols
-    # CSM = get_csm(M=M)
+    CSM = get_csm(M=M)
 
-    # ppm_mapped_message_with_csm = np.zeros(
-    #     len(PPM_symbols) + len(CSM) * num_codewords, dtype=int)
-    # for i in range(num_codewords):
-    #     prepended_codeword = np.hstack(
-    #         (CSM, PPM_symbols[i * symbols_per_codeword:(i + 1) * symbols_per_codeword]))
-    #     ppm_mapped_message_with_csm[
-    #         i * len(prepended_codeword):(i + 1) * len(prepended_codeword)
-    #     ] = prepended_codeword
+    ppm_mapped_message_with_csm = np.zeros(
+        len(PPM_symbols) + len(CSM) * num_codewords, dtype=int)
+    for i in range(num_codewords):
+        prepended_codeword = np.hstack(
+            (CSM, PPM_symbols[i * symbols_per_codeword:(i + 1) * symbols_per_codeword]))
+        ppm_mapped_message_with_csm[
+            i * len(prepended_codeword):(i + 1) * len(prepended_codeword)
+        ] = prepended_codeword
 
-    # PPM_symbols = ppm_mapped_message_with_csm
+    PPM_symbols = ppm_mapped_message_with_csm
 
     slot_mapped_sequence = slot_map(PPM_symbols, M)
 
