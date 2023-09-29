@@ -324,6 +324,18 @@ def channel_interleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray
 
     return output_array
 
+def get_remap_indices(input_array, B, N):
+    remap_indeces: list[int] = []
+
+    remap_indeces.append(0)
+    for i in range(1, input_array.shape[0] + B * N * (N - 1)):
+        if i % N == 0:
+            remap_indeces.append(i)
+        else:
+            remap_indeces.append(remap_indeces[i - 1] + N * B + 1)
+
+    return remap_indeces
+
 
 def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray[np.int_]:
     """Use N slots of linear shift registers to interleave the PPM symbols.
@@ -335,21 +347,14 @@ def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArr
     """
     arr = np.array(arr, dtype=int)
     output: list[int] = []
-    remap_indeces: list[int] = []
-
-    remap_indeces.append(0)
-    for i in range(1, arr.shape[0] + B * N * (N - 1)):
-        if i % N == 0:
-            remap_indeces.append(i)
-        else:
-            remap_indeces.append(remap_indeces[i - 1] + N * B + 1)
+    interleaver_remap_indices = get_remap_indices(arr, B, N)
 
     # Indeces < 0 indicate initial interleaver state bits, which is set at 0.
     # Indeces > the input array indicate terminal interleaver state bits, which are also set to 0
 
     # When the final bit of the input sequence is inserted into the interleaver,
     # The interleaver needs to be ran another B*N*(N-1) times to finalize the interleaving.
-    for i in remap_indeces:
+    for i in interleaver_remap_indices:
         if i < 0 or i >= arr.shape[0]:
             output.append(0)
         else:

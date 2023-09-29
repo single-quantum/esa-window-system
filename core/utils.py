@@ -158,10 +158,10 @@ def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float,
     for i, row in enumerate(output_sequence):
         j = np.where(row == 1)[0][0]
         row += rng.poisson(nb, size=len(row))
-        if lost_symbols[i]:
-            row[j] = rng.poisson(nb)
-        else:
-            row[j] = rng.poisson(ns + nb)
+        # if lost_symbols[i]:
+        #     row[j] = rng.poisson(nb)
+        # else:
+        row[j] = rng.poisson(ns + nb)
 
     return output_sequence
 
@@ -205,3 +205,13 @@ def get_BER_before_decoding(bit_sequence_file_path, received_bits, sent_bit_sequ
     BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)])
 
     return BER_before_decoding
+
+
+def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt.NDArray[np.int_]:
+    """Map PPM symbols back to bit array. """
+    received_symbols = np.array(received_symbols)
+    reshaped_ppm_symbols = received_symbols.astype(np.uint8).reshape(received_symbols.shape[0], 1)
+    bits_array = np.unpackbits(reshaped_ppm_symbols, axis=1).astype(int)
+    received_sequence: npt.NDArray[np.int_] = bits_array[:, -m:].reshape(-1)
+
+    return received_sequence

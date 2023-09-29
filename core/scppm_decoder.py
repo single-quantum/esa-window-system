@@ -11,7 +11,7 @@ from core.trellis import Trellis
 from core.utils import (bpsk_encoding, generate_outer_code_edges,
                         get_BER_before_decoding)
 
-from utils import poisson_noise
+from core.utils import poisson_noise
 
 
 class DecoderError(Exception):
@@ -53,7 +53,8 @@ def decode(
         B_interleaver = int(15120 / m / N_interleaver)
 
     deinterleaved_ppm_symbols = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
-    deinterleaved_slot_mapped_sequence = slot_map(deinterleaved_ppm_symbols, M, insert_guardslots=False)
+    num_zeros_interleaver: int = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
+    deinterleaved_slot_mapped_sequence = slot_map(deinterleaved_ppm_symbols[:len(deinterleaved_ppm_symbols)-num_zeros_interleaver], M, insert_guardslots=False)
 
     if CHANNEL_INTERLEAVE:
 
@@ -66,7 +67,6 @@ def decode(
         convoluted_bit_sequence = ppm_symbols_to_bit_array(ppm_mapped_message, m)
 
     BER_before_decoding: float | None = None
-
     # Get the BER before decoding
     if reference_file_path := user_settings.get('reference_file_path'):
         BER_before_decoding = get_BER_before_decoding(reference_file_path, convoluted_bit_sequence)
@@ -123,7 +123,7 @@ def decode(
     if not use_inner_encoder:
         predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
     else:
-        predicted_msg = predict_iteratively(deinterleaved_slot_mapped_sequence, M, CODE_RATE, max_num_iterations=5)
+        predicted_msg = predict_iteratively(deinterleaved_slot_mapped_sequence, M, CODE_RATE, max_num_iterations=5, **kwargs)
     information_block_sizes = {
         Fraction(1, 3): 5040,
         Fraction(1, 2): 7560,
@@ -135,7 +135,9 @@ def decode(
 
     # information_blocks = predicted_msg.reshape((-1, 5040)).flatten()
     # Derandomize
-    # information_blocks = randomize(information_blocks)
+    if not use_inner_encoder and kwargs.get('use_randomizer', False):
+        information_blocks = randomize(information_blocks.reshape((-1, num_bits-2)))
+        information_blocks = information_blocks.flatten()
 
     while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
         information_blocks = np.hstack((information_blocks, 0))

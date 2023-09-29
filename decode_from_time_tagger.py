@@ -10,7 +10,7 @@ from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from core.demodulation_functions import demodulate
 from core.encoder_functions import map_PPM_symbols
 
-from ppm_parameters import DEBUG_MODE, CORRELATION_THRESHOLD, MESSAGE_IDX
+from ppm_parameters import DEBUG_MODE, CORRELATION_THRESHOLD, MESSAGE_IDX, USE_INNER_ENCODER, USE_RANDOMIZER
 import numpy.typing as npt
 
 from core.scppm_decoder import decode
@@ -99,16 +99,77 @@ time_events = get_time_events_from_tt_file(time_tagger_filename)
 # Remove duplicate timing events
 time_events = np.unique(time_events)
 
+
+time_events_samples=(time_events-time_events[0])*(8.82091E9/num_samples_per_slot)+0.5
+# print(time_events_samples[0:110])
+
+# plt.plot(time_events_samples[0:100]%1)
+
+# plt.plot(time_events_samples[0:100]%1.001)
+
+# plt.plot(time_events_samples[0:100]%0.999)
+
+# plt.show()
+
+vals=[]
+dat=time_events_samples[10000:30000]
+factors=np.linspace(0.99998,1.00002,10000)
+
+for factor_here in factors:
+    dat2=dat%factor_here
+    vals.append(np.sum(np.abs(dat2-np.average(dat2))**2))
+
+
+# plt.figure()
+# plt.plot(vals)
+# plt.show()
+
+index=np.argmin(vals)
+correction=factors[index]
+vals=[]
+
+# print(correction)
+
+plt.figure()
+plt.plot(time_events_samples[:10000]%1-0.5,label='original')
+plt.xlabel('#symbol')
+plt.ylabel('deviation')
+plt.plot(time_events_samples[:10000]%correction-0.5,label='adjusted')
+plt.legend()
+plt.show()
+
+slot_length *= correction
+symbol_length *= correction
+
+
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message = demodulate(time_events[:100000], M, slot_length, symbol_length,
+slot_mapped_message, events_per_slot = demodulate(time_events[:550000], M, slot_length, symbol_length,
                                  num_slots_per_symbol, debug_mode=DEBUG_MODE,
-                                 csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX)
+                                 csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX, **{'num_samples_per_slot': num_samples_per_slot})
 
+m = int(np.log2(M))
+received_ppm_symbols = np.nonzero(slot_mapped_message)[1]
+received_bits = ppm_symbols_to_bit_array(received_ppm_symbols, m)
+
+with open('received_bit_sequence', 'wb') as f:
+    pickle.dump(received_bits, f)
+
+with open('sent_bit_sequence', 'rb') as f:
+    sent_bits = pickle.load(f)
+
+BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)])/len(sent_bits)
+print('BER before decoding', BER_before_decoding)
 
 information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
-    **{'use_cached_trellis': False, })
+    use_inner_encoder=USE_INNER_ENCODER,
+    **{
+        'use_cached_trellis': False, 
+        'num_events_per_slot': events_per_slot, 
+        'use_randomizer': USE_RANDOMIZER,
+        'sent_bit_sequence': sent_bits
+        })
 
 sent_img_array: npt.NDArray[np.int_] = np.array([])
 img_arr: npt.NDArray[np.int_] = np.array([])
@@ -116,9 +177,10 @@ CMAP = ''
 
 if PAYLOAD_TYPE == 'image':
     # compare to original image
-    sent_img_array = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
+    sent_message = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
 
     if GREYSCALE:
+        sent_img_array = map_PPM_symbols(sent_message, 8)
         pixel_values = map_PPM_symbols(information_blocks, 8)
         img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
         CMAP = 'Greys'
@@ -129,10 +191,10 @@ if PAYLOAD_TYPE == 'image':
 
 # In the case of a greyscale image, each pixel has a value from 0 to 255.
 # This would be the same as saying that each pixel is a symbol, which should be mapped to an 8 bit sequence.
-if GREYSCALE:
-    sent_message = ppm_symbols_to_bit_array(sent_img_array.flatten(), 8)
-else:
-    sent_message = sent_img_array.flatten()
+# if GREYSCALE:
+#     sent_message = ppm_symbols_to_bit_array(sent_img_array.flatten(), 8)
+# else:
+#     sent_message = sent_img_array.flatten()
 
 if len(information_blocks) < len(sent_message):
     BER_after_decoding = np.sum(np.abs(information_blocks -

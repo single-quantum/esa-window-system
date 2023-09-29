@@ -11,7 +11,7 @@ from numpy import dot
 from numpy.random import default_rng
 from tqdm import tqdm
 
-from core.encoder_functions import map_PPM_symbols
+from core.encoder_functions import map_PPM_symbols, get_csm, get_remap_indices
 from core.trellis import Trellis
 from core.utils import flatten
 from core.scppm_encoder import puncture
@@ -20,6 +20,8 @@ from core.encoder_functions import (bit_deinterleave, bit_interleave,
                                     unpuncture)
 from core.utils import (generate_inner_encoder_edges,
                         generate_outer_code_edges, poisson_noise)
+
+
 
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
@@ -421,8 +423,8 @@ def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=Fals
 
     # Calculate alphas, betas, gammas and LLRs
     calculate_gammas(trellis, received_sequence, trellis.num_output_bits, Es, N0, log_bcjr=LOG_BCJR)
-    alpha = calculate_alphas(trellis, alpha, log_bcjr=LOG_BCJR)
-    beta = calculate_betas(trellis, beta, log_bcjr=LOG_BCJR)
+    alpha = calculate_alphas(trellis, log_bcjr=LOG_BCJR)
+    beta = calculate_betas(trellis, log_bcjr=LOG_BCJR)
     LLRs = calculate_LLRs(trellis, alpha, beta, log_bcjr=LOG_BCJR)
 
     if verbose:
@@ -483,7 +485,7 @@ def set_outer_code_gammas(trellis, symbol_log_likelihoods):
                 # edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])
 
 
-def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=20, ns=2, nb=0.1):
+def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=20, ns=3, nb=0.1, **kwargs):
     # Initialize outer trellis edges
     memory_size_outer = 2
     num_output_bits_outer = 3
@@ -507,11 +509,36 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
     num_symbols_per_slice = int(num_bits_per_slice * 1 / code_rate / m)
     num_slices = int((slot_mapped_sequence.shape[0] * m * code_rate) / num_bits_per_slice)
 
-    channel_likelihoods = poisson_noise(
-        slot_mapped_sequence[:, :M], ns, nb, simulate_lost_symbols=True)
+    num_events_per_slot = kwargs.get('num_events_per_slot')
+    if num_events_per_slot is not None:
+        N_interleaver = 2
+        B_interleaver = int(15120/m/N_interleaver)
+        CSM = get_csm(M)
+        reshaped_num_events = num_events_per_slot.reshape(-1, num_symbols_per_slice+len(CSM), int(5/4*M))[:, len(CSM):, :M]
+        
+        # "flatten" it again
+        reshaped_num_events = reshaped_num_events.reshape(-1, M)
+        remapped_indices = get_remap_indices(reshaped_num_events.reshape(-1, M), B_interleaver, N_interleaver)
+        new_remapped_indices = np.zeros(reshaped_num_events.shape[0], dtype=int)
+        for i, idx in enumerate(remapped_indices):
+            if idx >= reshaped_num_events.shape[0]:
+                continue
+            else:
+                new_remapped_indices[i] = idx
+        
+        reshaped_num_events = reshaped_num_events[new_remapped_indices]
+
+        # reshaped_num_events = num_events_per_slot.reshape(num_slices, num_symbols_per_slice+len(CSM), int(5/4*M))[:, len(CSM):, :M]
+        channel_likelihoods = reshaped_num_events[:-3780].astype(int)
+
+    else:
+        channel_likelihoods = poisson_noise(
+            slot_mapped_sequence[:, :M], ns=2, nb=0.05, simulate_lost_symbols=False)
 
     decoded_message = []
     decoded_message_array = np.zeros((max_num_iterations, num_slices, num_bits_per_slice))
+
+    sent_bit_sequence = kwargs.get('sent_bit_sequence')
 
     for i in range(num_slices):
         print(f'Decoding slice {i+1}/{num_slices}')
@@ -552,14 +579,14 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
             u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
-            # ber = np.sum(
-            #     [abs(x - y) for x, y in zip(
-            #         u_hat, bit_stream[i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)]
-            #     )]
-            # ) / len(bit_stream)
-            # print(
-            #     f"iteration = {iteration+1} ber: {ber:.5f} \t min likelihood: " +
-            #     f"{np.min(LLRs_u):.2f} \t max likelihood: {np.max(LLRs_u):.2f}")
+            ber = np.sum(
+                [abs(x - y) for x, y in zip(
+                    u_hat, sent_bit_sequence[i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)]
+                )]
+            ) / len(sent_bit_sequence)
+            print(
+                f"iteration = {iteration+1} ber: {ber:.5f} \t min likelihood: " +
+                f"{np.min(LLRs_u):.2f} \t max likelihood: {np.max(LLRs_u):.2f}")
 
             decoded_message_array[iteration, i, :] = u_hat
 

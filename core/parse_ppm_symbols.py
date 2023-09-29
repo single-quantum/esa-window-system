@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 
+import matplotlib.pyplot as plt
 
 def find_pulses_within_symbol_frame(
     i: int,
@@ -51,7 +52,7 @@ def parse_ppm_symbols(
 
     symbols: list[float] = []
     num_symbol_frames: int = int(round((stop_time - codeword_start_time) / symbol_length))
-
+    residuals = []
     for i in range(num_symbol_frames):
         symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(
             i, symbol_length, pulse_times, codeword_start_time)
@@ -91,13 +92,26 @@ def parse_ppm_symbols(
             symbols.append(0)
             continue
         rounded_symbols = np.round(symbol_frame_symbols)
+        symbol_residuals = symbol_frame_symbols - rounded_symbols
         occurences = []
+        residuals.append(np.mean(symbol_residuals))
 
         for symbol in np.unique(rounded_symbols):
             occurences.append(np.count_nonzero(rounded_symbols == symbol))
 
         best_symbol = np.unique(rounded_symbols[np.argmax(occurences)])[0]
         symbols.append(best_symbol)
+
+    # rms_residuals = np.mean(residuals)**2 + np.std(residuals)**2
+    # mean_residuals = np.mean(residuals)
+
+    # print('mean residuals' , mean_residuals)
+
+    # plt.figure()
+    # plt.plot(residuals)
+    # plt.show()
+
+    # print('standard deviation', np.std(residuals - np.mean(residuals)))
 
     return symbols, num_darkcounts
 
