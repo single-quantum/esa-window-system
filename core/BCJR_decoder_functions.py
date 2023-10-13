@@ -1,9 +1,9 @@
 import itertools
 from copy import deepcopy
+from fractions import Fraction
 from functools import lru_cache
 from itertools import chain
 from math import exp
-from fractions import Fraction
 
 import numpy as np
 import numpy.typing as npt
@@ -11,17 +11,14 @@ from numpy import dot
 from numpy.random import default_rng
 from tqdm import tqdm
 
-from core.encoder_functions import map_PPM_symbols, get_csm, get_remap_indices
-from core.trellis import Trellis
-from core.utils import flatten
-from core.scppm_encoder import puncture
 from core.encoder_functions import (bit_deinterleave, bit_interleave,
-                                    channel_deinterleave, randomize, slot_map,
-                                    unpuncture)
-from core.utils import (generate_inner_encoder_edges,
+                                    channel_deinterleave, get_csm,
+                                    get_remap_indices, map_PPM_symbols,
+                                    randomize, slot_map, unpuncture)
+from core.scppm_encoder import puncture
+from core.trellis import Trellis
+from core.utils import (flatten, generate_inner_encoder_edges,
                         generate_outer_code_edges, poisson_noise)
-
-
 
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
@@ -510,35 +507,45 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
     num_slices = int((slot_mapped_sequence.shape[0] * m * code_rate) / num_bits_per_slice)
 
     num_events_per_slot = kwargs.get('num_events_per_slot')
+    # num_events_per_slot = None
     if num_events_per_slot is not None:
         N_interleaver = 2
-        B_interleaver = int(15120/m/N_interleaver)
+        B_interleaver = int(15120 / m / N_interleaver)
         CSM = get_csm(M)
-        reshaped_num_events = num_events_per_slot.reshape(-1, num_symbols_per_slice+len(CSM), int(5/4*M))[:, len(CSM):, :M]
-        
+        reshaped_num_events = num_events_per_slot.reshape(-1,
+                                                          num_symbols_per_slice + len(CSM), int(5 / 4 * M))[:, len(CSM):, :M]
+
         # "flatten" it again
         reshaped_num_events = reshaped_num_events.reshape(-1, M)
-        remapped_indices = get_remap_indices(reshaped_num_events.reshape(-1, M), B_interleaver, N_interleaver)
+        reshaped_num_events = channel_deinterleave(reshaped_num_events, B_interleaver, N_interleaver)
+
+        remapped_indices = get_remap_indices(reshaped_num_events, B_interleaver, N_interleaver)
         new_remapped_indices = np.zeros(reshaped_num_events.shape[0], dtype=int)
         for i, idx in enumerate(remapped_indices):
             if idx >= reshaped_num_events.shape[0]:
                 continue
             else:
                 new_remapped_indices[i] = idx
-        
-        reshaped_num_events = reshaped_num_events[new_remapped_indices]
 
+        # reshaped_num_events = reshaped_num_events[new_remapped_indices]
+        num_zeros_interleaver = 2*B_interleaver*N_interleaver*(N_interleaver-1)
         # reshaped_num_events = num_events_per_slot.reshape(num_slices, num_symbols_per_slice+len(CSM), int(5/4*M))[:, len(CSM):, :M]
-        channel_likelihoods = reshaped_num_events[:-3780].astype(int)
+        channel_likelihoods = reshaped_num_events[:-num_zeros_interleaver].astype(int)
 
     else:
         channel_likelihoods = poisson_noise(
-            slot_mapped_sequence[:, :M], ns=2, nb=0.05, simulate_lost_symbols=False)
+            slot_mapped_sequence[:, :M], ns=4, nb=0.01, simulate_lost_symbols=False)
+
+    num_errors = 0
+
+    for i, idx in enumerate(np.argmax(slot_mapped_sequence, axis=1)):
+        if idx != np.argmax(channel_likelihoods, axis=1)[i]:
+            num_errors += 1
 
     decoded_message = []
     decoded_message_array = np.zeros((max_num_iterations, num_slices, num_bits_per_slice))
 
-    sent_bit_sequence = kwargs.get('sent_bit_sequence')
+    sent_bit_sequence = kwargs.get('sent_bit_sequence_no_csm')
 
     for i in range(num_slices):
         print(f'Decoding slice {i+1}/{num_slices}')
@@ -579,6 +586,7 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
             u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
+
             ber = np.sum(
                 [abs(x - y) for x, y in zip(
                     u_hat, sent_bit_sequence[i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)]

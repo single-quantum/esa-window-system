@@ -11,11 +11,15 @@ from core.encoder_functions import (accumulate, bit_interleave,
 
 from core.utils import ppm_symbols_to_bit_array
 
+
 def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction, **kwargs) -> npt.NDArray[np.int_]:
     """This preprocessing function slices the bit stream in information blocks and attaches the CRC. """
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
     information_blocks = slicer(bit_stream, code_rate, include_crc=False)
+    with open('sent_bit_sequence_no_csm', 'wb') as f:
+        pickle.dump(information_blocks.flatten(), f)
+
     if kwargs.get('use_randomizer', False):
         information_blocks = randomize(information_blocks)
     information_blocks = zero_terminate(information_blocks)
@@ -142,6 +146,7 @@ def encoder(
 
     information_blocks = preprocess_bit_stream(bit_stream, code_rate, **kwargs)
     PPM_symbols = SCPPM_encoder(information_blocks, M, code_rate, **kwargs)
+
     slot_mapped_sequence = postprocess_ppm_symbols(
         PPM_symbols, M, B_interleaver, N_interleaver
     )

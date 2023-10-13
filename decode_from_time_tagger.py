@@ -1,27 +1,26 @@
+import pickle
 import re
 from pathlib import Path
-import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import TimeTagger
 
 from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
+from core.data_converter import payload_to_bit_sequence
 from core.demodulation_functions import demodulate
 from core.encoder_functions import map_PPM_symbols
-
-from ppm_parameters import DEBUG_MODE, CORRELATION_THRESHOLD, MESSAGE_IDX, USE_INNER_ENCODER, USE_RANDOMIZER
-import numpy.typing as npt
-
 from core.scppm_decoder import decode
 from core.utils import flatten
-from core.data_converter import payload_to_bit_sequence
+from ppm_parameters import (CORRELATION_THRESHOLD, DEBUG_MODE, MESSAGE_IDX,
+                            USE_INNER_ENCODER, USE_RANDOMIZER)
 
 """Read time tagger files from the Swabian Time Tagger Ultra. Required software for the time tagger can be found here:
 https://www.swabianinstruments.com/time-tagger/downloads/ . """
 
 
-def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
+def get_time_events_from_tt_file(time_events_filename: str, num_channels: int, get_time_events_per_channel=True, **kwargs):
     """Open the `time_events_filename` with the TimeTagger.FileReader class and retrieve events.
 
     Can either read out the entire buffer or read out a given number of events. """
@@ -39,21 +38,36 @@ def get_time_events_from_tt_file(time_events_filename: str, **kwargs):
     # It is a bit awkward to work with a list here, then flatten it and
     # recast it to a numpy array, but it is much faster than working with np.hstack / np.append
     time_stamps = []
+    time_stamps_per_channel = [[] for _ in range(num_channels)]
 
     while not buffer_empty:
         data = fr.getData(1000)
         events = data.getTimestamps()
         if events.size == 0:
             buffer_empty = True
-        else:
-            time_stamps.append(events)
+            break
+
+        channels = data.getChannels()
+
+        events_per_channel = [list(filter(lambda e: e[1] == i, zip(events, channels)))
+                              for i in range(1, num_channels+1)]
+
+        time_stamps.append(events)
+        for i in range(num_channels):
+            time_stamps_per_channel[i].append(list(map(lambda e: e[0], events_per_channel[i])))
+
+    num_items = 0
+    for i in range(num_channels):
+        num_items += len(flatten(time_stamps_per_channel[i]))
 
     time_stamps = flatten(time_stamps)
     # Time stamps from the time tagger are in picoseconds, but the rest of the code uses seconds as the base unit
     time_stamps = np.array(time_stamps)
+    # time_events_per_channel = np.zeros()
+    # time_events_per_channel = np.array(time_stamps_per_channel)
     time_events = time_stamps * 1E-12
 
-    return time_events
+    return time_events, time_stamps_per_channel
 
 
 use_latest_tt_file: bool = True
@@ -70,8 +84,8 @@ else:
     tt_files = time_tagger_files_path.rglob('*.ttbin')
     files: list[Path] = [x for x in tt_files if x.is_file()]
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
-    time_tagger_filename = time_tagger_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
-    time_tagger_file_epoch = time_tagger_filename.split('_')[-1].rstrip('.ttbin')
+    time_tagger_filename = time_tagger_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.2.ttbin'
+    time_tagger_file_epoch = time_tagger_filename.split('_')[-1].rstrip('.2.ttbin')
 
     # Get metadata files
     files_list = time_tagger_files_path.rglob('*')
@@ -92,15 +106,15 @@ with open(metadata_filepath, 'rb') as f:
     PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')
     IMG_FILE_PATH = metadata.get('IMG_FILE_PATH')
     IMG_SHAPE = metadata.get('IMG_SHAPE')
-    num_slots_per_symbol = int(5/4*M)
+    num_slots_per_symbol = int(5 / 4 * M)
 
 
-time_events = get_time_events_from_tt_file(time_tagger_filename)
+time_events, time_events_per_channel = get_time_events_from_tt_file(time_tagger_filename, 4)
 # Remove duplicate timing events
 time_events = np.unique(time_events)
 
 
-time_events_samples=(time_events-time_events[0])*(8.82091E9/num_samples_per_slot)+0.5
+time_events_samples = (time_events - time_events[0]) * (8.82091E9 / num_samples_per_slot) + 0.5
 # print(time_events_samples[0:110])
 
 # plt.plot(time_events_samples[0:100]%1)
@@ -111,30 +125,30 @@ time_events_samples=(time_events-time_events[0])*(8.82091E9/num_samples_per_slot
 
 # plt.show()
 
-vals=[]
-dat=time_events_samples[10000:30000]
-factors=np.linspace(0.99998,1.00002,10000)
+vals = []
+dat = time_events_samples[10000:30000]
+factors = np.linspace(0.99998, 1.00002, 10000)
 
 for factor_here in factors:
-    dat2=dat%factor_here
-    vals.append(np.sum(np.abs(dat2-np.average(dat2))**2))
+    dat2 = dat % factor_here
+    vals.append(np.sum(np.abs(dat2 - np.average(dat2))**2))
 
 
 # plt.figure()
 # plt.plot(vals)
 # plt.show()
 
-index=np.argmin(vals)
-correction=factors[index]
-vals=[]
+index = np.argmin(vals)
+correction = factors[index]
+vals = []
 
-# print(correction)
+print(correction)
 
 plt.figure()
-plt.plot(time_events_samples[:10000]%1-0.5,label='original')
+plt.plot(time_events_samples[:10000] % 1 - 0.5, label='original')
 plt.xlabel('#symbol')
 plt.ylabel('deviation')
-plt.plot(time_events_samples[:10000]%correction-0.5,label='adjusted')
+plt.plot(time_events_samples[:10000] % correction - 0.5, label='adjusted')
 plt.legend()
 plt.show()
 
@@ -145,8 +159,8 @@ symbol_length *= correction
 print(f'Number of events: {len(time_events)}')
 
 slot_mapped_message, events_per_slot = demodulate(time_events[:550000], M, slot_length, symbol_length,
-                                 num_slots_per_symbol, debug_mode=DEBUG_MODE,
-                                 csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX, **{'num_samples_per_slot': num_samples_per_slot})
+                                                  num_slots_per_symbol, debug_mode=DEBUG_MODE,
+                                                  csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX, **{'num_samples_per_slot': num_samples_per_slot})
 
 m = int(np.log2(M))
 received_ppm_symbols = np.nonzero(slot_mapped_message)[1]
@@ -158,18 +172,22 @@ with open('received_bit_sequence', 'wb') as f:
 with open('sent_bit_sequence', 'rb') as f:
     sent_bits = pickle.load(f)
 
-BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)])/len(sent_bits)
+with open('sent_bit_sequence_no_csm', 'rb') as f:
+    sent_bits_no_csm = pickle.load(f)
+
+BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)]) / len(sent_bits)
 print('BER before decoding', BER_before_decoding)
 
 information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
     use_inner_encoder=USE_INNER_ENCODER,
     **{
-        'use_cached_trellis': False, 
-        'num_events_per_slot': events_per_slot, 
+        'use_cached_trellis': False,
+        'num_events_per_slot': events_per_slot,
         'use_randomizer': USE_RANDOMIZER,
+        'sent_bit_sequence_no_csm': sent_bits_no_csm,
         'sent_bit_sequence': sent_bits
-        })
+    })
 
 sent_img_array: npt.NDArray[np.int_] = np.array([])
 img_arr: npt.NDArray[np.int_] = np.array([])

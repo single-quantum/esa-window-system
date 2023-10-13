@@ -324,6 +324,7 @@ def channel_interleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray
 
     return output_array
 
+
 def get_remap_indices(input_array, B, N):
     remap_indeces: list[int] = []
 
@@ -356,7 +357,10 @@ def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArr
     # The interleaver needs to be ran another B*N*(N-1) times to finalize the interleaving.
     for i in interleaver_remap_indices:
         if i < 0 or i >= arr.shape[0]:
-            output.append(0)
+            if len(arr.shape) == 2:
+                output.append(np.zeros(arr.shape[1]))
+            else:
+                output.append(0)
         else:
             output.append(arr[i])
 
