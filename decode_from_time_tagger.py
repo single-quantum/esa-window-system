@@ -47,18 +47,18 @@ def get_time_events_from_tt_file(time_events_filename: str, num_channels: int, g
             buffer_empty = True
             break
 
-        # channels = data.getChannels()
+        if get_time_events_per_channel:
+            channels = data.getChannels()
 
-        # events_per_channel = [list(filter(lambda e: e[1] == i, zip(events, channels)))
-        #                       for i in range(1, num_channels+1)]
+            events_per_channel = [list(filter(lambda e: e[1] == i, zip(events, channels)))
+                                for i in range(1, num_channels+1)]
+            for i in range(num_channels):
+                time_stamps_per_channel[i].append(list(map(lambda e: e[0], events_per_channel[i])))
 
         time_stamps.append(events)
-        # for i in range(num_channels):
-        #     time_stamps_per_channel[i].append(list(map(lambda e: e[0], events_per_channel[i])))
 
-    num_items = 0
     for i in range(num_channels):
-        num_items += len(flatten(time_stamps_per_channel[i]))
+        time_stamps_per_channel[i] = flatten(time_stamps_per_channel[i])
 
     time_stamps = flatten(time_stamps)
     # Time stamps from the time tagger are in picoseconds, but the rest of the code uses seconds as the base unit
@@ -109,9 +109,12 @@ with open(metadata_filepath, 'rb') as f:
     num_slots_per_symbol = int(5 / 4 * M)
 
 
-time_events, time_events_per_channel = get_time_events_from_tt_file(time_tagger_filename, 4)
+time_events, time_events_per_channel = get_time_events_from_tt_file(time_tagger_filename, 4, get_time_events_per_channel=True)
 # Remove duplicate timing events
 time_events = np.unique(time_events)
+
+channels = [1, 2, 3]
+time_events = np.sort(np.concatenate(tuple(np.array(time_events_per_channel[i]) for i in channels))*1E-12)
 
 
 time_events_samples = (time_events - time_events[0]) * (8.82091E9 / num_samples_per_slot) + 0.5
@@ -149,7 +152,7 @@ symbol_length *= correction
 
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message, events_per_slot = demodulate(time_events[:550000], M, slot_length, symbol_length, debug_mode=DEBUG_MODE,
+slot_mapped_message, events_per_slot = demodulate(time_events[:500000], M, slot_length, symbol_length, debug_mode=DEBUG_MODE,
                                                   csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX, **{'num_samples_per_slot': num_samples_per_slot})
 
 m = int(np.log2(M))
