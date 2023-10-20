@@ -7,7 +7,7 @@ from PIL import Image
 from core.encoder_functions import get_csm
 
 num_samples_per_slot: int = 10           # Number of DAC samples in one slot
-M: int = 16                              # each m = 4 bits are mapped from 0 to M = 16
+M: int = 32                              # each m = 4 bits are mapped from 0 to M = 16
 CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
@@ -22,11 +22,11 @@ USE_RANDOMIZER = True
 # as percentage of the maximum correlation of the received sequence, 'decides' whether a peak
 # belongs to the start of a codeword or not
 CORRELATION_THRESHOLD: float = 0.65
-DEBUG_MODE: bool = False
+DEBUG_MODE: bool = True
 
 # Usually we record multiple copies of the same message. You can use this to select a particular copy of the message,
 # as sometimes a certain copy of the message has too much noise to recover.
-MESSAGE_IDX: list[int] = [3, 4]
+MESSAGE_IDX: list[int] = [1, 2]
 
 # No need to change the parameters below, unless you know what you're doing!
 # Note: The fraction type is needed for proper match casing

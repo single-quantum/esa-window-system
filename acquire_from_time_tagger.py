@@ -46,7 +46,6 @@ filewriter.startFor(int(window_size_ps), clear=True)
 filewriter.waitUntilFinished()
 
 num_events = filewriter.getTotalEvents()
-channel_events = filewriter.getChannels()
 
 print(f'{num_events} events written to disk. ')
 print(f'Events per second: {num_events*1/window_size_secs:.3e}')
