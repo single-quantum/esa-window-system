@@ -2,10 +2,9 @@ import numpy as np
 import pytest
 from numpy.random import default_rng
 
-from core.demodulation_functions import demodulate
+from core.demodulation_functions import demodulate, determine_CSM_time_shift
 from core.encoder_functions import get_csm
 from core.parse_ppm_symbols import parse_ppm_symbols
-from ppm_parameters import num_slots_per_symbol
 
 
 def test_parse_ppm_symbols_single_noise_symbol():
@@ -123,3 +122,15 @@ def test_demodulate_happy_path(pulse_timestamps_with_csm):
     # The decoder is responsible for stripping off the CSM.
     assert slot_mapped_sequence.shape[0] == num_symbols + len(CSM)
     assert slot_mapped_sequence.shape[1] == int(5 / 4 * M)
+
+
+def test_csm_time_shift_happy_path(pulse_timestamps_with_csm):
+    pulse_timestamps, ppm_params = pulse_timestamps_with_csm
+    M, symbol_length, slot_length, num_symbols, CSM = ppm_params.values()
+    num_slots_per_symbol = int(5/4*M)
+    csm_times = np.array([pulse_timestamps[0]])
+
+    rng = np.random.default_rng(777)
+    pulse_timestamps += rng.normal(0, 0.1*slot_length, len(pulse_timestamps))
+    csm_time_shift = determine_CSM_time_shift(csm_times, pulse_timestamps, slot_length, CSM, num_slots_per_symbol)
+    assert csm_time_shift == 0

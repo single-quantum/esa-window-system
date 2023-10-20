@@ -53,7 +53,12 @@ def determine_CSM_time_shift(
             slot_length)
         n = 0
         csm_time = csm_times[i]
-        csm_timestamps = time_stamps[time_stamps >= csm_time] - 0.5*slot_length
+        csm_timestamps = time_stamps[time_stamps >= csm_time]
+        temporary_shift = False
+        if abs((csm_slot_times[0]-csm_timestamps[0])/slot_length) > 0.5:
+            temporary_shift = True
+            csm_timestamps = time_stamps[time_stamps >= csm_time] - 0.5*slot_length
+
         # for j in range(len(csm_slot_times) - 1):
         j = 0
         while j < len(csm_slot_times) - 1:
@@ -62,8 +67,10 @@ def determine_CSM_time_shift(
                 n += 1
             else:
                 j += 1
-
-        csm_shifts.append(np.mean(shifts) + 0.5*slot_length)
+        if temporary_shift:
+            csm_shifts.append(np.mean(shifts) + 0.5*slot_length)
+        else:
+            csm_shifts.append(np.mean(shifts))
 
     csm_shifts = np.array(csm_shifts)
     # csm_shifts = csm_shifts[0]
