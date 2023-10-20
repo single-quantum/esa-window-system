@@ -47,14 +47,14 @@ def get_time_events_from_tt_file(time_events_filename: str, num_channels: int, g
             buffer_empty = True
             break
 
-        channels = data.getChannels()
+        # channels = data.getChannels()
 
-        events_per_channel = [list(filter(lambda e: e[1] == i, zip(events, channels)))
-                              for i in range(1, num_channels+1)]
+        # events_per_channel = [list(filter(lambda e: e[1] == i, zip(events, channels)))
+        #                       for i in range(1, num_channels+1)]
 
         time_stamps.append(events)
-        for i in range(num_channels):
-            time_stamps_per_channel[i].append(list(map(lambda e: e[0], events_per_channel[i])))
+        # for i in range(num_channels):
+        #     time_stamps_per_channel[i].append(list(map(lambda e: e[0], events_per_channel[i])))
 
     num_items = 0
     for i in range(num_channels):
@@ -115,15 +115,6 @@ time_events = np.unique(time_events)
 
 
 time_events_samples = (time_events - time_events[0]) * (8.82091E9 / num_samples_per_slot) + 0.5
-# print(time_events_samples[0:110])
-
-# plt.plot(time_events_samples[0:100]%1)
-
-# plt.plot(time_events_samples[0:100]%1.001)
-
-# plt.plot(time_events_samples[0:100]%0.999)
-
-# plt.show()
 
 vals = []
 dat = time_events_samples[10000:30000]
@@ -158,8 +149,7 @@ symbol_length *= correction
 
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message, events_per_slot = demodulate(time_events[:550000], M, slot_length, symbol_length,
-                                                  num_slots_per_symbol, debug_mode=DEBUG_MODE,
+slot_mapped_message, events_per_slot = demodulate(time_events[:550000], M, slot_length, symbol_length, debug_mode=DEBUG_MODE,
                                                   csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX, **{'num_samples_per_slot': num_samples_per_slot})
 
 m = int(np.log2(M))
