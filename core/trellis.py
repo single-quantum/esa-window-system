@@ -1,9 +1,12 @@
 from copy import copy, deepcopy
 
+from core.encoder_functions import map_PPM_symbols
+
 
 class Edge:
 
-    __slots__ = ('from_state', 'to_state', 'edge_input', 'edge_output', 'gamma', 'lmbda', 'hamming_distance')
+    __slots__ = ('from_state', 'to_state', 'edge_input', 'edge_output', 'gamma',
+                 'lmbda', 'hamming_distance', 'edge_input_label', 'edge_output_label')
 
     def __init__(self):
 
@@ -29,6 +32,12 @@ class Edge:
         self.to_state = to_state
         self.edge_input = edge_input
         self.edge_output = edge_output
+        if isinstance(edge_input, int):
+            self.edge_input_label = edge_input
+        else:
+            self.edge_input_label = map_PPM_symbols(edge_input, len(edge_input))[0]
+
+        self.edge_output_label = map_PPM_symbols(edge_output, len(edge_output))[0]
         self.gamma = gamma
 
     # Not sure if this is necessary, but this way the edges can be sorted and

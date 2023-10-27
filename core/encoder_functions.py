@@ -69,17 +69,27 @@ def randomize(information_blocks: npt.NDArray) -> npt.NDArray:
     initial_shape = information_blocks.shape
     pseudo_randomized_sequence = generate_pseudo_randomized_sequence()
 
-    information_blocks = information_blocks.flatten()
+    output_array = np.zeros(initial_shape, dtype=int)
+    # information_blocks = information_blocks.flatten()
 
-    # Tile the randomized sequence, so that it is long enough to XOR with the information blocks
-    copies = math.ceil(len(information_blocks) / len(pseudo_randomized_sequence))
-    pseudo_randomized_sequence = np.tile(pseudo_randomized_sequence, copies)
+    if information_blocks.ndim == 1:
+        copies = math.ceil(len(information_blocks) / len(pseudo_randomized_sequence))
+        pseudo_randomized_sequence = np.tile(pseudo_randomized_sequence, copies)
+        output_array = information_blocks ^ pseudo_randomized_sequence[:len(information_blocks)]
+        return output_array
 
-    # XOR addition of both sequences.
-    randomized_information_blocks = information_blocks ^ pseudo_randomized_sequence[:len(information_blocks)]
-    randomized_information_blocks = randomized_information_blocks.reshape(initial_shape)
+    i = 0
+    for row in information_blocks:
+        # Tile the randomized sequence, so that it is long enough to XOR with the information blocks
+        copies = math.ceil(len(row) / len(pseudo_randomized_sequence))
+        pseudo_randomized_sequence = np.tile(pseudo_randomized_sequence, copies)
 
-    return randomized_information_blocks
+        # XOR addition of both sequences.
+        randomized_row = row ^ pseudo_randomized_sequence[:len(row)]
+        output_array[i] = randomized_row
+        i += 1
+
+    return output_array
 
 
 def append_CRC(arr: npt.NDArray):
@@ -122,7 +132,8 @@ def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
     return arr
 
 
-def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction) -> npt.NDArray[np.int_]:
+def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction,
+               dtype: int | float = int) -> npt.NDArray[np.int_]:
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
         Fraction(1, 2): [1, 1, 0, 1, 1, 0],
@@ -132,7 +143,7 @@ def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction) -> n
     P = puncture_scheme[code_rate]
 
     factor = code_rate / Fraction(1, 3)
-    unpunctured_sequence = np.zeros(int(factor * len(encoded_sequence)), dtype=int)
+    unpunctured_sequence = np.zeros(int(factor * len(encoded_sequence)), dtype=dtype)
 
     j = 0
     for i in range(len(unpunctured_sequence) - 1):
@@ -143,7 +154,8 @@ def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction) -> n
     return unpunctured_sequence
 
 
-def puncture(convoluted_bit_sequence: npt.NDArray[np.int_], code_rate: Fraction) -> npt.NDArray[np.int_]:
+def puncture(convoluted_bit_sequence: npt.NDArray[np.int_],
+             code_rate: Fraction, dtype: int | float = int) -> npt.NDArray[np.int_]:
     """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
@@ -156,7 +168,7 @@ def puncture(convoluted_bit_sequence: npt.NDArray[np.int_], code_rate: Fraction)
     # (See page 3-12 of the CCSDS 142.0-B-1 blue book, August 2019 edition)
 
     convolutional_codewords: npt.NDArray[np.int_] = np.zeros(
-        (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1] / (3 * float(code_rate)))), dtype=int
+        (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1] / (3 * float(code_rate)))), dtype=dtype
     )
     P = puncture_scheme[code_rate]
     for i, row in enumerate(convoluted_bit_sequence):
@@ -241,7 +253,7 @@ def map_PPM_symbols(arr, m: int):
     return output_arr
 
 
-def bit_interleave(arr: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+def bit_interleave(arr: npt.NDArray, dtype: type[int] | type[float] = int) -> npt.NDArray:
     """Shuffle some bits around to make a so-called bit-interleaved codeword.
 
     Note: works only with 15120 element arrays. The modulo 15120 is hard coded for a reason.
@@ -251,7 +263,7 @@ def bit_interleave(arr: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
     if arr.shape[0] != 15120:
         raise ValueError("Input array should have length 15120")
 
-    interleaved_output = np.zeros_like(arr).astype(int)
+    interleaved_output = np.zeros_like(arr).astype(dtype)
 
     # pi_j is the bit index from the original bit array
     for j in range(interleaved_output.shape[0]):
@@ -261,14 +273,14 @@ def bit_interleave(arr: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
     return interleaved_output
 
 
-def bit_deinterleave(arr: np.ndarray | list[float]) -> npt.NDArray[np.int_]:
+def bit_deinterleave(arr: np.ndarray | list[float], dtype: Any = int) -> npt.NDArray[np.int_]:
     """De-interleave the interleaved array `arr`.
 
     Note: works only with 15120 element arrays. """
 
     assert len(arr) == 15120, "Input array should have length 15120"
 
-    deinterleaved_array: np.ndarray = np.zeros_like(arr).astype(int)
+    deinterleaved_array: np.ndarray = np.zeros_like(arr).astype(dtype)
 
     # pi_j is the new index for the interleaved array
     for j in range(deinterleaved_array.shape[0]):
@@ -313,6 +325,19 @@ def channel_interleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray
     return output_array
 
 
+def get_remap_indices(input_array, B, N):
+    remap_indeces: list[int] = []
+
+    remap_indeces.append(0)
+    for i in range(1, input_array.shape[0] + B * N * (N - 1)):
+        if i % N == 0:
+            remap_indeces.append(i)
+        else:
+            remap_indeces.append(remap_indeces[i - 1] + N * B + 1)
+
+    return remap_indeces
+
+
 def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray[np.int_]:
     """Use N slots of linear shift registers to interleave the PPM symbols.
 
@@ -323,23 +348,19 @@ def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArr
     """
     arr = np.array(arr, dtype=int)
     output: list[int] = []
-    remap_indeces: list[int] = []
-
-    remap_indeces.append(0)
-    for i in range(1, arr.shape[0] + B * N * (N - 1)):
-        if i % N == 0:
-            remap_indeces.append(i)
-        else:
-            remap_indeces.append(remap_indeces[i - 1] + N * B + 1)
+    interleaver_remap_indices = get_remap_indices(arr, B, N)
 
     # Indeces < 0 indicate initial interleaver state bits, which is set at 0.
     # Indeces > the input array indicate terminal interleaver state bits, which are also set to 0
 
     # When the final bit of the input sequence is inserted into the interleaver,
     # The interleaver needs to be ran another B*N*(N-1) times to finalize the interleaving.
-    for i in remap_indeces:
+    for i in interleaver_remap_indices:
         if i < 0 or i >= arr.shape[0]:
-            output.append(0)
+            if len(arr.shape) == 2:
+                output.append(np.zeros(arr.shape[1]))
+            else:
+                output.append(0)
         else:
             output.append(arr[i])
 

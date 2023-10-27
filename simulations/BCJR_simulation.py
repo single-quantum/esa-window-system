@@ -9,16 +9,15 @@ from numpy.random import default_rng
 from PIL import Image
 
 from core.BCJR_decoder_functions import (calculate_alphas, calculate_betas,
-                                    calculate_gammas, calculate_LLRs, ppm_symbols_to_bit_array)
+                                         calculate_gammas, calculate_LLRs,
+                                         ppm_symbols_to_bit_array)
 from core.encoder_functions import (bit_deinterleave, bit_interleave,
-                               channel_deinterleave, channel_interleave,
-                               convolve, map_PPM_symbols, slicer,
-                               zero_terminate, get_csm)
+                                    channel_deinterleave, channel_interleave,
+                                    convolve, get_csm, map_PPM_symbols, slicer,
+                                    zero_terminate)
 from core.parse_ppm_symbols import rolling_window
-
 from core.trellis import Edge, Trellis
-from core.utils import (AWGN, bpsk, bpsk_encoding,
-                   generate_outer_code_edges)
+from core.utils import AWGN, bpsk, bpsk_encoding, generate_outer_code_edges
 from simulations.viterbi import viterbi
 
 GREYSCALE = True
@@ -68,44 +67,6 @@ def gamma_poisson(ns, nb, num_photons, noise=False):
         return np.exp(-lmbda) * np.sum([lmbda**k / math.factorial(k) for k in range(num_photons)])
 
 
-def poisson_noise(input_sequence, ns, nb):
-
-    rng = default_rng()
-    for row in input_sequence:
-        i = np.where(row == 1)[0][0]
-        row += rng.poisson(nb, size=len(row))
-        row[i] = rng.poisson(ns + nb)
-
-    return input_sequence
-
-
-def generate_inner_encoder_edges(num_input_bits, bpsk_encoding=True):
-    input_combinations = list(itertools.product([0, 1], repeat=num_input_bits))
-    edges = []
-    for initial_state in [0, 1]:
-        state_edges = []
-        for input_bits in input_combinations:
-            # initial_state = 1
-            current_state = initial_state
-            output = []
-
-            for bit in input_bits:
-                output_bit = current_state ^ bit
-                output.append(output_bit)
-                current_state = output_bit
-
-            if bpsk_encoding:
-                output = bpsk(output)
-
-            e = Edge()
-            e.set_edge(initial_state, current_state, input_bits, output, gamma=None)
-            state_edges.append(e)
-
-        edges.append(state_edges)
-
-    return edges
-
-
 num_output_bits = 3
 num_input_bits = 1
 memory_size = 2
@@ -141,13 +102,13 @@ ppm_mapped_message = channel_interleave(ppm_mapped_message, B_interleaver, N_int
 
 # Insert CSMs
 len_codeword = 15120 // m
-num_codewords = ppm_mapped_message.shape[0]//len_codeword
+num_codewords = ppm_mapped_message.shape[0] // len_codeword
 CSM = get_csm(M=M)
 
-ppm_mapped_message_with_csm = np.zeros(len(ppm_mapped_message)+len(CSM)*num_codewords, dtype=int)
+ppm_mapped_message_with_csm = np.zeros(len(ppm_mapped_message) + len(CSM) * num_codewords, dtype=int)
 for i in range(num_codewords):
-    prepended_codeword = np.hstack((CSM, ppm_mapped_message[i*len_codeword:(i+1)*len_codeword]))
-    ppm_mapped_message_with_csm[i*len(prepended_codeword):(i+1)*len(prepended_codeword)] = prepended_codeword
+    prepended_codeword = np.hstack((CSM, ppm_mapped_message[i * len_codeword:(i + 1) * len_codeword]))
+    ppm_mapped_message_with_csm[i * len(prepended_codeword):(i + 1) * len(prepended_codeword)] = prepended_codeword
 
 ppm_mapped_message = ppm_mapped_message_with_csm
 
@@ -200,7 +161,7 @@ tr.set_edges(edges)
 
 # Remove CSMs
 where_csm = np.where(np.all(rolling_window(ppm_mapped_message, len(CSM)) == CSM, axis=1))[0]
-idxs = [np.arange(csm_idx, csm_idx+len(CSM), 1) for csm_idx in where_csm]
+idxs = [np.arange(csm_idx, csm_idx + len(CSM), 1) for csm_idx in where_csm]
 idxs_to_be_removed = np.hstack(idxs)
 
 ppm_mapped_message = np.delete(ppm_mapped_message, idxs_to_be_removed)
@@ -275,7 +236,7 @@ for Es, N0 in list(zip(E, N)):
     BER_BCJR.append(error_ratio)
 
     # For some reason, Viterbi is shifted by one bit.
-    predicted_msg_viterbi = predicted_msg_viterbi[1:1+len(sent_message)]
+    predicted_msg_viterbi = predicted_msg_viterbi[1:1 + len(sent_message)]
     num_errors_viterbi = sum(abs(np.array(sent_message) - np.array(predicted_msg_viterbi)))
     error_percentage_viterbi = 100 * num_errors_viterbi / len(sent_message)
     error_ratio_viterbi = error_percentage_viterbi / 100

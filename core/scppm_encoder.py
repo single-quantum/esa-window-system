@@ -4,16 +4,24 @@ from fractions import Fraction
 import numpy as np
 import numpy.typing as npt
 
-from core.encoder_functions import (bit_interleave, channel_interleave, convolve, get_csm, map_PPM_symbols, puncture,
-                                    randomize, slicer, slot_map, zero_terminate)
+from core.encoder_functions import (accumulate, bit_interleave,
+                                    channel_interleave, convolve, get_csm,
+                                    map_PPM_symbols, puncture, randomize,
+                                    slicer, slot_map, zero_terminate)
+
+from core.utils import ppm_symbols_to_bit_array
 
 
-def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction) -> npt.NDArray[np.int_]:
+def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction, **kwargs) -> npt.NDArray[np.int_]:
     """This preprocessing function slices the bit stream in information blocks and attaches the CRC. """
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
     information_blocks = slicer(bit_stream, code_rate, include_crc=False)
-    # information_blocks = randomize(information_blocks)
+    with open('sent_bit_sequence_no_csm', 'wb') as f:
+        pickle.dump(information_blocks.flatten(), f)
+
+    if kwargs.get('use_randomizer', False):
+        information_blocks = randomize(information_blocks)
     information_blocks = zero_terminate(information_blocks)
 
     return information_blocks
@@ -47,6 +55,10 @@ def SCPPM_encoder(
     if BIT_INTERLEAVE:
         for i, row in enumerate(convolutional_codewords):
             convolutional_codewords[i] = bit_interleave(convolutional_codewords[i])
+
+    if kwargs.get('use_inner_encoder'):
+        for i, row in enumerate(convolutional_codewords):
+            convolutional_codewords[i] = accumulate(convolutional_codewords[i])
 
     encoded_message = convolutional_codewords.flatten()
 
@@ -87,8 +99,8 @@ def postprocess_ppm_symbols(
     symbols_per_codeword = int(15120 / np.log2(M))
     num_codewords = int(PPM_symbols.shape[0] / symbols_per_codeword)
 
-    # Attach Codeword Synchronisation Markerk (CSM) to each codeword of
-    # 15120/m PPM symbols
+    # # Attach Codeword Synchronisation Markerk (CSM) to each codeword of
+    # # 15120/m PPM symbols
     CSM = get_csm(M=M)
 
     ppm_mapped_message_with_csm = np.zeros(
@@ -132,10 +144,16 @@ def encoder(
         m = int(np.log2(M))
         B_interleaver = int(15120 / m / N_interleaver)
 
-    information_blocks = preprocess_bit_stream(bit_stream, code_rate)
+    information_blocks = preprocess_bit_stream(bit_stream, code_rate, **kwargs)
     PPM_symbols = SCPPM_encoder(information_blocks, M, code_rate, **kwargs)
+
     slot_mapped_sequence = postprocess_ppm_symbols(
         PPM_symbols, M, B_interleaver, N_interleaver
     )
+
+    with open('sent_bit_sequence', 'wb') as f:
+        sent_ppm_symbols = np.nonzero(slot_mapped_sequence)[1]
+        sent_bit_sequence = ppm_symbols_to_bit_array(sent_ppm_symbols, int(np.log2(M)))
+        pickle.dump(sent_bit_sequence, f)
 
     return slot_mapped_sequence
