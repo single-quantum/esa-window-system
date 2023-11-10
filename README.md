@@ -30,3 +30,5 @@ For convenience, there are three high level functions that can be used to encode
 - `decode`: Decodes a slot mapped sequence, given M and a code rate.
 - `demodulate`: This function is used to convert a sequence of timestamps to PPM symbols.
 
+Further utility functions are:
+- `payload_to_bit_sequence`: With this function, a given payload (string or image) can be converted to a bit stream that can then be encoded with the `encode` function. 
