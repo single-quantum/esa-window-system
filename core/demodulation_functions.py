@@ -48,14 +48,11 @@ def determine_CSM_time_shift(
     for csm_time in csm_times:
         # for i in range(1):
         shifts = []
-        csm_slot_times = np.arange(
-            csm_time,
-            csm_time + num_slots_per_symbol * 3 * len(CSM) * slot_length,
-            slot_length)
+
         csm_symbol_times = [
             csm_time + CSM[i] * slot_length + i * num_slots_per_symbol * slot_length for i in range(len(CSM))
         ]
-        n = 0
+
         # Double check if copy is needed here
         # csm_timestamps = copy.deepcopy(time_stamps[time_stamps >= csm_time])
         csm_timestamps = copy.deepcopy(time_stamps[
@@ -73,26 +70,6 @@ def determine_CSM_time_shift(
         outliers = np.where(abs(z_score) > 2)[0]
         shifts = np.delete(shifts, outliers)
 
-        # temporary_shift: bool = False
-
-        # if abs((csm_timestamps[0] - csm_slot_times[0]) / slot_length) > num_slots_per_symbol:
-        #     csm_shifts.append(0)
-        #     continue
-
-        # if abs((csm_timestamps[0] - csm_slot_times[0]) / slot_length) > 0.5:
-        #     temporary_shift = True
-        #     csm_timestamps -= 0.5 * slot_length
-
-        # j = 0
-        # while j < len(csm_slot_times) - 1:
-        #     if csm_slot_times[j] <= csm_timestamps[n] <= csm_slot_times[j + 1]:
-        #         shifts.append(csm_timestamps[n] - csm_slot_times[j])
-        #         n += 1
-        #     else:
-        #         j += 1
-        # if temporary_shift:
-        #     csm_shifts.append(np.mean(shifts) + 0.5 * slot_length)
-        # else:
         csm_shifts.append(np.mean(shifts))
 
     csm_shifts = np.array(csm_shifts)
@@ -117,7 +94,7 @@ def get_csm_correlation(time_stamps, slot_length, CSM, symbol_length, csm_correl
         plt.xlabel('Shift (A.U.)')
         plt.ylabel('Correlation (-)')
         plt.title('Message correlation with the CSM')
-        plt.legend()
+        plt.legend(loc='lower left')
         plt.show()
 
     return corr
@@ -158,7 +135,7 @@ def find_csm_times(
     moving_avg_corr: npt.NDArray[np.int_] = moving_average(csm_correlation, n=len(CSM) * num_slots_per_symbol)
     message_start_idxs: npt.NDArray[np.int_] = find_peaks(
         -(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1,
-        height=(0.8, 1),
+        height=(0.9, 1),
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
     if kwargs.get('debug_mode'):

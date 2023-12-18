@@ -124,8 +124,8 @@ def decode(
     if not use_inner_encoder:
         predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
     else:
-        predicted_msg = predict_iteratively(deinterleaved_slot_mapped_sequence, M,
-                                            CODE_RATE, max_num_iterations=5, **kwargs)
+        predicted_msg, _, _ = predict_iteratively(deinterleaved_slot_mapped_sequence, M,
+                                                  CODE_RATE, max_num_iterations=5, **kwargs)
     information_block_sizes = {
         Fraction(1, 3): 5040,
         Fraction(1, 2): 7560,

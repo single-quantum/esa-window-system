@@ -150,18 +150,22 @@ def AWGN(input_sequence, sigma=0.8):
 
 
 def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float,
-                  simulate_lost_symbols=False, detection_efficiency: float = 0):
+                  simulate_lost_symbols=False, detection_efficiency: float = 1):
     output_sequence = deepcopy(input_sequence)
     rng = default_rng()
     if simulate_lost_symbols:
-        lost_symbols = np.array(rng.random(input_sequence.shape[0]) > detection_efficiency)
+        lost_symbols = np.array(rng.random(input_sequence.shape[0]) >= detection_efficiency)
+
+    poisson_dist_signal_slots = rng.poisson(ns+nb, size=output_sequence.shape)
+    poisson_dist_noise_slots = rng.poisson(nb, size=output_sequence.shape)
+
     for i, row in enumerate(output_sequence):
         j = np.where(row == 1)[0][0]
-        row += rng.poisson(nb, size=len(row))
-        # if lost_symbols[i]:
-        #     row[j] = rng.poisson(nb)
-        # else:
-        row[j] = rng.poisson(ns + nb)
+        row += poisson_dist_noise_slots[i]
+        if not (simulate_lost_symbols and lost_symbols[i]):
+            #     row[j] = poisson_dist_noise_slots[i, j]
+            # else:
+            row[j] = poisson_dist_signal_slots[i, j]
 
     return output_sequence
 
