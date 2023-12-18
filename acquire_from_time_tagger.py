@@ -30,7 +30,7 @@ current_time = datetime.now()
 timestamp_epoch = int(datetime.timestamp(datetime.now()))
 print('Current time: ', current_time)
 formatted_time = current_time.strftime("%H-%M-%S")
-window_size_secs = 200E-3
+window_size_secs = 2*3000E-6
 window_size_ps = window_size_secs * 1E12  # Window time in ps
 
 cr = str(CODE_RATE).replace('/', '-')
@@ -67,3 +67,5 @@ with open(f'time tagger files/timetags_metadata_{timestamp_epoch}', 'wb') as f:
     }
 
     pickle.dump(metadata, f)
+
+print('Metadata epoch:', timestamp_epoch)

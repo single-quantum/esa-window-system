@@ -1,5 +1,6 @@
 # %%
 import math
+import pickle
 
 import numpy as np
 import numpy.typing as npt
@@ -10,10 +11,10 @@ from core.encoder_functions import slot_map
 from core.scppm_encoder import encoder
 from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             GREYSCALE, IMG_FILE_PATH, IMG_SHAPE, PAYLOAD_TYPE,
-                            B_interleaver, M, N_interleaver, m,
-                            num_samples_per_slot, num_slots_per_symbol,
-                            num_symbols_per_slice, sample_size_awg,
-                            slot_length, symbols_per_codeword, USE_INNER_ENCODER, USE_RANDOMIZER)
+                            USE_INNER_ENCODER, USE_RANDOMIZER, B_interleaver,
+                            M, N_interleaver, m, num_samples_per_slot,
+                            num_slots_per_symbol, num_symbols_per_slice,
+                            sample_size_awg, slot_length, symbols_per_codeword)
 
 pulse_width: int = 8        # number of DAC samples for 1 symbol
 ADD_ASM: bool = True
@@ -63,13 +64,13 @@ match PAYLOAD_TYPE:
                                        **{
                                            'use_inner_encoder': USE_INNER_ENCODER,
                                            'use_randomizer': USE_RANDOMIZER,
-                                           'user_settings': 
+                                           'user_settings':
                                            {
-                                            'B_interleaver': B_interleaver,
-                                            'N_interleaver': N_interleaver
+                                               'B_interleaver': B_interleaver,
+                                               'N_interleaver': N_interleaver
                                            },
                                            'save_encoded_sequence_to_file': True,
-                                           'reference_file_prefix': 'jupiter_greyscale',
+                                           'reference_file_prefix': 'herbig_haro',
                                            'num_samples_per_slot': num_samples_per_slot}
                                        )
         num_PPM_symbols = slot_mapped_sequence.shape[0]
@@ -79,6 +80,10 @@ match PAYLOAD_TYPE:
         num_slots = slot_mapped_sequence.flatten().shape[0]
         message_time_microseconds = num_slots * slot_length * 1E6
 
+sent_symbols = np.nonzero(slot_mapped_sequence)[1]
+
+with open('sent_symbols', 'wb') as f:
+    pickle.dump(sent_symbols, f)
 
 if PAYLOAD_TYPE == 'image':
     print(f'Sending image with shape {IMG_SHAPE[0]}x{IMG_SHAPE[1]}')
@@ -117,7 +122,7 @@ for i, slot_mapped_symbol in enumerate(slot_mapped_sequence):
 
 
 gap_vector = np.array([0] * num_samples_per_symbol * len(CSM))
-for i in np.arange(0, len(gap_vector), len(gap_vector)/4, dtype=int):
+for i in np.arange(0, len(gap_vector), len(gap_vector) / 4, dtype=int):
     gap_vector[i] = 30000
 pulse = np.hstack((gap_vector, pulse))
 

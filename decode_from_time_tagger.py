@@ -20,7 +20,8 @@ from ppm_parameters import (CORRELATION_THRESHOLD, DEBUG_MODE, MESSAGE_IDX,
 https://www.swabianinstruments.com/time-tagger/downloads/ . """
 
 
-def get_time_events_from_tt_file(time_events_filename: str, num_channels: int, get_time_events_per_channel=True, **kwargs):
+def get_time_events_from_tt_file(time_events_filename: str, num_channels: int,
+                                 get_time_events_per_channel=True, **kwargs):
     """Open the `time_events_filename` with the TimeTagger.FileReader class and retrieve events.
 
     Can either read out the entire buffer or read out a given number of events. """
@@ -51,7 +52,7 @@ def get_time_events_from_tt_file(time_events_filename: str, num_channels: int, g
             channels = data.getChannels()
 
             events_per_channel = [list(filter(lambda e: e[1] == i, zip(events, channels)))
-                                for i in range(1, num_channels+1)]
+                                  for i in range(1, num_channels + 1)]
             for i in range(num_channels):
                 time_stamps_per_channel[i].append(list(map(lambda e: e[0], events_per_channel[i])))
 
@@ -70,18 +71,26 @@ def get_time_events_from_tt_file(time_events_filename: str, num_channels: int, g
     return time_events, time_stamps_per_channel
 
 
-use_latest_tt_file: bool = True
-time_tagger_files_dir: str = 'time tagger files/'
+use_latest_tt_file: bool = False
+GET_TIME_EVENTS_PER_SECOND = True
+time_tagger_files_dir: str = 'experimental results/15-12-2023/32 ppm/41 dBm (15)'
+# time_tagger_files_dir: str = 'time tagger files/'
+time_tagger_channels = [0, 1, 2, 3]
 # reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
+
+time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
+tt_files = time_tagger_files_path.rglob('*.ttbin')
+
+time_tagger_filename: str | Path
 
 # You can choose to manually put in the time tagger filename below, or use the last added file to the directory.
 if not use_latest_tt_file:
-    time_tagger_filename = time_tagger_files_dir + \
-        'jupiter_tiny_greyscale_64_samples_per_slot_CSM_0_interleaved_16-37-19.ttbin'
-    metadata_filepath = Path('')
+    metadata_filename = 'timetags_metadata_1702647955'
+    metadata_id = metadata_filename.split('_')[-1]
+    metadata_filepath = time_tagger_files_dir / Path(metadata_filename)
+    time_tagger_files = list(filter(lambda f: metadata_id in f.name, tt_files))
+    time_tagger_filename = time_tagger_files[0]
 else:
-    time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
-    tt_files = time_tagger_files_path.rglob('*.ttbin')
     files: list[Path] = [x for x in tt_files if x.is_file()]
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
     time_tagger_filename = time_tagger_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.2.ttbin'
@@ -109,51 +118,33 @@ with open(metadata_filepath, 'rb') as f:
     num_slots_per_symbol = int(5 / 4 * M)
 
 
-time_events, time_events_per_channel = get_time_events_from_tt_file(time_tagger_filename, 4, get_time_events_per_channel=True)
+time_events, time_events_per_channel = get_time_events_from_tt_file(
+    time_tagger_filename, 4, get_time_events_per_channel=GET_TIME_EVENTS_PER_SECOND)
 # Remove duplicate timing events
 time_events = np.unique(time_events)
 
-channels = [1, 2, 3]
-time_events = np.sort(np.concatenate(tuple(np.array(time_events_per_channel[i]) for i in channels))*1E-12)
+if GET_TIME_EVENTS_PER_SECOND:
+    time_events = np.sort(np.concatenate(
+        tuple(np.array(time_events_per_channel[i]) for i in time_tagger_channels)) * 1E-12)
 
 
 time_events_samples = (time_events - time_events[0]) * (8.82091E9 / num_samples_per_slot) + 0.5
 
-vals = []
-dat = time_events_samples[10000:30000]
-factors = np.linspace(0.99998, 1.00002, 10000)
-
-for factor_here in factors:
-    dat2 = dat % factor_here
-    vals.append(np.sum(np.abs(dat2 - np.average(dat2))**2))
-
-
-# plt.figure()
-# plt.plot(vals)
-# plt.show()
-
-index = np.argmin(vals)
-correction = factors[index]
-vals = []
-
-print(correction)
-
-plt.figure()
-plt.plot(time_events_samples[:10000] % 1 - 0.5, label='original')
-plt.xlabel('#symbol')
-plt.ylabel('deviation')
-plt.plot(time_events_samples[:10000] % correction - 0.5, label='adjusted')
-plt.legend()
-plt.show()
-
-slot_length *= correction
-symbol_length *= correction
-
 
 print(f'Number of events: {len(time_events)}')
 
-slot_mapped_message, events_per_slot = demodulate(time_events[:500000], M, slot_length, symbol_length, debug_mode=DEBUG_MODE,
-                                                  csm_correlation_threshold=CORRELATION_THRESHOLD, message_idx=MESSAGE_IDX, **{'num_samples_per_slot': num_samples_per_slot})
+slot_mapped_message, events_per_slot = demodulate(
+    time_events,
+    M,
+    slot_length,
+    symbol_length,
+    csm_correlation_threshold=CORRELATION_THRESHOLD,
+    message_idx=MESSAGE_IDX,
+    **{
+        'num_samples_per_slot': num_samples_per_slot,
+        'debug_mode': DEBUG_MODE
+    }
+)
 
 m = int(np.log2(M))
 received_ppm_symbols = np.nonzero(slot_mapped_message)[1]
@@ -185,6 +176,8 @@ information_blocks, BER_before_decoding = decode(
 sent_img_array: npt.NDArray[np.int_] = np.array([])
 img_arr: npt.NDArray[np.int_] = np.array([])
 CMAP = ''
+
+sent_message: npt.NDArray = np.array([])
 
 if PAYLOAD_TYPE == 'image':
     # compare to original image

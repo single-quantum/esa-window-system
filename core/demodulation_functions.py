@@ -8,22 +8,22 @@ from scipy.signal import find_peaks
 
 from core.encoder_functions import get_csm, slot_map
 from core.parse_ppm_symbols import parse_ppm_symbols
-
 from core.utils import flatten, moving_average
 
 
 def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) -> npt.NDArray[np.int_]:
     """Digitize/discretize the array of time_stamps, so that it becomes a time series of zeros and ones. """
-    time_vec: npt.NDArray[np.float_] = np.arange(time_stamps[0], time_stamps[-1]+slot_length, slot_length, dtype=float)
+    time_vec: npt.NDArray[np.float_] = np.arange(
+        time_stamps[0], time_stamps[-1] + 2 * slot_length, slot_length, dtype=float)
 
     # The time series vector is a vector of ones and zeros with a one if there is a pulse in that slot
-    time_series: npt.NDArray[np.int_] = np.zeros(len(time_vec), dtype=np.int_)
+    time_series: npt.NDArray[np.int_] = np.zeros(len(time_vec) - 1, dtype=np.int_)
 
     m: int = 0
     n: int = 0
 
-    while m < len(time_stamps) - 1:
-        if time_vec[n] <= time_stamps[m] <= time_vec[n + 1]:
+    while m < len(time_stamps):
+        if time_vec[n] <= time_stamps[m] < time_vec[n + 1]:
             time_series[n] += 1
             m += 1
         else:
@@ -37,59 +37,48 @@ def determine_CSM_time_shift(
         time_stamps: npt.NDArray[np.float_],
         slot_length: float,
         CSM: npt.NDArray[np.int_],
-        num_slots_per_symbol: int):
+        num_slots_per_symbol: int) -> npt.NDArray:
     """ Determine the time shift that is needed to shift the CSM times to the beginning of a slot.
 
     Because the CSM times are found with a correlation relative to a random time event,
     a time shift needs to be determined to find the true CSM time. """
 
     csm_shifts = []
-    for i in range(len(csm_times)):
+
+    for csm_time in csm_times:
         # for i in range(1):
         shifts = []
-        csm_slot_times = np.arange(
-            csm_times[i],
-            csm_times[i] + num_slots_per_symbol * 2 * len(CSM) * slot_length,
-            slot_length)
-        n = 0
-        csm_time = csm_times[i]
-        csm_timestamps = time_stamps[time_stamps >= csm_time]
-        temporary_shift = False
-        if abs((csm_slot_times[0]-csm_timestamps[0])/slot_length) > 0.5:
-            temporary_shift = True
-            csm_timestamps = time_stamps[time_stamps >= csm_time] - 0.5*slot_length
 
-        # for j in range(len(csm_slot_times) - 1):
-        j = 0
-        while j < len(csm_slot_times) - 1:
-            if csm_slot_times[j] <= csm_timestamps[n] <= csm_slot_times[j + 1]:
-                shifts.append(csm_timestamps[n] - csm_slot_times[j])
-                n += 1
-            else:
-                j += 1
-        if temporary_shift:
-            csm_shifts.append(np.mean(shifts) + 0.5*slot_length)
-        else:
-            csm_shifts.append(np.mean(shifts))
+        csm_symbol_times = [
+            csm_time + CSM[i] * slot_length + i * num_slots_per_symbol * slot_length for i in range(len(CSM))
+        ]
+
+        # Double check if copy is needed here
+        # csm_timestamps = copy.deepcopy(time_stamps[time_stamps >= csm_time])
+        csm_timestamps = copy.deepcopy(time_stamps[
+            np.logical_and(
+                time_stamps >= csm_time, time_stamps <= csm_time + num_slots_per_symbol * len(CSM) * slot_length
+            )
+        ])
+
+        for ti in range(len(csm_timestamps)):
+            closest_idx = (np.abs(csm_symbol_times - csm_timestamps[ti])).argmin()
+            shifts.append(csm_timestamps[ti] - csm_symbol_times[closest_idx])
+
+        # Determine z score to remove statistical outliers
+        z_score = (np.array(shifts) - np.mean(shifts)) / np.std(shifts)
+        outliers = np.where(abs(z_score) > 2)[0]
+        shifts = np.delete(shifts, outliers)
+
+        csm_shifts.append(np.mean(shifts))
 
     csm_shifts = np.array(csm_shifts)
     # csm_shifts = csm_shifts[0]
+
     return csm_shifts
 
 
-def find_csm_times(
-        time_stamps: npt.NDArray[np.float_],
-        CSM: npt.NDArray[np.int_],
-        slot_length: float,
-        symbol_length: float,
-        symbols_per_codeword: int,
-        num_slots_per_symbol: int,
-        csm_correlation_threshold: float = 0.6,
-        debug_mode: bool = False,
-        **kwargs
-) -> npt.NDArray[np.float_]:
-    """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
-
+def get_csm_correlation(time_stamps, slot_length, CSM, symbol_length, csm_correlation_threshold=0.6, **kwargs):
     # + 0.5 slot length because pulse times should be in the middle of a slot.
     csm_time_stamps = np.array([slot_length * CSM[i] + i * symbol_length for i in range(len(CSM))]) + 0.5 * slot_length
 
@@ -98,43 +87,68 @@ def find_csm_times(
 
     corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
     correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
-    if debug_mode:
+    if kwargs.get('debug_mode'):
         plt.figure()
         plt.plot(corr, label='CSM correlation')
         plt.axhline(correlation_threshold, color='r', linestyle='--', label='Correlation threshold')
         plt.xlabel('Shift (A.U.)')
         plt.ylabel('Correlation (-)')
         plt.title('Message correlation with the CSM')
-        plt.legend()
+        plt.legend(loc='lower left')
         plt.show()
+
+    return corr
+
+
+def find_csm_times(
+        time_stamps: npt.NDArray[np.float_],
+        CSM: npt.NDArray[np.int_],
+        slot_length: float,
+        symbols_per_codeword: int,
+        num_slots_per_symbol: int,
+        csm_correlation,
+        csm_correlation_threshold: float = 0.6,
+        **kwargs
+) -> npt.NDArray[np.float_]:
+    """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
+
+    correlation_threshold: int = int(np.max(csm_correlation) * csm_correlation_threshold)
 
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
     where_corr: npt.NDArray[np.int_]
     where_corr = find_peaks(
-        corr,
+        csm_correlation,
         height=correlation_threshold,
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
-
     # There is an edge case that if the CSM appears right at the start of the timestamps,
     # that find_peaks cannot find it, even if the correlation is high enough.
     # In that case, try a simple threshold check.
     if where_corr.shape[0] == 0:
-        where_corr = np.where(corr >= correlation_threshold)[0]
+        where_corr = np.where(csm_correlation >= correlation_threshold)[0]
 
     if where_corr.shape[0] == 0:
         raise ValueError("Could not find any CSM. ")
 
     # Make a moving average of the correlation to find out where the start and end is of the message
-    moving_avg_corr: npt.NDArray[np.int_] = moving_average(corr, n=1000)
+    # moving_avg_corr: npt.NDArray[np.int_] = moving_average(corr, n=1000)
+    moving_avg_corr: npt.NDArray[np.int_] = moving_average(csm_correlation, n=len(CSM) * num_slots_per_symbol)
     message_start_idxs: npt.NDArray[np.int_] = find_peaks(
         -(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1,
-        height=(0.8, 1),
+        height=(0.9, 1),
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
-    if debug_mode:
-        plt.figure()
-        plt.plot(-(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1)
+    if kwargs.get('debug_mode'):
+        fig, ax1 = plt.subplots()
+
+        ax1.plot(csm_correlation)
+        ax1.axhline(correlation_threshold, color='r', linestyle='--', label='Correlation threshold')
+
+        ax2 = ax1.twinx()
+
+        ax2.plot(-(moving_avg_corr - min(moving_avg_corr)) /
+                 (max(moving_avg_corr) - min(moving_avg_corr)) + 1, color='tab:red')
+        fig.tight_layout()
         plt.show()
 
     if message_start_idxs.shape[0] == 0:
@@ -156,11 +170,15 @@ def find_csm_times(
 
     t0: float = time_stamps[0]
 
-    # I don't know why the -1 slot length is needed
-    csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr - 1 * slot_length
+    csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr
+    # csm_times = [
+    #     time_stamps[time_stamps >= t0 + slot_length * where_csm_corr[i] - 1 * slot_length][0] for i in range(len(where_csm_corr))
+    # ]
 
     time_shifts: float = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
+    print(np.array(time_shifts) / slot_length)
     csm_times += time_shifts - 0.5 * slot_length
+    # csm_times -= 0.5 * slot_length
 
     return csm_times
 
@@ -172,7 +190,8 @@ def find_and_parse_codewords(
         symbols_per_codeword: int,
         slot_length: float,
         symbol_length: float,
-        M):
+        M: int,
+        **kwargs):
     """Using the CSM times, find and parse (demodulate) PPM codewords from the given PPM pulse timestamps. """
     len_codeword: int = symbols_per_codeword + len(CSM)
     len_codeword_no_CSM: int = symbols_per_codeword
@@ -196,6 +215,7 @@ def find_and_parse_codewords(
             symbol_length,
             M,
             num_darkcounts,
+            **{**kwargs, **{'codeword_idx': i}}
         )
 
         # If `parse_ppm_symbols` did not manage to parse enough symbols from the
@@ -222,7 +242,8 @@ def find_and_parse_codewords(
         slot_length,
         symbol_length,
         M,
-        num_darkcounts
+        num_darkcounts,
+        **{**kwargs, **{'codeword_idx': len(csm_times) - 1}}
     )
     msg_symbols.append(np.round(symbols).astype(int))
 
@@ -249,7 +270,7 @@ def get_num_events_per_slot(
 
     # peak_locations_shifted = copy.deepcopy(peak_locations) + 0.5*slot_length
 
-    num_slots_per_codeword = int((symbols_per_codeword + len(CSM))*5/4*M)
+    num_slots_per_codeword = int((symbols_per_codeword + len(CSM)) * 5 / 4 * M)
     num_events_per_slot_1 = np.zeros(num_slots)
     num_events_per_slot_2 = np.zeros((len(csm_times), num_slots_per_codeword))
 
@@ -263,11 +284,11 @@ def get_num_events_per_slot(
     for i in range(len(csm_times)):
         csm_time = csm_times[i]
         for j in range(num_slots_per_codeword):
-            slot_start = csm_time + j*slot_length
-            slot_end = csm_time + (j+1)*slot_length
+            slot_start = csm_time + j * slot_length
+            slot_end = csm_time + (j + 1) * slot_length
 
             events = peak_locations[(peak_locations >= slot_start) & (peak_locations < slot_end)]
-            deviations = (events-slot_start)/slot_length
+            deviations = (events - slot_start) / slot_length
             if len(deviations) > 1:
                 deviations_arr.append(mean(deviations))
             num_events = events.shape[0]
@@ -286,6 +307,7 @@ def demodulate(
     M: int,
     slot_length: float,
     symbol_length: float,
+    csm_correlation_threshold=0.6,
     **kwargs
 ) -> npt.NDArray[np.int_]:
     """Demodulate the PPM pulse time stamps (convert the time stamps to PPM symbols).
@@ -298,9 +320,12 @@ def demodulate(
 
     CSM: npt.NDArray[np.int_] = get_csm(M)
     symbols_per_codeword = int(15120 / np.log2(M))
-    num_slots_per_symbol = int(5/4*M)
+    num_slots_per_symbol = int(5 / 4 * M)
+
+    csm_correlation = get_csm_correlation(pulse_timestamps, slot_length, CSM,
+                                          symbol_length, csm_correlation_threshold=csm_correlation_threshold, **kwargs)
     csm_times: npt.NDArray[np.float_] = find_csm_times(
-        pulse_timestamps, CSM, slot_length, symbol_length, symbols_per_codeword, num_slots_per_symbol, **kwargs)
+        pulse_timestamps, CSM, slot_length, symbols_per_codeword, num_slots_per_symbol, csm_correlation, csm_correlation_threshold=csm_correlation_threshold, **kwargs)
 
     # For now, this function is only used to compare results to simulations
     msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
@@ -308,6 +333,13 @@ def demodulate(
 
     num_samples_per_slot = kwargs.get('num_samples_per_slot')
 
+    # csm_times[1] += slot_length / 4
+    # csm_times[3] += slot_length / 4
+    # csm_times[4] -= 3*slot_length / 4
+    # csm_times[5] -= 3*slot_length / 4
+    # csm_times[6] += slot_length / 2
+    # csm_times[7] += 2 * slot_length
+    # csm_times[8] += 2 * slot_length
     # time_events_samples=(msg_pulse_timestamps-msg_pulse_timestamps[0])*(8.82091E9/num_samples_per_slot)+0.5
 
     events_per_slot = get_num_events_per_slot(csm_times, msg_pulse_timestamps,
@@ -322,7 +354,7 @@ def demodulate(
     print()
 
     msg_symbols = find_and_parse_codewords(csm_times, pulse_timestamps, CSM,
-                                           symbols_per_codeword, slot_length, symbol_length, M)
+                                           symbols_per_codeword, slot_length, symbol_length, M, **kwargs)
 
     print('Number of demodulated symbols: ', len(flatten(msg_symbols)))
 
