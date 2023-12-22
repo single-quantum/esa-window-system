@@ -600,7 +600,7 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
                         u_hat, sent_bit_sequence[i * num_bits_per_slice -
                                                  2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)]
                     )]
-                ) / len(sent_bit_sequence)
+                ) / num_bits_per_slice
                 print(
                     f"iteration = {iteration+1} ber: {ber:.5f} \t min likelihood: " +
                     f"{np.min(LLRs_u):.2f} \t max likelihood: {np.max(LLRs_u):.2f}")
