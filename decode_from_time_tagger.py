@@ -71,9 +71,9 @@ def get_time_events_from_tt_file(time_events_filename: str, num_channels: int,
     return time_events, time_stamps_per_channel
 
 
-use_latest_tt_file: bool = False
+use_latest_tt_file: bool = True
 GET_TIME_EVENTS_PER_SECOND = True
-time_tagger_files_dir: str = 'experimental results/15-12-2023/32 ppm/41 dBm (15)'
+time_tagger_files_dir: str = 'experimental results/22-12-2023/64 ppm/38 dBm (12)/'
 # time_tagger_files_dir: str = 'time tagger files/'
 time_tagger_channels = [0, 1, 2, 3]
 # reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
@@ -85,7 +85,7 @@ time_tagger_filename: str | Path
 
 # You can choose to manually put in the time tagger filename below, or use the last added file to the directory.
 if not use_latest_tt_file:
-    metadata_filename = 'timetags_metadata_1702647955'
+    metadata_filename = 'timetags_metadata_1703248884'
     metadata_id = metadata_filename.split('_')[-1]
     metadata_filepath = time_tagger_files_dir / Path(metadata_filename)
     time_tagger_files = list(filter(lambda f: metadata_id in f.name, tt_files))
@@ -104,7 +104,10 @@ else:
 if not metadata_filepath.exists():
     raise FileNotFoundError('Metadata file not found. Check path / filename.')
 
-with open(metadata_filepath, 'rb') as f:
+with open(
+    'C:\\Users\\Henri\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\64 ppm\\40 dBm (14)\\timetags_metadata_1702655122',
+    'rb'
+) as f:
     metadata = pickle.load(f)
     M = metadata.get('M')
     num_samples_per_slot = metadata.get('num_samples_per_slot')
@@ -166,7 +169,8 @@ information_blocks, BER_before_decoding = decode(
     slot_mapped_message, M, CODE_RATE,
     use_inner_encoder=USE_INNER_ENCODER,
     **{
-        'use_cached_trellis': False,
+        'use_cached_trellis': True,
+        'cached_trellis_file_path': Path.cwd() / Path('cached_trellis_80640_timesteps'),
         'num_events_per_slot': events_per_slot,
         'use_randomizer': USE_RANDOMIZER,
         'sent_bit_sequence_no_csm': sent_bits_no_csm,

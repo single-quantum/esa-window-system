@@ -65,10 +65,12 @@ def determine_CSM_time_shift(
             closest_idx = (np.abs(csm_symbol_times - csm_timestamps[ti])).argmin()
             shifts.append(csm_timestamps[ti] - csm_symbol_times[closest_idx])
 
-        # Determine z score to remove statistical outliers
-        z_score = (np.array(shifts) - np.mean(shifts)) / np.std(shifts)
-        outliers = np.where(abs(z_score) > 2)[0]
-        shifts = np.delete(shifts, outliers)
+        # Determine z score to remove statistical outliers.
+        # Perform twice in case the spread is very large (should maybe be conditioned).
+        for _ in range(2):
+            z_score = (np.array(shifts) - np.mean(shifts)) / np.std(shifts)
+            outliers = np.where(abs(z_score) > 2)[0]
+            shifts = np.delete(shifts, outliers)
 
         csm_shifts.append(np.mean(shifts))
 
@@ -170,7 +172,7 @@ def find_csm_times(
 
     t0: float = time_stamps[0]
 
-    csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr
+    csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr + 0.5 * slot_length
     # csm_times = [
     #     time_stamps[time_stamps >= t0 + slot_length * where_csm_corr[i] - 1 * slot_length][0] for i in range(len(where_csm_corr))
     # ]
@@ -178,6 +180,7 @@ def find_csm_times(
     time_shifts: float = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
     print(np.array(time_shifts) / slot_length)
     csm_times += time_shifts - 0.5 * slot_length
+    # csm_times += time_shifts
     # csm_times -= 0.5 * slot_length
 
     return csm_times
@@ -259,46 +262,36 @@ def get_num_events_per_slot(
         slot_length: float,
         symbol_length: float,
         M: float):
+    """This function determines how many detection events there were for each slot. """
 
-    # Timespan of the entire message
-    msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
-    msg_start_idx = np.where(peak_locations >= csm_times[0])[0][0]
-    msg_timespan = msg_end_time - csm_times[0]
-    num_slots = int(round(msg_timespan / slot_length))
-
-    msg_start_time = peak_locations[msg_start_idx]
-
-    # peak_locations_shifted = copy.deepcopy(peak_locations) + 0.5*slot_length
-
+    # The factor 5/4 is determined by the protocol, which states that there
+    # shall be M/4 guard slots for each PPM symbol.
     num_slots_per_codeword = int((symbols_per_codeword + len(CSM)) * 5 / 4 * M)
-    num_events_per_slot_1 = np.zeros(num_slots)
-    num_events_per_slot_2 = np.zeros((len(csm_times), num_slots_per_codeword))
+    num_events_per_slot = np.zeros((len(csm_times), num_slots_per_codeword))
 
-    # for i in range(num_events_per_slot_1.shape[0] - 1):
-    #     slot_start = msg_start_time + i * slot_length
-    #     slot_end = msg_start_time + (i + 1) * slot_length
-
-    #     num_events = peak_locations[(peak_locations >= slot_start) & (peak_locations < slot_end)].shape[0]
-    #     num_events_per_slot_1[i] = num_events
-    deviations_arr = []
     for i in range(len(csm_times)):
         csm_time = csm_times[i]
+
+        # Preselect those detection peaks that are within the csm times
+        if i < len(csm_times) - 1:
+            message_peak_locations = peak_locations[
+                (peak_locations >= csm_times[i]) & (peak_locations < csm_times[i + 1])
+            ]
+        else:
+            message_peak_locations = peak_locations[peak_locations >= csm_times[i]]
+
         for j in range(num_slots_per_codeword):
             slot_start = csm_time + j * slot_length
             slot_end = csm_time + (j + 1) * slot_length
 
-            events = peak_locations[(peak_locations >= slot_start) & (peak_locations < slot_end)]
-            deviations = (events - slot_start) / slot_length
-            if len(deviations) > 1:
-                deviations_arr.append(mean(deviations))
+            events = message_peak_locations[
+                (message_peak_locations >= slot_start) & (message_peak_locations < slot_end)
+            ]
+
             num_events = events.shape[0]
-            num_events_per_slot_2[i, j] = num_events
+            num_events_per_slot[i, j] = num_events
 
-    # plt.figure()
-    # plt.plot(deviations_arr)
-    # plt.show()
-
-    num_events_per_slot = num_events_per_slot_2.flatten()
+    num_events_per_slot = num_events_per_slot.flatten()
     return num_events_per_slot
 
 
@@ -332,15 +325,6 @@ def demodulate(
     msg_pulse_timestamps = pulse_timestamps[(pulse_timestamps >= csm_times[0]) & (pulse_timestamps <= msg_end_time)]
 
     num_samples_per_slot = kwargs.get('num_samples_per_slot')
-
-    # csm_times[1] += slot_length / 4
-    # csm_times[3] += slot_length / 4
-    # csm_times[4] -= 3*slot_length / 4
-    # csm_times[5] -= 3*slot_length / 4
-    # csm_times[6] += slot_length / 2
-    # csm_times[7] += 2 * slot_length
-    # csm_times[8] += 2 * slot_length
-    # time_events_samples=(msg_pulse_timestamps-msg_pulse_timestamps[0])*(8.82091E9/num_samples_per_slot)+0.5
 
     events_per_slot = get_num_events_per_slot(csm_times, msg_pulse_timestamps,
                                               CSM, symbols_per_codeword, slot_length, symbol_length, M)

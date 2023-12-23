@@ -21,8 +21,8 @@ USE_RANDOMIZER = True
 # To calculate where the codewords are, a correlation is made with the CSM. The threshold,
 # as percentage of the maximum correlation of the received sequence, 'decides' whether a peak
 # belongs to the start of a codeword or not
-CORRELATION_THRESHOLD: float = 0.45
-DEBUG_MODE: bool = True
+CORRELATION_THRESHOLD: float = 0.50
+DEBUG_MODE: bool = False
 
 # Usually we record multiple copies of the same message. You can use this to select a particular copy of the message,
 # as sometimes a certain copy of the message has too much noise to recover.
