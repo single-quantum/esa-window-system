@@ -153,9 +153,11 @@ def parse_ppm_symbols(
     num_symbol_frames: int = int(round((stop_time - codeword_start_time) / symbol_length))
     residuals = []
 
+    message_pulse_times = pulse_times[(pulse_times >= codeword_start_time) & (pulse_times < stop_time)]
+
     for i in range(num_symbol_frames):
         symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(
-            i, symbol_length, pulse_times, codeword_start_time)
+            i, symbol_length, message_pulse_times, codeword_start_time)
 
         # No symbol detected in this symbol frame
         if symbol_frame_pulses.size == 0:
