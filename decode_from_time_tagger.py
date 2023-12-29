@@ -105,7 +105,7 @@ if not metadata_filepath.exists():
     raise FileNotFoundError('Metadata file not found. Check path / filename.')
 
 with open(
-    'C:\\Users\\Henri\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\64 ppm\\40 dBm (14)\\timetags_metadata_1702655122',
+    'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\64 ppm\\40 dBm (14)\\timetags_metadata_1702655122',
     'rb'
 ) as f:
     metadata = pickle.load(f)
