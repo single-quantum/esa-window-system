@@ -347,10 +347,22 @@ def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
 
         for i in range(trellis.num_input_bits):
 
-            zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
-            ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
+            # zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
+            # ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
 
-            LLRs[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
+            ones_edges_lmbdas = []
+            zero_edges_lmbdas = []
+
+            for e in edges:
+                if e.edge_input[i] == 0:
+                    zero_edges_lmbdas.append(e.lmbda)
+                else:
+                    ones_edges_lmbdas.append(e.lmbda)
+
+            # print(np.all(np.array(zero_edges_lmbdas) == np.array(zero_edges_lmbdas_2)))
+
+            LLRs[k, i] = max_star_recursive(zero_edges_lmbdas) - \
+                max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
 
     return LLRs
 
@@ -385,28 +397,47 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
 
         for i in range(trellis.num_output_bits):
             # Edge input or edge output?
-            zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
-            ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
+            # zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
+            # ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
 
-            if len(zero_edges) == 1 and len(ones_edges) == 1:
-                p_xk_O[k, i] = max_star(zero_edges[0], -np.infty) - \
-                    max_star(ones_edges[0], -np.infty) - symbol_bit_LLRs[k, i]
+            ones_edges_lmbdas = []
+            zero_edges_lmbdas = []
+
+            for e in edges:
+                if e.edge_output[i] == 0:
+                    zero_edges_lmbdas.append(e.lmbda)
+                else:
+                    ones_edges_lmbdas.append(e.lmbda)
+
+            if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
+                p_xk_O[k, i] = max_star(zero_edges_lmbdas[0], -np.infty) - \
+                    max_star(ones_edges_lmbdas[0], -np.infty) - symbol_bit_LLRs[k, i]
                 continue
-            if len(ones_edges) == 0 and len(zero_edges) != 0:
-                p_xk_O[k, i] = max_star_recursive(zero_edges) - symbol_bit_LLRs[k, i]
+            if len(ones_edges_lmbdas) == 0 and len(zero_edges_lmbdas) != 0:
+                p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - symbol_bit_LLRs[k, i]
                 continue
 
-            p_xk_O[k, i] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges) - symbol_bit_LLRs[k, i]
+            p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - \
+                max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
 
-        zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
-        ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
+        # zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
+        # ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
 
-        if len(zero_edges) == 1 and len(ones_edges) == 1:
-            p_uk_O[k] = max_star(zero_edges[0], -np.infty) - max_star(ones_edges[0], -np.infty)
-        elif len(ones_edges) == 0 and len(zero_edges) != 0:
-            p_uk_O[k] = max_star_recursive(zero_edges)
+        ones_edges_lmbdas = []
+        zero_edges_lmbdas = []
+
+        for e in edges:
+            if e.edge_input == 0:
+                zero_edges_lmbdas.append(e.lmbda)
+            else:
+                ones_edges_lmbdas.append(e.lmbda)
+
+        if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
+            p_uk_O[k] = max_star(zero_edges_lmbdas[0], -np.infty) - max_star(ones_edges_lmbdas[0], -np.infty)
+        elif len(ones_edges_lmbdas) == 0 and len(zero_edges_lmbdas) != 0:
+            p_uk_O[k] = max_star_recursive(zero_edges_lmbdas)
         else:
-            p_uk_O[k] = max_star_recursive(zero_edges) - max_star_recursive(ones_edges)
+            p_uk_O[k] = max_star_recursive(zero_edges_lmbdas) - max_star_recursive(ones_edges_lmbdas)
 
     return p_xk_O, p_uk_O
 
@@ -467,7 +498,7 @@ def pi_ck(input_sequence, ns, nb):
 
 
 def pi_ak(PPM_symbol_vector, bit_LLRs):
-    return np.sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
+    return sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
 
 
 def set_outer_code_gammas(trellis, symbol_log_likelihoods):
@@ -475,14 +506,15 @@ def set_outer_code_gammas(trellis, symbol_log_likelihoods):
     for k, stage in enumerate(trellis.stages):
         for state in stage.states:
             for edge in state.edges:
-                edge.gamma = np.sum([
+                edge.gamma = sum([
                     0.5 * (-1)**edge.edge_output[0] * symbol_log_likelihoods[k, 0],
                     0.5 * (-1)**edge.edge_output[1] * symbol_log_likelihoods[k, 1],
                     0.5 * (-1)**edge.edge_output[2] * symbol_log_likelihoods[k, 2]])
                 # edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])
 
 
-def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=20, ns: float = 3, nb: float = 0.1, ber_stop_threshold=1E-3, **kwargs):
+def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=20,
+                        ns: float = 3, nb: float = 0.1, ber_stop_threshold=1E-3, **kwargs):
     # Initialize outer trellis edges
     memory_size_outer = 2
     num_output_bits_outer = 3
@@ -528,7 +560,7 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
                 new_remapped_indices[i] = idx
 
         # reshaped_num_events = reshaped_num_events[new_remapped_indices]
-        num_zeros_interleaver = 2*B_interleaver*N_interleaver*(N_interleaver-1)
+        num_zeros_interleaver = 2 * B_interleaver * N_interleaver * (N_interleaver - 1)
         # reshaped_num_events = num_events_per_slot.reshape(num_slices, num_symbols_per_slice+len(CSM), int(5/4*M))[:, len(CSM):, :M]
         channel_likelihoods = reshaped_num_events[:-num_zeros_interleaver].astype(int)
 
@@ -541,18 +573,19 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
             detection_efficiency=kwargs.get('detection_efficiency', 1)
         )
 
-    num_errors = 0
-
-    # for i, idx in enumerate(np.argmax(slot_mapped_sequence, axis=1)):
-    #     if idx != np.argmax(channel_likelihoods, axis=1)[i]:
-    #         num_errors += 1
-
     decoded_message = []
     decoded_message_array = np.zeros((max_num_iterations, num_slices, num_bits_per_slice))
 
     sent_bit_sequence = kwargs.get('sent_bit_sequence_no_csm')
 
     bit_error_ratios = np.zeros((max_num_iterations, num_slices))
+
+    inner_trellis = Trellis(memory_size, num_output_bits, num_symbols_per_slice, inner_edges, num_input_bits)
+    inner_trellis.set_edges(inner_edges, zero_terminated=False)
+
+    outer_trellis = Trellis(memory_size_outer, num_output_bits_outer,
+                            num_bits_per_slice, outer_edges, num_input_bits_outer)
+    outer_trellis.set_edges(outer_edges)
 
     for i in range(num_slices):
         print(f'Decoding slice {i+1}/{num_slices}')
@@ -563,9 +596,6 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
 
         time_steps_inner = num_symbols_per_slice
 
-        inner_trellis = Trellis(memory_size, num_output_bits, time_steps_inner, inner_edges, num_input_bits)
-        inner_trellis.set_edges(inner_edges, zero_terminated=False)
-
         symbol_bit_LLRs = None
         u_hat = []
 
@@ -573,14 +603,9 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
             p_ak_O = predict_inner_SISO(inner_trellis, channel_log_likelihoods,
                                         time_steps_inner, m, symbol_bit_LLRs=symbol_bit_LLRs)
             p_xk_I = bit_deinterleave(p_ak_O.flatten(), dtype=float)
-            # p_xk_I = p_ak_O.flatten()
 
             p_xk_I = unpuncture(p_xk_I, code_rate, dtype=float)
-            time_steps_outer_trellis = int(len(p_xk_I) / 3)
 
-            outer_trellis = Trellis(memory_size_outer, num_output_bits_outer,
-                                    time_steps_outer_trellis, outer_edges, num_input_bits_outer)
-            outer_trellis.set_edges(outer_edges)
             set_outer_code_gammas(outer_trellis, p_xk_I)
             calculate_alphas(outer_trellis)
             calculate_betas(outer_trellis)
