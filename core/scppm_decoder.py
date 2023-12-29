@@ -4,14 +4,13 @@ from fractions import Fraction
 import numpy as np
 import numpy.typing as npt
 
-from core.BCJR_decoder_functions import ppm_symbols_to_bit_array, predict, pi_ck, predict_iteratively
+from core.BCJR_decoder_functions import (pi_ck, ppm_symbols_to_bit_array,
+                                         predict, predict_iteratively)
 from core.encoder_functions import (bit_deinterleave, channel_deinterleave,
-                                    get_csm, randomize, unpuncture, slot_map)
+                                    get_csm, randomize, slot_map, unpuncture)
 from core.trellis import Trellis
 from core.utils import (bpsk_encoding, generate_outer_code_edges,
-                        get_BER_before_decoding)
-
-from core.utils import poisson_noise
+                        get_BER_before_decoding, poisson_noise)
 
 
 class DecoderError(Exception):
@@ -55,7 +54,7 @@ def decode(
     deinterleaved_ppm_symbols = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
     num_zeros_interleaver: int = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
     deinterleaved_slot_mapped_sequence = slot_map(deinterleaved_ppm_symbols[:len(
-        deinterleaved_ppm_symbols)-num_zeros_interleaver], M, insert_guardslots=False)
+        deinterleaved_ppm_symbols) - num_zeros_interleaver], M, insert_guardslots=False)
 
     if CHANNEL_INTERLEAVE:
 
@@ -96,7 +95,6 @@ def decode(
 
     print('Setting up trellis')
 
-    # Trellis paramters (can be defined outside of for loop for optimisation)
     num_output_bits: int = 3
     num_input_bits: int = 1
     memory_size: int = 2
@@ -104,24 +102,29 @@ def decode(
 
     time_steps = int(deinterleaved_received_sequence.shape[0] * float(CODE_RATE))
 
-    if kwargs.get('use_cached_trellis'):
-        cached_trellis_file_path = kwargs['cached_trellis_file_path']
-        cached_trellis = kwargs['cached_trellis']
-        if time_steps == 80640 and cached_trellis_file_path.is_file():
-            tr = cached_trellis
+    if not use_inner_encoder:
+        if kwargs.get('use_cached_trellis'):
+            cached_trellis_file_path = kwargs.get('cached_trellis_file_path')
+            # Note to self: do this more proper, now it just falls back silently if the file path is not found.
+            if cached_trellis_file_path is not None and cached_trellis_file_path.is_file():
+                with open(cached_trellis_file_path, 'rb') as f:
+                    cached_trellis = pickle.load(f)
+                    tr = cached_trellis
+            else:
+                tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
+                tr.set_edges(edges)
+
+                with open(f'cached_trellis_{time_steps}_timesteps', 'wb') as f:
+                    pickle.dump(tr, f)
+
         else:
             tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
             tr.set_edges(edges)
-    else:
-        tr = Trellis(memory_size, num_output_bits, time_steps, edges, num_input_bits)
-        tr.set_edges(edges)
 
-    Es = 5
+        Es = 5
 
-    encoded_sequence = bpsk_encoding(deinterleaved_received_sequence.astype(float))
-
-    encoded_sequence = unpuncture(encoded_sequence, CODE_RATE)
-    if not use_inner_encoder:
+        encoded_sequence = bpsk_encoding(deinterleaved_received_sequence.astype(float))
+        encoded_sequence = unpuncture(encoded_sequence, CODE_RATE)
         predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
     else:
         predicted_msg, _, _ = predict_iteratively(deinterleaved_slot_mapped_sequence, M,
@@ -138,7 +141,7 @@ def decode(
     # information_blocks = predicted_msg.reshape((-1, 5040)).flatten()
     # Derandomize
     if not use_inner_encoder and kwargs.get('use_randomizer', False):
-        information_blocks = randomize(information_blocks.reshape((-1, num_bits-2)))
+        information_blocks = randomize(information_blocks.reshape((-1, num_bits - 2)))
         information_blocks = information_blocks.flatten()
 
     while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
