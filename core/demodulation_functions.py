@@ -171,17 +171,11 @@ def find_csm_times(
         where_csm_corr = where_corr
 
     t0: float = time_stamps[0]
-
     csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr + 0.5 * slot_length
-    # csm_times = [
-    #     time_stamps[time_stamps >= t0 + slot_length * where_csm_corr[i] - 1 * slot_length][0] for i in range(len(where_csm_corr))
-    # ]
 
     time_shifts: float = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
     print(np.array(time_shifts) / slot_length)
     csm_times += time_shifts - 0.5 * slot_length
-    # csm_times += time_shifts
-    # csm_times -= 0.5 * slot_length
 
     return csm_times
 
@@ -206,7 +200,7 @@ def find_and_parse_codewords(
     for i in range(len(csm_times) - 1):
         start: float = csm_times[i]
         stop: float = csm_times[i + 1]
-        # t0_codeword = pulse_timestamps[start] - 0.5 * slot_length
+
         fraction_lost: float = (stop - start) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
@@ -302,7 +296,7 @@ def demodulate(
     symbol_length: float,
     csm_correlation_threshold=0.6,
     **kwargs
-) -> npt.NDArray[np.int_]:
+) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_]]:
     """Demodulate the PPM pulse time stamps (convert the time stamps to PPM symbols).
 
     First, the Codeword Synchronisation Marker (CSM) is derived from the timestamps, then
@@ -324,11 +318,8 @@ def demodulate(
     msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
     msg_pulse_timestamps = pulse_timestamps[(pulse_timestamps >= csm_times[0]) & (pulse_timestamps <= msg_end_time)]
 
-    num_samples_per_slot = kwargs.get('num_samples_per_slot')
-
     events_per_slot = get_num_events_per_slot(csm_times, msg_pulse_timestamps,
                                               CSM, symbols_per_codeword, slot_length, symbol_length, M)
-    # events_per_slot = None
 
     num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
         pulse_timestamps <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]
