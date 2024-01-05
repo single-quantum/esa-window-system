@@ -7,19 +7,22 @@ import numpy.typing as npt
 
 
 def plot_symbol_times(
-    symbol_times,
-    symbol_length,
-    slot_length,
-    codeword_start_time,
-    demodulated_symbols,
-    num_symbols_per_codeword,
-    start_symbol_index=0,
+    symbol_times: npt.NDArray,
+    symbol_length: float,
+    slot_length: float,
+    codeword_start_time: float,
+    demodulated_symbols: npt.NDArray,
+    num_symbols_per_codeword: int,
+    start_symbol_index: int = 0,
     **kwargs
 ):
+    """Used for debugging, this function plots the PPM symbol locations in time.
+
+    It compares the received symbols with the expected / sent symbols. """
     with open('sent_symbols', 'rb') as f:
         sent_symbols = pickle.load(f)
 
-    codeword_idx = kwargs.get('codeword_idx')
+    codeword_idx = kwargs.get('codeword_idx', 0)
     sent_symbols = deepcopy(sent_symbols[codeword_idx * num_symbols_per_codeword:])
     num_symbols = 6
     t0 = codeword_start_time + start_symbol_index * symbol_length
