@@ -50,7 +50,8 @@ ax.set_xticklabels([str(M) for M in ppm_orders])
 
 plt.xlabel('PPM orders (-)')
 plt.ylabel('Datarate (Mbps)')
-plt.title('SCPPM data rates')
+plt.title('SCPPM theoretical data rates')
 plt.legend()
+plt.show()
 
 # %%

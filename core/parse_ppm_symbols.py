@@ -207,7 +207,7 @@ def parse_ppm_symbols(
         best_symbol = np.unique(rounded_symbols[np.argmax(occurences)])[0]
         symbols.append(best_symbol)
 
-    codeword_idx = kwargs.get('codeword_idx')
+    codeword_idx = kwargs.get('codeword_idx', 0)
     with open('sent_symbols', 'rb') as f:
         sent_symbols = pickle.load(f)
 
