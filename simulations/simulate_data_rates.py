@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # %% - Input parameters
-N_bits = 80000              # Number of bits in the payload / image
+num_bits_sent = 80000              # Number of bits in the payload / image
 M = 4                       # PPM order
 N = 2                       # Number of parallel shift registers
 CR = float(Fraction(2, 3))  # Code rate
@@ -23,7 +23,7 @@ num_bits = [40000, 80000, 120000]
 # %% - Calculate data rates for each parameter
 data_rates = np.zeros((len(num_bits), len(ppm_orders)))
 
-for ni, N_bits in enumerate(num_bits):
+for ni, num_bits_sent in enumerate(num_bits):
     for mi, M in enumerate(ppm_orders):
         m = np.log2(M)
         B = int(15120 / m / N)      # Base length of the shift register in the channel interleaver
@@ -31,20 +31,20 @@ for ni, N_bits in enumerate(num_bits):
         L_CSM = 24 if M == 4 else 16    # Number of PPM symbols in the Codeword Synchronisation Marker (CSM)
         N_bits_IB = 15120 * CR - 2      # Number of bits in one Information Block (IB)
 
-        N_PPM_symbols_encoder = ceil(N_bits / N_bits_IB) * (N_bits_IB + 2) / (CR * np.log2(M))
+        N_PPM_symbols_encoder = ceil(num_bits_sent / N_bits_IB) * (N_bits_IB + 2) / (CR * np.log2(M))
         N_codewords = N_PPM_symbols_encoder / (15120 / np.log2(M))
 
         N_PPM_symbols = N_PPM_symbols_encoder + N_codewords * L_CSM + B * N * (N - 1)
         t_message = tau_slot * 5 / 4 * M * N_PPM_symbols
 
-        datarate = N_bits / t_message * 1E-6
+        datarate = num_bits_sent / t_message * 1E-6
         data_rates[ni, mi] = datarate
         print(f'Datarate ({M} ppm): {datarate:.4f} Mbps')
 
 # %% - Plot
 ax = plt.axes()
 for i in range(len(num_bits)):
-    plt.semilogx(ppm_orders, data_rates[i], '-x', label=f'Nbits = {num_bits[i]/1000} kbits')
+    plt.semilogx(ppm_orders, data_rates[i], '-x', label=f'Bits sent = {num_bits[i]/1000} kbits')
 ax.set_xticks(ppm_orders)
 ax.set_xticklabels([str(M) for M in ppm_orders])
 
@@ -55,3 +55,19 @@ plt.legend()
 plt.show()
 
 # %%
+datarates_interleaving_per_codeword = [116.4938, 87.3703, 58.216, 36.3659, 21.8080]
+
+overestimate_percentage = np.zeros((len(num_bits), len(datarates_interleaving_per_codeword)))
+for i in range(len(num_bits)):
+    for j in range(len(datarates_interleaving_per_codeword)):
+        overestimate_percentage[i, j] = 100*data_rates[i][j]/datarates_interleaving_per_codeword[j]
+
+ax = plt.axes()
+for i in range(len(num_bits)):
+    plt.semilogx(ppm_orders, overestimate_percentage[i, :], '-x', label=f'Bits sent = {num_bits[i]/1000} kbits')
+plt.ylabel('Datarate overestimate (%)')
+plt.xlabel('PPM order (-)')
+ax.set_xticks(ppm_orders)
+ax.set_xticklabels([str(M) for M in ppm_orders])
+plt.legend()
+plt.show()
