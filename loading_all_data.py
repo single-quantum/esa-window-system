@@ -102,35 +102,4 @@ if __name__ == '__main__':
     plt.xlabel('Photons per pulse')
     plt.legend()
     plt.show()
-
-    # for i in range(1, 5):
-
-    #     total_attenuation = []
-    #     ref_power = []
-    #     counts = []
-    #     counts_TT = []
-    #     y = []
-    #     y2 = []
-    #     for key, value in data.items():
-    #         for key2, value2 in value.items():
-
-    #             for j in range(4, len(value2)):
-    #                 if (np.all(value2[j]['time_tagger_channels'] == np.arange(i))):
-    #                     # if(value2):
-
-    #                     total_attenuation.append(key2)
-    #                     y.append(value2[j].get('BER before decoding'))
-    #                     y2.append(value2[j].get('BER after decoding'))
-    #                     ref_power.append(value2[1])
-    #                     counts.append(value2[1]*value2[3]/22.7e6)
-    #                     counts_TT.append(value2[2])
-    #     # plt.plot(counts,y,'.-',label='before decoding, number of channels='+str(i))
-    #     plt.plot(counts, y2, '.-', label='after decoding, number of channels='+str(i))
-    #     # plt.plot(x,y2,label='after decoding, number of channels='+str(i))
-    # plt.xlabel('Photons per pulse')
-    # plt.ylabel('BER')
-    # plt.yscale('log')
-    # plt.legend()
-    # plt.tight_layout()
-    # plt.show()
-    print('Done')
+print('Done')
