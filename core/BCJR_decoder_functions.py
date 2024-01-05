@@ -514,7 +514,7 @@ def set_outer_code_gammas(trellis, symbol_log_likelihoods):
 
 
 def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=20,
-                        ns: float = 3, nb: float = 0.1, ber_stop_threshold=1E-3, **kwargs):
+                        ns: float = 3, nb: float = 0.1, ber_stop_threshold=1E-7, **kwargs):
     # Initialize outer trellis edges
     memory_size_outer = 2
     num_output_bits_outer = 3
@@ -627,7 +627,7 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
                     )]
                 ) / num_bits_per_slice
                 print(
-                    f"iteration = {iteration+1} ber: {ber:.5f} \t min likelihood: " +
+                    f"iteration = {iteration+1} ber: {ber:.3e} \t min likelihood: " +
                     f"{np.min(LLRs_u):.2f} \t max likelihood: {np.max(LLRs_u):.2f}")
 
                 bit_error_ratios[iteration, i] = ber
