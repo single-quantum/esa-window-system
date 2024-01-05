@@ -230,9 +230,3 @@ def parse_ppm_symbols(
     # print('standard deviation', np.std(residuals - np.mean(residuals)))
 
     return symbols, num_darkcounts
-
-
-def rolling_window(a, size):
-    shape = a.shape[:-1] + (a.shape[-1] - size + 1, size)
-    strides = a.strides + (a. strides[-1],)
-    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)

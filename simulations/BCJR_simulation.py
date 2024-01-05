@@ -15,10 +15,17 @@ from core.encoder_functions import (bit_deinterleave, bit_interleave,
                                     channel_deinterleave, channel_interleave,
                                     convolve, get_csm, map_PPM_symbols, slicer,
                                     zero_terminate)
-from core.parse_ppm_symbols import rolling_window
+
 from core.trellis import Edge, Trellis
 from core.utils import AWGN, bpsk, bpsk_encoding, generate_outer_code_edges
 from simulations.viterbi import viterbi
+
+
+def rolling_window(a, size):
+    shape = a.shape[:-1] + (a.shape[-1] - size + 1, size)
+    strides = a.strides + (a. strides[-1],)
+    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
+
 
 GREYSCALE = True
 PAYLOAD_TYPE = 'image'
