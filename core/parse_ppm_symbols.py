@@ -11,7 +11,7 @@ def plot_symbol_times(
     symbol_length: float,
     slot_length: float,
     codeword_start_time: float,
-    demodulated_symbols: npt.NDArray,
+    demodulated_symbols: list[float],
     num_symbols_per_codeword: int,
     start_symbol_index: int = 0,
     **kwargs
@@ -212,7 +212,8 @@ def parse_ppm_symbols(
         sent_symbols = pickle.load(f)
 
     num_symbol_errors = np.nonzero(
-        np.round(symbols) - sent_symbols[codeword_idx * num_symbol_frames:(codeword_idx + 1) * num_symbol_frames]
+        np.round(np.array(symbols)) - sent_symbols[codeword_idx *
+                                                   num_symbol_frames:(codeword_idx + 1) * num_symbol_frames]
     )[0].shape[0]
     symbol_error_ratio = num_symbol_errors / num_symbol_frames
     print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.3f}')
