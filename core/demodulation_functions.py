@@ -226,7 +226,8 @@ def find_csm_times(
     if message_start_idxs.shape[0] == 1:
         where_csm_corr = where_corr[where_corr >= message_start_idxs[0]]
     else:
-        (message_idx := kwargs.get('message_idx') if kwargs.get('message_idx') else [0, 1])
+        message_idx: list[int]
+        (message_idx := kwargs.get('message_idx', [0, 1]))
         where_csm_corr = where_corr[(
             where_corr >= message_start_idxs[message_idx[0]]) & (where_corr <= message_start_idxs[message_idx[1]])]
         for i in range(0, len(message_start_idxs)-1):
@@ -251,7 +252,7 @@ def find_csm_times(
     t0: float = time_stamps[0]
     csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr + 0.5 * slot_length
 
-    time_shifts: float = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
+    time_shifts: npt.NDArray = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
     print(np.array(time_shifts) / slot_length)
     csm_times += time_shifts - 0.5 * slot_length
 
