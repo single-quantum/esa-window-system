@@ -92,7 +92,7 @@ def test_parse_ppm_symbols_multiple_symbols():
 
     timestamps = np.linspace(0, (num_symbols - 1) * symbol_length, num_symbols) + 0.5 * slot_length
     symbols, _ = parse_ppm_symbols(timestamps, 0, timestamps[-1] + symbol_length, slot_length, symbol_length, M)
-    symbols = np.round(symbols).astype(int)
+    symbols = np.round(np.array(symbols)).astype(int)
     print(symbols)
 
     assert len(symbols) == len(timestamps)
@@ -122,7 +122,7 @@ def test_parse_ppm_symbols_multiple_symbols_with_jitter():
 
 def test_demodulate_empty_array_raises_exception():
     with pytest.raises(IndexError):
-        _ = demodulate([], 16, 1, 1)
+        _ = demodulate(np.array([]), 16, 1, 1)
 
 
 def test_demodulate_no_csm_raises_value_error(pulse_timestamps_no_csm):
