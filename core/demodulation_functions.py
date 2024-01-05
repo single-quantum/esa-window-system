@@ -80,14 +80,20 @@ def determine_CSM_time_shift(
     return csm_shifts
 
 
-def get_csm_correlation(time_stamps, slot_length, CSM, symbol_length, csm_correlation_threshold=0.6, **kwargs):
+def get_csm_correlation(
+        time_stamps: npt.NDArray[np.float_],
+        slot_length: float,
+        CSM: npt.NDArray[np.int_],
+        symbol_length: float,
+        csm_correlation_threshold: float = 0.6,
+        **kwargs):
     # + 0.5 slot length because pulse times should be in the middle of a slot.
     csm_time_stamps = np.array([slot_length * CSM[i] + i * symbol_length for i in range(len(CSM))]) + 0.5 * slot_length
 
     A = make_time_series(time_stamps, slot_length)
     B = make_time_series(csm_time_stamps, slot_length)
 
-    corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
+    corr: npt.NDArray = np.correlate(A, B, mode='valid')
     correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
     if kwargs.get('debug_mode'):
         plt.figure()
@@ -167,9 +173,8 @@ def find_csm_times(
         height=(0.9, 1),
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
-    expected_number_codewords_per_message = 9
-    print("I hard coded the expected values as", expected_number_codewords_per_message,
-          '\nShould probably be able to get this from the distance between the starts')
+    expected_number_codewords_per_message = round(
+        (message_start_idxs[1]-message_start_idxs[0])/(num_slots_per_symbol*symbols_per_codeword))
     expected_number_messages = expected_number_codewords_in_data/expected_number_codewords_per_message
 
     message_start_postions, message_start_heights = find_peaks(
