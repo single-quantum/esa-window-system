@@ -78,6 +78,7 @@ match PAYLOAD_TYPE:
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
         num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword + len(CSM)))
         num_slots = slot_mapped_sequence.flatten().shape[0]
+        message_time = num_slots * slot_length
         message_time_microseconds = num_slots * slot_length * 1E6
 
 sent_symbols = np.nonzero(slot_mapped_sequence)[1]
@@ -87,10 +88,14 @@ with open('sent_symbols', 'wb') as f:
 
 if PAYLOAD_TYPE == 'image':
     print(f'Sending image with shape {IMG_SHAPE[0]}x{IMG_SHAPE[1]}')
+
+datarate = (num_bits_sent / (message_time)) / 1E6
+
+print(f'PPM order: {M}')
 print(f'num symbols sent: {num_PPM_symbols}')
 print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols:.3e}')
 print(f'Number of codewords: {num_codewords}')
-print(f'Datarate: {1000*num_bits_sent/(message_time_microseconds*1000):.2f} Mbps')
+print(f'Datarate: {datarate:.2f} Mbps')
 print(f'Message time span: {message_time_microseconds:.3f} microseconds')
 print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microseconds')
 
