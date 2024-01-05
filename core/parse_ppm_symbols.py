@@ -212,7 +212,7 @@ def parse_ppm_symbols(
         np.round(symbols) - sent_symbols[codeword_idx * num_symbol_frames:(codeword_idx + 1) * num_symbol_frames]
     )[0].shape[0]
     symbol_error_ratio = num_symbol_errors / num_symbol_frames
-    print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.2f}')
+    print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.3f}')
 
     if kwargs.get('debug_mode'):
         plot_symbol_times(pulse_times, symbol_length, slot_length,
