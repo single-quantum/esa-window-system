@@ -222,15 +222,4 @@ def parse_ppm_symbols(
         plot_symbol_times(pulse_times, symbol_length, slot_length,
                           codeword_start_time, symbols, num_symbol_frames, start_symbol_index=6, **kwargs)
 
-    # rms_residuals = np.mean(residuals)**2 + np.std(residuals)**2
-    # mean_residuals = np.mean(residuals)
-
-    # print('mean residuals' , mean_residuals)
-
-    # plt.figure()
-    # plt.plot(residuals)
-    # plt.show()
-
-    # print('standard deviation', np.std(residuals - np.mean(residuals)))
-
     return symbols, num_darkcounts
