@@ -133,7 +133,7 @@ def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
 
 
 def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction,
-               dtype: int | float = int) -> npt.NDArray[np.int_]:
+               dtype: type[int] | type[float] = int) -> npt.NDArray[np.int_]:
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
         Fraction(1, 2): [1, 1, 0, 1, 1, 0],
@@ -155,7 +155,7 @@ def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction,
 
 
 def puncture(convoluted_bit_sequence: npt.NDArray[np.int_],
-             code_rate: Fraction, dtype: int | float = int) -> npt.NDArray[np.int_]:
+             code_rate: Fraction, dtype: type[int] | type[float] = int) -> npt.NDArray[np.int_]:
     """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
@@ -347,7 +347,7 @@ def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArr
         - `N`: Number of rows
     """
     arr = np.array(arr, dtype=int)
-    output: list[int] = []
+    output: list = []
     interleaver_remap_indices = get_remap_indices(arr, B, N)
 
     # Indeces < 0 indicate initial interleaver state bits, which is set at 0.
@@ -397,7 +397,7 @@ def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True) -> npt.NDArray
     if not np.all(ppm_symbols < M):
         raise ValueError(f"All PPM symbols should be smaller than {M}")
 
-    slot_mapped = np.zeros((len(ppm_symbols), M), dtype=int)
+    slot_mapped: npt.NDArray[np.int_] = np.zeros((len(ppm_symbols), M), dtype=int)
     for j in range(len(ppm_symbols)):
         slot_mapped[j, ppm_symbols[j]] = 1
 

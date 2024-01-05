@@ -120,6 +120,8 @@ for i in range(num_codewords):
 ppm_mapped_message = ppm_mapped_message_with_csm
 
 rng = default_rng()
+num_noise_symbols: int = 0
+
 if SIMULATE_LOST_SYMBOLS:
     # Simulate some lost symbols
     symbol_noise_factor = 0.00
@@ -204,8 +206,8 @@ for Es, N0 in list(zip(E, N)):
 
     # Calculate alphas, betas, gammas and LLRs
     gammas = calculate_gammas(tr, encoded_sequence, num_output_bits, Es, N0, log_bcjr=LOG_BCRJ, verbose=True)
-    alpha = calculate_alphas(tr, alpha, log_bcjr=LOG_BCRJ, verbose=True)
-    beta = calculate_betas(tr, beta, log_bcjr=LOG_BCRJ, verbose=True)
+    alpha = calculate_alphas(tr, log_bcjr=LOG_BCRJ, verbose=True)
+    beta = calculate_betas(tr, log_bcjr=LOG_BCRJ, verbose=True)
     LLR = calculate_LLRs(tr, alpha, beta, log_bcjr=LOG_BCRJ, verbose=True)
 
     predicted_msg = np.array([1 if l >= 0 else 0 for l in LLR])
@@ -254,6 +256,7 @@ for Es, N0 in list(zip(E, N)):
     # f'errors (Viterbi): {num_errors_viterbi} / {len(sent_message)}
     # ({error_percentage_viterbi:.3f} %, sigma={sigma:.2f})')
 
+    original_shape: tuple[int, ...] = (0, 0)
     if PAYLOAD_TYPE == 'image' and round(N0) == 5:
         INTERPOLATION = None
         CMAP = "binary"

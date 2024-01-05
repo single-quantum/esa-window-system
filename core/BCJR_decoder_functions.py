@@ -619,6 +619,7 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
 
+            ber = 1
             if sent_bit_sequence is not None:
                 ber = np.sum(
                     [abs(x - y) for x, y in zip(
