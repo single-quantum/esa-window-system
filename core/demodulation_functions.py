@@ -173,8 +173,14 @@ def find_csm_times(
         height=(0.9, 1),
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
-    expected_number_codewords_per_message = round(
-        (message_start_idxs[1]-message_start_idxs[0])/(num_slots_per_symbol*symbols_per_codeword))
+    if message_start_idxs.shape[0] == 0:
+        raise ValueError("Could not find message start / end. ")
+
+    if len(message_start_idxs) == 1:
+        expected_number_codewords_per_message = (time_stamps[-1]-time_stamps[0])/slot_length/symbols_per_codeword
+    else:
+        expected_number_codewords_per_message = round(
+            (message_start_idxs[1]-message_start_idxs[0])/(num_slots_per_symbol*symbols_per_codeword))
     expected_number_messages = expected_number_codewords_in_data/expected_number_codewords_per_message
 
     message_start_postions, message_start_heights = find_peaks(
@@ -215,9 +221,6 @@ def find_csm_times(
                  (max(moving_avg_corr) - min(moving_avg_corr)) + 1, color='tab:red')
         fig.tight_layout()
         plt.show()
-
-    if message_start_idxs.shape[0] == 0:
-        raise ValueError("Could not find message start / end. ")
 
     # If there is only one codeword, assume there is only one CSM, so the end
     # of the message is equal to the end of the timestamps.
