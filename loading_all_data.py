@@ -9,6 +9,8 @@ import numpy as np
 def LoadData(path_input, overwrite_file=False, generate=False):
     ppm_orders = {}
     last_ppm_number = -1
+    metadata: dict = {}
+    time_events = np.array([])
     for (dir_path, dir_names, file_names) in os.walk(path_input, topdown=True):
         current_dir = os.path.split(dir_path)[-1]
         print(current_dir)
@@ -28,8 +30,8 @@ def LoadData(path_input, overwrite_file=False, generate=False):
                 ppm_orders[number] = dat
             elif ('metadata' in val):
                 temp = os.path.join(dir_path, val)
-                DEBUG_MODE = False
-                decode_from_time_tagger.DEBUG_MODE = False
+                DEBUG_MODE = True
+                decode_from_time_tagger.DEBUG_MODE = True
                 if (generate):
                     for i in range(1, 5):
                         output_data_filename = 'output_'+str(i)+'_channel_B'
@@ -69,7 +71,7 @@ if __name__ == '__main__':
     attenuation_range = np.arange(40, 50)
 
     data = LoadData(f'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\{ppm_order} ppm',
-                    overwrite_file=False, generate=False)
+                    overwrite_file=True, generate=True)
     print(data)
 
     plot_data = {i: {
