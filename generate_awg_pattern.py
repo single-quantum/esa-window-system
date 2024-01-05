@@ -131,16 +131,6 @@ for i in np.arange(0, len(gap_vector), len(gap_vector) / 4, dtype=int):
     gap_vector[i] = 30000
 pulse = np.hstack((gap_vector, pulse))
 
-# Repeat the CSM to distinguish between repeated messages
-# for i, slot_mapped_symbol in enumerate(slot_mapped_sequence[:len(CSM)]):
-#     ppm_symbol_position = slot_mapped_symbol.nonzero()[0][0]
-#     if ADD_ASM:
-#         idx = i * num_samples_per_symbol + ppm_symbol_position * \
-#             num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
-#         pulse[idx:idx + pulse_width] = 30000
-
-# pulse = np.hstack((pulse, [0] * num_samples_per_symbol * len(CSM) * 20))
-
 # Convert to pandas dataframe for easy write to CSV
 df = pd.DataFrame(pulse)
 
