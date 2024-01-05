@@ -49,8 +49,9 @@ match PAYLOAD_TYPE:
         if len(msg_PPM_symbols) % 2 != 0:
             msg_PPM_symbols = np.append(msg_PPM_symbols, 0)
 
-        message_time_microseconds = sample_size_awg * 1E-12 * num_samples_per_slot * \
-            num_slots_per_symbol * msg_PPM_symbols.shape[0] * 1E6
+        message_time = sample_size_awg * 1E-12 * num_samples_per_slot * \
+            num_slots_per_symbol * msg_PPM_symbols.shape[0]
+        message_time_microseconds = message_time * 1E6
         num_PPM_symbols = msg_PPM_symbols.shape[0]
         num_bits_sent = num_PPM_symbols * m
         slot_mapped_sequence = slot_map(msg_PPM_symbols, M)
@@ -60,19 +61,21 @@ match PAYLOAD_TYPE:
             PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
         num_bits_sent = len(sent_message)
 
-        slot_mapped_sequence = encoder(sent_message, M, CODE_RATE,
-                                       **{
-                                           'use_inner_encoder': USE_INNER_ENCODER,
-                                           'use_randomizer': USE_RANDOMIZER,
-                                           'user_settings':
-                                           {
-                                               'B_interleaver': B_interleaver,
-                                               'N_interleaver': N_interleaver
-                                           },
-                                           'save_encoded_sequence_to_file': True,
-                                           'reference_file_prefix': 'herbig_haro',
-                                           'num_samples_per_slot': num_samples_per_slot}
-                                       )
+        # I should consider replacing some of these kwargs with default positional arguments
+        slot_mapped_sequence, _, _ = encoder(
+            sent_message, M, CODE_RATE,
+            **{
+                'use_inner_encoder': USE_INNER_ENCODER,
+                'use_randomizer': USE_RANDOMIZER,
+                'user_settings':
+                {
+                    'B_interleaver': B_interleaver,
+                    'N_interleaver': N_interleaver
+                },
+                'save_encoded_sequence_to_file': True,
+                'reference_file_prefix': 'herbig_haro',
+                'num_samples_per_slot': num_samples_per_slot}
+        )
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol

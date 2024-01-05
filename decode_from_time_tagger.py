@@ -21,7 +21,7 @@ from ppm_parameters import (CORRELATION_THRESHOLD, DEBUG_MODE, MESSAGE_IDX,
 https://www.swabianinstruments.com/time-tagger/downloads/ . """
 
 
-def get_time_events_from_tt_file(time_events_filename: str, num_channels: int,
+def get_time_events_from_tt_file(time_events_filename: str | Path, num_channels: int,
                                  get_time_events_per_channel=True, **kwargs):
     """Open the `time_events_filename` with the TimeTagger.FileReader class and retrieve events.
 
@@ -133,6 +133,8 @@ def analyze_data(time_events, metadata):
     PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')
     IMG_FILE_PATH = metadata.get('IMG_FILE_PATH')
     IMG_SHAPE = metadata.get('IMG_SHAPE')
+    sent_bits = metadata.get('sent_bit_sequence')
+    sent_bits_no_csm = metadata.get('sent_bit_sequence_no_csm')
     num_slots_per_symbol = int(5 / 4 * M)
 
     # time_events_samples = (time_events - time_events[0]) * (8.82091E9 / num_samples_per_slot) + 0.5
@@ -159,11 +161,13 @@ def analyze_data(time_events, metadata):
     with open('received_bit_sequence', 'wb') as f:
         pickle.dump(received_bits, f)
 
-    with open('sent_bit_sequence', 'rb') as f:
-        sent_bits = pickle.load(f)
+    if sent_bits is None:
+        with open('sent_bit_sequence', 'rb') as f:
+            sent_bits = pickle.load(f)
 
-    with open('sent_bit_sequence_no_csm', 'rb') as f:
-        sent_bits_no_csm = pickle.load(f)
+    if sent_bits_no_csm is None:
+        with open('sent_bit_sequence_no_csm', 'rb') as f:
+            sent_bits_no_csm = pickle.load(f)
 
     BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)]) / len(sent_bits)
     print('BER before decoding', BER_before_decoding)
