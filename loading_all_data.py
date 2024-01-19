@@ -12,24 +12,24 @@ def LoadData(path_input, overwrite_file=False, generate=False):
     metadata: dict = {}
     time_events = np.array([])
     for (dir_path, dir_names, file_names) in os.walk(path_input, topdown=True):
-        current_dir = os.path.split(dir_path)[-1]
-        print(current_dir)
-        temp = re.findall(r'\d+', current_dir)
-        if (len(temp) > 0):
-            number = int(temp[0])
-        else:
-            number = -1
-        print(number)
-        for val in file_names:
-            if (os.path.splitext(val)[-1] == '.xlsx'):
-                temp = os.path.join(dir_path, val)
-                last_ppm_number = number
-                excel_data = pd.read_excel(temp, sheet_name=None)['Sheet1']
+        sub_directory_str = os.path.split(dir_path)[-1]
+        print(f'Sub-directory: {sub_directory_str}')
+        ppm_order_match = re.search(r'\d+', sub_directory_str)
+        if ppm_order_match is None:
+            raise AttributeError("Could not find PPM order from directory name")
+
+        ppm_order = int(ppm_order_match.group())
+
+        for file_name in file_names:
+            if (os.path.splitext(file_name)[-1] == '.xlsx'):
+                excel_sheet_path = os.path.join(dir_path, file_name)
+                last_ppm_number = ppm_order
+                excel_data = pd.read_excel(excel_sheet_path, sheet_name=None)['Sheet1']
                 dat = excel_data.set_index('Total attenuation').T.to_dict('list')
                 print(dat)
-                ppm_orders[number] = dat
-            elif ('metadata' in val):
-                temp = os.path.join(dir_path, val)
+                ppm_orders[ppm_order] = dat
+            elif ('metadata' in file_name):
+                metadata_file_path = os.path.join(dir_path, file_name)
                 DEBUG_MODE = True
                 decode_from_time_tagger.DEBUG_MODE = True
                 if (generate):
@@ -43,24 +43,24 @@ def LoadData(path_input, overwrite_file=False, generate=False):
                                 time_events, metadata = decode_from_time_tagger.load_timetagger_data(
                                     True, True, dir_path, time_tagger_channels)
                             except:
-                                print(f"Can't load file {temp}")
+                                print(f"Can't load file {metadata_file_path}")
                             try:
                                 data_for_analysis = decode_from_time_tagger.analyze_data(time_events, metadata)
                                 data_for_analysis['time_tagger_channels'] = time_tagger_channels
                                 print(f'decoding with {i} channel(s)')
                                 decode_from_time_tagger.save_data(data_for_analysis, dir_path, output_data_filename)
                             except Exception as e:
-                                print(f"Can't decode file {temp}")
+                                print(f"Can't decode file {metadata_file_path}")
                                 print(e)
                         else:
                             print('Skipped creating file'+output_data_filename)
                 for i in range(1, 5):
                     try:
                         dat = decode_from_time_tagger.load_output_data(dir_path, 'output_'+str(i)+'_channel_B')
-                        ppm_orders[last_ppm_number][number].append(dat)
+                        ppm_orders[last_ppm_number][ppm_order].append(dat)
                         print('fixed')
                     except:
-                        print('Cant load'+temp)
+                        print('Cant load'+metadata_file_path)
 
     return ppm_orders
 
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     attenuation_range = np.arange(40, 50)
 
     data = LoadData(f'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\{ppm_order} ppm',
-                    overwrite_file=True, generate=True)
+                    overwrite_file=False, generate=False)
     print(data)
 
     plot_data = {i: {
@@ -97,11 +97,15 @@ if __name__ == '__main__':
 
     plt.figure()
     for i in range(1, 5):
-        plt.semilogy(plot_data[i]['counts'], plot_data[i]['BER before decoding'],
-                     '-x', label=f'number of channels = {i}')
-    plt.title(f'BER before decoding ({ppm_order} PPM)')
-    plt.ylabel('Bit Error Ratio (-)')
-    plt.xlabel('Photons per pulse')
-    plt.legend()
+        plt.semilogy(plot_data[i]['counts'], plot_data[i]['BER after decoding'],
+                     '-x', label=f'# of pixels = {i}')
+    plt.title(f'BER after decoding ({ppm_order} PPM)')
+    plt.ylabel('Bit Error Ratio (-)', fontsize=12)
+    plt.xlabel('Photons per pulse', fontsize=12)
+
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
+    plt.legend(fontsize=12)
     plt.show()
 print('Done')
