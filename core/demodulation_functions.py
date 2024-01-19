@@ -416,5 +416,6 @@ def demodulate(
     print('Number of demodulated symbols: ', len(flatten(msg_symbols)))
 
     slot_mapped_message = slot_map(flatten(msg_symbols), M)
+    print()
 
     return slot_mapped_message, events_per_slot
