@@ -58,7 +58,6 @@ def LoadData(path_input, overwrite_file=False, generate=False):
                     try:
                         dat = decode_from_time_tagger.load_output_data(dir_path, 'output_'+str(i)+'_channel_B')
                         ppm_orders[last_ppm_number][ppm_order].append(dat)
-                        print('fixed')
                     except:
                         print('Cant load'+metadata_file_path)
 
@@ -71,7 +70,7 @@ if __name__ == '__main__':
     attenuation_range = np.arange(40, 50)
 
     data = LoadData(f'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\{ppm_order} ppm',
-                    overwrite_file=False, generate=False)
+                    overwrite_file=False, generate=True)
     print(data)
 
     plot_data = {i: {

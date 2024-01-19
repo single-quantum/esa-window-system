@@ -97,7 +97,6 @@ def load_timetagger_data(use_latest_tt_file: bool, GET_TIME_EVENTS_PER_SECOND: b
         files: list[Path] = [x for x in tt_files if x.is_file()]
         files = sorted(files, key=lambda x: x.lstat().st_mtime)
         time_tagger_filename = os.path.join(time_tagger_files_dir, (re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'))
-        print('jher')
         print(time_tagger_filename)
         time_tagger_file_epoch = time_tagger_filename.split('_')[-1].rstrip('.ttbin')
 
