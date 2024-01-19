@@ -8,13 +8,12 @@ from math import exp
 import numpy as np
 import numpy.typing as npt
 from numpy import dot
-from numpy.random import default_rng
 from tqdm import tqdm
 
 from core.encoder_functions import (bit_deinterleave, bit_interleave,
                                     channel_deinterleave, get_csm,
-                                    get_remap_indices, map_PPM_symbols,
-                                    randomize, slot_map, unpuncture)
+                                    get_remap_indices,
+                                    randomize, unpuncture)
 from core.scppm_encoder import puncture
 from core.trellis import Trellis
 from core.utils import (flatten, generate_inner_encoder_edges,
@@ -346,20 +345,9 @@ def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
         edges = flatten(list(map(lambda s: s.edges, stage.states)))
 
         for i in range(trellis.num_input_bits):
-
-            # zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
-            # ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
-
-            ones_edges_lmbdas = []
-            zero_edges_lmbdas = []
-
-            for e in edges:
-                if e.edge_input[i] == 0:
-                    zero_edges_lmbdas.append(e.lmbda)
-                else:
-                    ones_edges_lmbdas.append(e.lmbda)
-
-            # print(np.all(np.array(zero_edges_lmbdas) == np.array(zero_edges_lmbdas_2)))
+            # This is a code efficient implementation, even though there is slightly more overhead compared to a simple for loop.
+            zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
+            ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
 
             LLRs[k, i] = max_star_recursive(zero_edges_lmbdas) - \
                 max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
@@ -396,18 +384,10 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
         edges = flatten(list(map(lambda s: s.edges, stage.states)))
 
         for i in range(trellis.num_output_bits):
-            # Edge input or edge output?
-            # zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
-            # ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
-
-            ones_edges_lmbdas = []
-            zero_edges_lmbdas = []
-
-            for e in edges:
-                if e.edge_output[i] == 0:
-                    zero_edges_lmbdas.append(e.lmbda)
-                else:
-                    ones_edges_lmbdas.append(e.lmbda)
+            # First, select all edges with 0 (or 1) at the i-th output bit, then of those edges, take the lambda value.
+            # This is a code efficient implementation, even though there is slightly more overhead compared to a simple for loop.
+            zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
+            ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
 
             if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
                 p_xk_O[k, i] = max_star(zero_edges_lmbdas[0], -np.infty) - \
@@ -420,17 +400,8 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
             p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - \
                 max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
 
-        # zero_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
-        # ones_edges = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
-
-        ones_edges_lmbdas = []
-        zero_edges_lmbdas = []
-
-        for e in edges:
-            if e.edge_input == 0:
-                zero_edges_lmbdas.append(e.lmbda)
-            else:
-                ones_edges_lmbdas.append(e.lmbda)
+        zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
+        ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
 
         if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
             p_uk_O[k] = max_star(zero_edges_lmbdas[0], -np.infty) - max_star(ones_edges_lmbdas[0], -np.infty)
