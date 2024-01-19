@@ -230,7 +230,7 @@ def find_csm_times(
         where_csm_corr = where_corr[where_corr >= message_start_idxs[0]]
     else:
         message_idx: list[int]
-        (message_idx := kwargs.get('message_idx', [0, 1]))
+        message_idx = kwargs.get('message_idx', [0, 1])
         where_csm_corr = where_corr[(
             where_corr >= message_start_idxs[message_idx[0]]) & (where_corr <= message_start_idxs[message_idx[1]])]
         for i in range(0, len(message_start_idxs)-1):
@@ -324,7 +324,7 @@ def find_and_parse_codewords(
         num_darkcounts,
         **{**kwargs, **{'codeword_idx': len(csm_times) - 1}}
     )
-    msg_symbols.append(np.round(symbols).astype(int))
+    msg_symbols.append(np.round(np.array(symbols)).astype(int))
 
     print(f'Estimated number of darkcounts in message frame: {num_darkcounts}')
     return msg_symbols
@@ -337,7 +337,7 @@ def get_num_events_per_slot(
         symbols_per_codeword: int,
         slot_length: float,
         symbol_length: float,
-        M: float):
+        M: float) -> npt.NDArray[np.int_]:
     """This function determines how many detection events there were for each slot. """
 
     # The factor 5/4 is determined by the protocol, which states that there
@@ -367,7 +367,7 @@ def get_num_events_per_slot(
             num_events = events.shape[0]
             num_events_per_slot[i, j] = num_events
 
-    num_events_per_slot = num_events_per_slot.flatten()
+    num_events_per_slot = num_events_per_slot.flatten().astype(int)
     return num_events_per_slot
 
 
@@ -400,8 +400,8 @@ def demodulate(
     msg_end_time = csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length
     msg_pulse_timestamps = pulse_timestamps[(pulse_timestamps >= csm_times[0]) & (pulse_timestamps <= msg_end_time)]
 
-    events_per_slot = get_num_events_per_slot(csm_times, msg_pulse_timestamps,
-                                              CSM, symbols_per_codeword, slot_length, symbol_length, M)
+    events_per_slot: npt.NDArray[np.int_] = get_num_events_per_slot(csm_times, msg_pulse_timestamps,
+                                                                    CSM, symbols_per_codeword, slot_length, symbol_length, M)
 
     num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
         pulse_timestamps <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]
