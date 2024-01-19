@@ -7,19 +7,22 @@ import numpy.typing as npt
 
 
 def plot_symbol_times(
-    symbol_times,
-    symbol_length,
-    slot_length,
-    codeword_start_time,
-    demodulated_symbols,
-    num_symbols_per_codeword,
-    start_symbol_index=0,
+    symbol_times: npt.NDArray,
+    symbol_length: float,
+    slot_length: float,
+    codeword_start_time: float,
+    demodulated_symbols: list[float],
+    num_symbols_per_codeword: int,
+    start_symbol_index: int = 0,
     **kwargs
 ):
+    """Used for debugging, this function plots the PPM symbol locations in time.
+
+    It compares the received symbols with the expected / sent symbols. """
     with open('sent_symbols', 'rb') as f:
         sent_symbols = pickle.load(f)
 
-    codeword_idx = kwargs.get('codeword_idx')
+    codeword_idx = kwargs.get('codeword_idx', 0)
     sent_symbols = deepcopy(sent_symbols[codeword_idx * num_symbols_per_codeword:])
     num_symbols = 6
     t0 = codeword_start_time + start_symbol_index * symbol_length
@@ -204,35 +207,19 @@ def parse_ppm_symbols(
         best_symbol = np.unique(rounded_symbols[np.argmax(occurences)])[0]
         symbols.append(best_symbol)
 
-    codeword_idx = kwargs.get('codeword_idx')
+    codeword_idx = kwargs.get('codeword_idx', 0)
     with open('sent_symbols', 'rb') as f:
         sent_symbols = pickle.load(f)
 
     num_symbol_errors = np.nonzero(
-        np.round(symbols) - sent_symbols[codeword_idx * num_symbol_frames:(codeword_idx + 1) * num_symbol_frames]
+        np.round(np.array(symbols)) - sent_symbols[codeword_idx *
+                                                   num_symbol_frames:(codeword_idx + 1) * num_symbol_frames]
     )[0].shape[0]
     symbol_error_ratio = num_symbol_errors / num_symbol_frames
-    print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.2f}')
+    print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.3f}')
 
     if kwargs.get('debug_mode'):
         plot_symbol_times(pulse_times, symbol_length, slot_length,
                           codeword_start_time, symbols, num_symbol_frames, start_symbol_index=6, **kwargs)
 
-    # rms_residuals = np.mean(residuals)**2 + np.std(residuals)**2
-    # mean_residuals = np.mean(residuals)
-
-    # print('mean residuals' , mean_residuals)
-
-    # plt.figure()
-    # plt.plot(residuals)
-    # plt.show()
-
-    # print('standard deviation', np.std(residuals - np.mean(residuals)))
-
     return symbols, num_darkcounts
-
-
-def rolling_window(a, size):
-    shape = a.shape[:-1] + (a.shape[-1] - size + 1, size)
-    strides = a.strides + (a. strides[-1],)
-    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)

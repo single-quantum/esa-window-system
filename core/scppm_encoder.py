@@ -123,7 +123,7 @@ def encoder(
         bit_stream: npt.NDArray[np.int_],
         M: int,
         code_rate: Fraction,
-        **kwargs) -> npt.NDArray[np.int_]:
+        **kwargs) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_], npt.NDArray[np.int_]]:
     """Does some preprocessing to the bit_stream, puts it through the SCPPM_encoder and does some post-processing.
 
     Returns a slot mapped binary vector.
@@ -156,4 +156,4 @@ def encoder(
         sent_bit_sequence = ppm_symbols_to_bit_array(sent_ppm_symbols, int(np.log2(M)))
         pickle.dump(sent_bit_sequence, f)
 
-    return slot_mapped_sequence
+    return slot_mapped_sequence, sent_bit_sequence, information_blocks

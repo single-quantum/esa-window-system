@@ -6,7 +6,7 @@ import pickle
 
 import TimeTagger
 
-from ppm_parameters import CODE_RATE, M, num_samples_per_slot, IMG_FILE_PATH, GREYSCALE, slot_length, symbol_length, PAYLOAD_TYPE, IMG_SHAPE, IMG_FILE_PATH, USE_INNER_ENCODER, USE_RANDOMIZER
+from ppm_parameters import CODE_RATE, M, num_samples_per_slot, IMG_FILE_PATH, GREYSCALE, slot_length, symbol_length, PAYLOAD_TYPE, IMG_SHAPE, USE_INNER_ENCODER, USE_RANDOMIZER
 
 # num_channels = 4
 # channels = [i+1 for i in range(num_channels)]
@@ -46,9 +46,16 @@ filewriter.startFor(int(window_size_ps), clear=True)
 filewriter.waitUntilFinished()
 
 num_events = filewriter.getTotalEvents()
+events_per_second = num_events/window_size_secs
 
 print(f'{num_events} events written to disk. ')
-print(f'Events per second: {num_events*1/window_size_secs:.3e}')
+print(f'Events per second: {events_per_second:.3e}')
+
+with open('sent_bit_sequence', 'rb') as f:
+    sent_bits = pickle.load(f)
+
+with open('sent_bit_sequence_no_csm', 'rb') as f:
+    sent_bits_no_csm = pickle.load(f)
 
 # Write metadata file
 with open(f'time tagger files/timetags_metadata_{timestamp_epoch}', 'wb') as f:
@@ -64,6 +71,13 @@ with open(f'time tagger files/timetags_metadata_{timestamp_epoch}', 'wb') as f:
         'IMG_FILE_PATH': IMG_FILE_PATH,
         'USE_INNER_ENCODER': USE_INNER_ENCODER,
         'USE_RANDOMIZER': USE_RANDOMIZER,
+        'num_events_TT': num_events,
+        'acquisition_time_TT': window_size_secs,
+        'recorded_channels': channels,
+        'countrate_TT': events_per_second,
+        'timestamp_epoch': timestamp_epoch,
+        'sent_bit_sequence': sent_bits,
+        'sent_bit_sequence_no_csm': sent_bits_no_csm
     }
 
     pickle.dump(metadata, f)

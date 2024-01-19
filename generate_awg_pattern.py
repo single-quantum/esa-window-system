@@ -49,8 +49,9 @@ match PAYLOAD_TYPE:
         if len(msg_PPM_symbols) % 2 != 0:
             msg_PPM_symbols = np.append(msg_PPM_symbols, 0)
 
-        message_time_microseconds = sample_size_awg * 1E-12 * num_samples_per_slot * \
-            num_slots_per_symbol * msg_PPM_symbols.shape[0] * 1E6
+        message_time = sample_size_awg * 1E-12 * num_samples_per_slot * \
+            num_slots_per_symbol * msg_PPM_symbols.shape[0]
+        message_time_microseconds = message_time * 1E6
         num_PPM_symbols = msg_PPM_symbols.shape[0]
         num_bits_sent = num_PPM_symbols * m
         slot_mapped_sequence = slot_map(msg_PPM_symbols, M)
@@ -60,24 +61,27 @@ match PAYLOAD_TYPE:
             PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
         num_bits_sent = len(sent_message)
 
-        slot_mapped_sequence = encoder(sent_message, M, CODE_RATE,
-                                       **{
-                                           'use_inner_encoder': USE_INNER_ENCODER,
-                                           'use_randomizer': USE_RANDOMIZER,
-                                           'user_settings':
-                                           {
-                                               'B_interleaver': B_interleaver,
-                                               'N_interleaver': N_interleaver
-                                           },
-                                           'save_encoded_sequence_to_file': True,
-                                           'reference_file_prefix': 'herbig_haro',
-                                           'num_samples_per_slot': num_samples_per_slot}
-                                       )
+        # I should consider replacing some of these kwargs with default positional arguments
+        slot_mapped_sequence, _, _ = encoder(
+            sent_message, M, CODE_RATE,
+            **{
+                'use_inner_encoder': USE_INNER_ENCODER,
+                'use_randomizer': USE_RANDOMIZER,
+                'user_settings':
+                {
+                    'B_interleaver': B_interleaver,
+                    'N_interleaver': N_interleaver
+                },
+                'save_encoded_sequence_to_file': True,
+                'reference_file_prefix': 'herbig_haro',
+                'num_samples_per_slot': num_samples_per_slot}
+        )
         num_PPM_symbols = slot_mapped_sequence.shape[0]
 
         # One SCPPM codeword is 15120/m symbols, as defined by the CCSDS protocol
         num_codewords = math.ceil(num_PPM_symbols / (symbols_per_codeword + len(CSM)))
         num_slots = slot_mapped_sequence.flatten().shape[0]
+        message_time = num_slots * slot_length
         message_time_microseconds = num_slots * slot_length * 1E6
 
 sent_symbols = np.nonzero(slot_mapped_sequence)[1]
@@ -87,10 +91,14 @@ with open('sent_symbols', 'wb') as f:
 
 if PAYLOAD_TYPE == 'image':
     print(f'Sending image with shape {IMG_SHAPE[0]}x{IMG_SHAPE[1]}')
+
+datarate = (num_bits_sent / (message_time)) / 1E6
+
+print(f'PPM order: {M}')
 print(f'num symbols sent: {num_PPM_symbols}')
 print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols:.3e}')
 print(f'Number of codewords: {num_codewords}')
-print(f'Datarate: {1000*num_bits_sent/(message_time_microseconds*1000):.2f} Mbps')
+print(f'Datarate: {datarate:.2f} Mbps')
 print(f'Message time span: {message_time_microseconds:.3f} microseconds')
 print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microseconds')
 
@@ -125,16 +133,6 @@ gap_vector = np.array([0] * num_samples_per_symbol * len(CSM))
 for i in np.arange(0, len(gap_vector), len(gap_vector) / 4, dtype=int):
     gap_vector[i] = 30000
 pulse = np.hstack((gap_vector, pulse))
-
-# Repeat the CSM to distinguish between repeated messages
-# for i, slot_mapped_symbol in enumerate(slot_mapped_sequence[:len(CSM)]):
-#     ppm_symbol_position = slot_mapped_symbol.nonzero()[0][0]
-#     if ADD_ASM:
-#         idx = i * num_samples_per_symbol + ppm_symbol_position * \
-#             num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
-#         pulse[idx:idx + pulse_width] = 30000
-
-# pulse = np.hstack((pulse, [0] * num_samples_per_symbol * len(CSM) * 20))
 
 # Convert to pandas dataframe for easy write to CSV
 df = pd.DataFrame(pulse)
