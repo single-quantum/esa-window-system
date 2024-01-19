@@ -1,7 +1,7 @@
+import os
 import pickle
 import re
 from pathlib import Path
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -77,7 +77,8 @@ def get_time_events_from_tt_file(time_events_filename: str | Path, num_channels:
     return time_events, time_stamps_per_channel
 
 
-def load_timetagger_data(use_latest_tt_file: bool, GET_TIME_EVENTS_PER_SECOND: bool, time_tagger_files_dir: str, time_tagger_channels):
+def load_timetagger_data(use_latest_tt_file: bool, GET_TIME_EVENTS_PER_SECOND: bool,
+                         time_tagger_files_dir: str, time_tagger_channels):
     time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
     tt_files = time_tagger_files_path.rglob('*.ttbin')
 
@@ -147,10 +148,10 @@ def analyze_data(time_events, metadata):
         slot_length,
         symbol_length,
         csm_correlation_threshold=CORRELATION_THRESHOLD,
-        message_idx=MESSAGE_IDX,
         **{
             'num_samples_per_slot': num_samples_per_slot,
-            'debug_mode': DEBUG_MODE
+            'debug_mode': DEBUG_MODE,
+            'message_idx': MESSAGE_IDX
         }
     )
 
@@ -239,7 +240,7 @@ def analyze_data(time_events, metadata):
     data_for_analysis['BER after decoding'] = BER_after_decoding
 
     print('Analysis done')
-    return data_for_analysis
+    return data_for_analysis, img_arr
 
 
 def save_data(data_to_be_saved, path, name='output_data'):
@@ -258,18 +259,73 @@ def load_output_data(path, name='output_data'):
 
 
 if __name__ == '__main__':
-    DEBUG_MODE = True
+    DEBUG_MODE = False
     use_latest_tt_file: bool = True
     GET_TIME_EVENTS_PER_SECOND = True
-    time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/15-12-2023/16 ppm/42 dBm (16)/'
+    time_tagger_channels = [
+        [0, 1, 2, 3],
+        [0, 1, 2],
+        [0, 1],
+    ]
+    time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/15-12-2023/16 ppm/46 dBm (20)/'
     # time_tagger_files_dir: str = 'time tagger files/'
-    time_tagger_channels = [0, 1]
 
-    time_events, metadata = load_timetagger_data(
-        use_latest_tt_file, GET_TIME_EVENTS_PER_SECOND, time_tagger_files_dir, time_tagger_channels)
-    print('here')
-    data_for_analysis = analyze_data(time_events, metadata)
-    save_data(data_for_analysis, time_tagger_files_dir)
-    print(load_output_data(time_tagger_files_dir))
+    # fig, axs = plt.subplots(1, len(time_tagger_channels))
+    # img_arrs = []
+    for i, channels in enumerate(time_tagger_channels):
+        time_events, metadata = load_timetagger_data(
+            use_latest_tt_file, GET_TIME_EVENTS_PER_SECOND, time_tagger_files_dir, channels)
+    #     print('here')
+    #     data_for_analysis, img_arr = analyze_data(time_events, metadata)
+    #     img_arrs.append(img_arr)
+
+    # axs[i].imshow(img_arr, cmap='Greys')
+    # plt.tick_params(
+    #     axis='x',          # changes apply to the x-axis
+    #     which='both',      # both major and minor ticks are affected
+    #     bottom=False,      # ticks along the bottom edge are off
+    #     top=False,         # ticks along the top edge are off
+    #     labelbottom=False
+    # )  # labels along the bottom edge are off
+    # # plt.show()
+    # with open('decoded_image_arrays_46dbm', 'wb') as f:
+    #     pickle.dump(img_arrs, f)
+
+    with open('decoded_image_arrays_46dbm', 'rb') as f:
+        decoded_imgs = pickle.load(f)
+
+    IMG_SHAPE = metadata.get('IMG_SHAPE')
+    PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')
+    IMG_FILE_PATH = metadata.get('IMG_FILE_PATH')
+    sent_message = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
+    sent_img_array = map_PPM_symbols(sent_message, 8)
+    original_img_arr = sent_img_array[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+
+    fig, axs = plt.subplots(1, len(decoded_imgs)+1)
+    axs[0].imshow(original_img_arr, cmap='Greys')
+    axs[0].tick_params(
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        left=False,
+        labelbottom=False,
+        labelleft=False
+    )  # labels along the bottom edge are off
+    for i, img_arr in enumerate(decoded_imgs):
+        axs[i+1].imshow(img_arr, cmap='Greys')
+        axs[i+1].tick_params(
+            which='both',      # both major and minor ticks are affected
+            bottom=False,      # ticks along the bottom edge are off
+            top=False,         # ticks along the top edge are off
+            left=False,
+            labelbottom=False,
+            labelleft=False
+        )  # labels along the bottom edge are off
+
+    plt.show()
+
+    print('done')
+    # save_data(data_for_analysis, time_tagger_files_dir)
+    # print(load_output_data(time_tagger_files_dir))
 
     # reference_file_path = f'jupiter_greyscale_{num_samples_per_slot}_samples_per_slot_{M}-PPM_interleaved_sent_bit_sequence'
