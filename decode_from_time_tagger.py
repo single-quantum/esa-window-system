@@ -198,8 +198,7 @@ def analyze_data(time_events, metadata):
 
         if GREYSCALE:
             sent_img_array = map_PPM_symbols(sent_message, 8)
-            pixel_values = map_PPM_symbols(information_blocks, 8)
-            img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+            img_arr = sent_img_array[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
             CMAP = 'Greys'
         else:
             img_arr = information_blocks.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
@@ -261,6 +260,8 @@ if __name__ == '__main__':
     DEBUG_MODE = False
     use_latest_tt_file: bool = True
     GET_TIME_EVENTS_PER_SECOND = True
+    ANALYZE_DATA = False
+
     time_tagger_channels = [
         [0, 1, 2, 3],
         [0, 1, 2],
@@ -269,29 +270,22 @@ if __name__ == '__main__':
     time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/15-12-2023/16 ppm/46 dBm (20)/'
     # time_tagger_files_dir: str = 'time tagger files/'
 
-    # fig, axs = plt.subplots(1, len(time_tagger_channels))
-    # img_arrs = []
+    img_arrs = []
     for i, channels in enumerate(time_tagger_channels):
         time_events, metadata = load_timetagger_data(
             use_latest_tt_file, GET_TIME_EVENTS_PER_SECOND, time_tagger_files_dir, channels)
-    #     print('here')
-    #     data_for_analysis, img_arr = analyze_data(time_events, metadata)
-    #     img_arrs.append(img_arr)
 
-    # axs[i].imshow(img_arr, cmap='Greys')
-    # plt.tick_params(
-    #     axis='x',          # changes apply to the x-axis
-    #     which='both',      # both major and minor ticks are affected
-    #     bottom=False,      # ticks along the bottom edge are off
-    #     top=False,         # ticks along the top edge are off
-    #     labelbottom=False
-    # )  # labels along the bottom edge are off
-    # # plt.show()
-    # with open('decoded_image_arrays_46dbm', 'wb') as f:
-    #     pickle.dump(img_arrs, f)
+        if ANALYZE_DATA:
+            data_for_analysis, img_arr = analyze_data(time_events, metadata)
+            img_arrs.append(img_arr)
 
-    with open('decoded_image_arrays_46dbm', 'rb') as f:
-        decoded_imgs = pickle.load(f)
+    if ANALYZE_DATA:
+        with open('decoded_image_arrays_46dbm', 'wb') as f:
+            pickle.dump(img_arrs, f)
+        decoded_imgs = img_arrs
+    else:
+        with open('decoded_image_arrays_46dbm', 'rb') as f:
+            decoded_imgs = pickle.load(f)
 
     IMG_SHAPE = metadata.get('IMG_SHAPE')
     PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')

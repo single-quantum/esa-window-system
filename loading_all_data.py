@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def LoadData(path_input, overwrite_file=False, generate=False):
+def load_data(path_input, overwrite_file=False, generate=False, debug_mode=False):
     ppm_orders = {}
     last_ppm_number = -1
     metadata: dict = {}
@@ -30,11 +30,10 @@ def LoadData(path_input, overwrite_file=False, generate=False):
                 ppm_orders[ppm_order] = dat
             elif ('metadata' in file_name):
                 metadata_file_path = os.path.join(dir_path, file_name)
-                DEBUG_MODE = True
-                decode_from_time_tagger.DEBUG_MODE = True
+                decode_from_time_tagger.DEBUG_MODE = debug_mode
                 if (generate):
                     for i in range(1, 5):
-                        output_data_filename = 'output_'+str(i)+'_channel_B'
+                        output_data_filename = f'output_{i}_channel_B'
                         time_tagger_channels = np.arange(i)
                         print(os.path.join(dir_path, output_data_filename),
                               os.path.isfile(os.path.join(dir_path, output_data_filename)))
@@ -42,8 +41,9 @@ def LoadData(path_input, overwrite_file=False, generate=False):
                             try:
                                 time_events, metadata = decode_from_time_tagger.load_timetagger_data(
                                     True, True, dir_path, time_tagger_channels)
-                            except:
+                            except Exception as e:
                                 print(f"Can't load file {metadata_file_path}")
+                                print(e)
                             try:
                                 data_for_analysis = decode_from_time_tagger.analyze_data(time_events, metadata)
                                 data_for_analysis['time_tagger_channels'] = time_tagger_channels
@@ -53,13 +53,13 @@ def LoadData(path_input, overwrite_file=False, generate=False):
                                 print(f"Can't decode file {metadata_file_path}")
                                 print(e)
                         else:
-                            print('Skipped creating file'+output_data_filename)
+                            print(f'Skipped creating file {output_data_filename}')
                 for i in range(1, 5):
                     try:
                         dat = decode_from_time_tagger.load_output_data(dir_path, 'output_'+str(i)+'_channel_B')
                         ppm_orders[last_ppm_number][ppm_order].append(dat)
                     except:
-                        print('Cant load'+metadata_file_path)
+                        print(f'Cant load {metadata_file_path}')
 
     return ppm_orders
 
@@ -69,8 +69,8 @@ if __name__ == '__main__':
     sent_pulses_per_second = 44.10e6
     attenuation_range = np.arange(40, 50)
 
-    data = LoadData(f'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\{ppm_order} ppm',
-                    overwrite_file=False, generate=True)
+    data = load_data(f'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\15-12-2023\\{ppm_order} ppm',
+                     overwrite_file=False, generate=True)
     print(data)
 
     plot_data = {i: {
