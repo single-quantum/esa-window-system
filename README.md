@@ -1,6 +1,6 @@
 # ESA window system
 
-This repo is used to simulate and test the Pulse Position Modulation (PPM) communication protocol. It is in part based on the CCSDS standard. The CCSDS recommended standard can be found [here](https://public.ccsds.org/Pubs/142x0b1.pdf), or via the [overview](https://public.ccsds.org/publications/BlueBooks.aspx) (Document number CCSDS 142.0-B-1). It should be noted that the standard is not followed completely, but rather used as a guideline for the encoding and decoding process. Most notably, iterative decoding is not used.
+This repo is used to simulate and test the Pulse Position Modulation (PPM) communication protocol. It is in part based on the CCSDS standard. The CCSDS recommended standard can be found [here](https://public.ccsds.org/Pubs/142x0b1.pdf), or via the [overview](https://public.ccsds.org/publications/BlueBooks.aspx) (Document number CCSDS 142.0-B-1). It should be noted that the standard is not followed completely, but rather used as a guideline for the encoding and decoding process. 
 
 ## Nomenclature
 | Variable | Description                                                     |
@@ -30,3 +30,5 @@ For convenience, there are three high level functions that can be used to encode
 - `decode`: Decodes a slot mapped sequence, given M and a code rate.
 - `demodulate`: This function is used to convert a sequence of timestamps to PPM symbols.
 
+## Contact
+In case you have any questions or suggestions for the code, feel free to contact me at h.vlot@singlequantum.com
