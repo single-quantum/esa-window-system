@@ -153,6 +153,7 @@ def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float,
                   simulate_lost_symbols=False, detection_efficiency: float = 1):
     output_sequence = deepcopy(input_sequence)
     rng = default_rng()
+    lost_symbols = [None for _ in range(input_sequence.shape[0])]
     if simulate_lost_symbols:
         lost_symbols = np.array(rng.random(input_sequence.shape[0]) >= detection_efficiency)
 
@@ -163,14 +164,12 @@ def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float,
         j = np.where(row == 1)[0][0]
         row += poisson_dist_noise_slots[i]
         if not (simulate_lost_symbols and lost_symbols[i]):
-            #     row[j] = poisson_dist_noise_slots[i, j]
-            # else:
             row[j] = poisson_dist_signal_slots[i, j]
 
     return output_sequence
 
 
-def flatten(list_of_lists):
+def flatten(list_of_lists: list[list]) -> list:
     """Convert a list of lists to a flat (1D) list. """
     return [i for sublist in list_of_lists for i in sublist]
 
