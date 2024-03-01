@@ -3,7 +3,7 @@ from copy import deepcopy
 from fractions import Fraction
 from functools import lru_cache
 from itertools import chain
-from math import exp
+from math import exp, prod
 
 import numpy as np
 import numpy.typing as npt
@@ -15,7 +15,7 @@ from core.encoder_functions import (bit_deinterleave, bit_interleave,
                                     get_remap_indices,
                                     randomize, unpuncture)
 from core.scppm_encoder import puncture
-from core.trellis import Trellis
+from core.trellis import Trellis, Edge
 from core.utils import (flatten, generate_inner_encoder_edges,
                         generate_outer_code_edges, poisson_noise)
 
@@ -48,7 +48,8 @@ def max_star(a: float, b: float) -> float:
         return max(a, b) + max_log_lookup[(int(round(a)), int(round(b)))]
 
 
-def max_star_recursive(arr):
+def max_star_recursive(arr: list | npt.NDArray) -> float:
+    """Recursive implementation of the max star operator. """
     result = max_star(arr[0], arr[1])
     i = 2
     while i < len(arr):
@@ -58,13 +59,16 @@ def max_star_recursive(arr):
     return result
 
 
-def calculate_alphas(trellis, log_bcjr=True, verbose=False) -> None:
+def calculate_alphas(trellis: Trellis, log_bcjr: bool=True, verbose: bool=False) -> None:
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
     It says something about the likelihood of being in that state,
     given the history of the received sequence up to that state.
-    Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. """
+    Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. 
+    
+    `log_bcjr` determines whether or not to take the log of alpha, which turns a multiplication into a sum. 
+    For more information, see Moison and Hamkins (2005), section 3.C."""
     if verbose:
         print('Calculating alphas')
 
@@ -74,29 +78,28 @@ def calculate_alphas(trellis, log_bcjr=True, verbose=False) -> None:
         trellis.stages[0].states[1].alpha = -np.inf
         trellis.stages[0].states[2].alpha = -np.inf
         trellis.stages[0].states[3].alpha = -np.inf
-
     else:
         trellis.stages[0].states[0].alpha = 1
 
-    time_steps = len(trellis.stages)
+    time_steps: int = len(trellis.stages)
 
     for i in tqdm(range(1, time_steps), leave=False):
         for state in trellis.stages[i].states:
-            alpha_ji = []
+            alpha_ji: list[float] = []
 
             # Get a list of all edges in the previous stage
             previous_states = trellis.stages[i - 1].states
             previous_edges = list(chain(*map(lambda s: s.edges, previous_states)))
 
             # Find all the edges that go to the current state
-            edges = list(filter(lambda e: e.to_state == state.label, previous_edges))
+            edges: list[Edge] = list(filter(lambda e: e.to_state == state.label, previous_edges))
 
             for edge in edges:
                 previous_state = previous_states[edge.from_state]
                 if log_bcjr:
                     alpha_ji.append(previous_state.alpha + edge.gamma)
                 else:
-                    alpha_ji.append(edge.alpha * edge.gamma)
+                    alpha_ji.append(previous_state.alpha * edge.gamma)
 
             if log_bcjr and len(alpha_ji) > 1:
                 state.alpha = max_star_recursive(alpha_ji)
@@ -264,7 +267,7 @@ def calculate_gamma_primes(trellis: Trellis):
     return gamma_prime
 
 
-def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False) -> npt.NDArray[np.float_]:
+def calculate_LLRs(trellis, log_bcjr=True, verbose=False) -> npt.NDArray[np.float_]:
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -275,44 +278,37 @@ def calculate_LLRs(trellis, alpha, beta, log_bcjr=True, verbose=False) -> npt.ND
     """
     if verbose:
         print('Calculate log likelihoods')
-    time_steps = len(trellis.stages) - 1
+    time_steps: int = len(trellis.stages) - 1
     LLR = np.zeros(time_steps, dtype=float)
 
     # The last stage has no edges
     for t, stage in enumerate(trellis.stages[:-1]):
-        numerator = 0
-        denomenator = 0
-
-        a = []
-        b = []
+        numerator = []
+        denomenator = []
         for state in stage.states:
             for edge in state.edges:
-                from_state = edge.from_state
                 to_state = edge.to_state
 
-                if log_bcjr:
-                    if edge.edge_input == 1:
-                        a.append(state.alpha + edge.gamma + trellis.stages[t + 1].states[to_state].beta)
-                    else:
-                        b.append(state.alpha + edge.gamma + trellis.stages[t + 1].states[to_state].beta)
+                likelihood_terms = [state.alpha, edge.gamma, trellis.stages[t + 1].states[to_state].beta]
+                likelihood = sum(likelihood_terms) if log_bcjr else prod(likelihood_terms)
+
+                if edge.edge_input == 1:
+                    numerator.append(likelihood)
                 else:
-                    if edge.edge_input == 1:
-                        numerator += alpha[from_state, t] * edge.gamma * beta[to_state, t + 1]
-                    else:
-                        denomenator += alpha[from_state, t] * edge.gamma * beta[to_state, t + 1]
+                    denomenator.append(likelihood)
 
         if not log_bcjr:
-            LLR[t] = np.log(numerator / denomenator)
+            LLR[t] = np.log(sum(numerator) / sum(denomenator))
             continue
 
         # When leaving from the first state in the first timestep, there's only two transitions possible
-        if len(a) == 1 and len(b) == 1:
-            LLR[t] = a[0] - b[0]
+        if len(numerator) == 1 and len(denomenator) == 1:
+            LLR[t] = numerator[0] - denomenator[0]
         # Termination phase
-        elif len(a) == 0 and len(b) >= 1:
+        elif len(numerator) == 0 and len(denomenator) >= 1:
             LLR[t] = -np.inf
         else:
-            LLR[t] = max_star_recursive(a) - max_star_recursive(b)
+            LLR[t] = max_star_recursive(numerator) - max_star_recursive(denomenator)
 
     return LLR
 
@@ -422,9 +418,9 @@ def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=Fals
 
     # Calculate alphas, betas, gammas and LLRs
     calculate_gammas(trellis, received_sequence, trellis.num_output_bits, Es, N0, log_bcjr=LOG_BCJR)
-    alpha = calculate_alphas(trellis, log_bcjr=LOG_BCJR)
-    beta = calculate_betas(trellis, log_bcjr=LOG_BCJR)
-    LLRs = calculate_LLRs(trellis, alpha, beta, log_bcjr=LOG_BCJR)
+    calculate_alphas(trellis, log_bcjr=LOG_BCJR)
+    calculate_betas(trellis, log_bcjr=LOG_BCJR)
+    LLRs = calculate_LLRs(trellis, log_bcjr=LOG_BCJR)
 
     if verbose:
         print('Message decoded')
@@ -459,16 +455,23 @@ def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt
 
 
 def pi_ck(input_sequence, ns, nb):
+    """Calculate symbol log likelihood, based on likelihoods from the channel (Poisson statistics). 
+    
+    This formula is given in Moision on page 12, below formula 13. 
+    """
     output_sequence = deepcopy(input_sequence)
 
-    for i, row in enumerate(output_sequence):
-        output_sequence[i] = np.array([np.log((((ns + nb) ** x) *
-                                               np.exp(-ns)) / (nb ** x)) for x in row])
+    for i, channel_likelihoods in enumerate(output_sequence):
+        # I don't know why, but the equation for pi_ck (), seemingly needs to be corrected with log(ns/nb). 
+        output_sequence[i] = np.array([cl*np.log(1+ns/nb) for cl in channel_likelihoods])/np.log(ns/nb)
 
     return output_sequence
 
 
 def pi_ak(PPM_symbol_vector, bit_LLRs):
+    """Calculate symbol log likelihood, based on bit likelihoods from outer SISO
+    
+    This formula is given in Moision on page 9, below formula 10. """
     return sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
 
 

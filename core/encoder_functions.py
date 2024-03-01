@@ -403,7 +403,6 @@ def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True) -> npt.NDArray
 
     # Insert guard slot (M / 4 zeros) for each slot map, if applicable
     if insert_guardslots:
-        slot_mapped = np.hstack(
-            (slot_mapped, np.zeros((M // 4, slot_mapped.shape[0])).T))
+        slot_mapped = np.hstack((slot_mapped, np.zeros((M // 4, slot_mapped.shape[0]), dtype=int).T))
 
     return slot_mapped
