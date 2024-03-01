@@ -7,13 +7,14 @@ import numpy.typing as npt
 
 from esawindowsystem.core.shift_register import CRC
 
+BitArray = npt.NDArray[np.int_]
 
 def validate_PPM_order(M: int):
     if M not in (4, 8, 16, 32, 64, 128, 256):
         raise ValueError("M should be one of 4, 8, 16, 32, 64, 128 or 256")
 
 
-def get_asm_bit_arr(asm_hex: str = '1ACFFC1D') -> npt.NDArray:
+def get_asm_bit_arr(asm_hex: str = '1ACFFC1D') -> BitArray:
     """Returns the binary representation of the Attached Synchronisation Markerk, as defined by the CCSDS. """
     ASM_binary = np.binary_repr(int(asm_hex, base=16), width=32)
     ASM_arr = np.array([int(i) for i in ASM_binary])
@@ -21,7 +22,7 @@ def get_asm_bit_arr(asm_hex: str = '1ACFFC1D') -> npt.NDArray:
     return ASM_arr.astype(int)
 
 
-def prepend_asm(arr) -> npt.NDArray:
+def prepend_asm(arr: BitArray) -> BitArray:
     """Prepend `arr` with the Attached Synchronization Marker. """
     ASM_arr = get_asm_bit_arr()
     # Tile the ASM, such that it vertically, so that it can be stacked to the reshaped array
@@ -30,15 +31,15 @@ def prepend_asm(arr) -> npt.NDArray:
     return np.hstack((asm_bit_array, arr))
 
 
-def generate_pseudo_randomized_sequence(seed: list = [1] * 8):
+def generate_pseudo_randomized_sequence(seed: list[int] = [1] * 8) -> list[int]:
     """Generate the pseudo randomized sequence, as defined in the CCSDS standard. """
-    sequence = []
+    sequence: list[int] = []
 
     sequence.append(seed[-1])
 
-    addition_1 = seed[4] ^ seed[7]
-    addition_2 = seed[2] ^ addition_1
-    addition_3 = seed[0] ^ addition_2
+    addition_1: int = seed[4] ^ seed[7]
+    addition_2: int = seed[2] ^ addition_1
+    addition_3: int = seed[0] ^ addition_2
 
     output = np.roll(seed, 1).tolist()
     output[0] = addition_3
@@ -62,7 +63,7 @@ def generate_pseudo_randomized_sequence(seed: list = [1] * 8):
     return sequence
 
 
-def randomize(information_blocks: npt.NDArray) -> npt.NDArray:
+def randomize(information_blocks: BitArray) -> BitArray:
     """Pseudo randomize the information blocks, using the shift register defined by the CCSDS.
 
     Note that performing the randomize function twice gives back the de-randomized sequence. """
@@ -92,7 +93,7 @@ def randomize(information_blocks: npt.NDArray) -> npt.NDArray:
     return output_array
 
 
-def append_CRC(arr: npt.NDArray):
+def append_CRC(arr: BitArray):
     # Fill the input array `arr` with 32 zeros, so that the CRC can be attached
     CRC_size = 32
     arr = np.pad(arr, (0, CRC_size))
@@ -111,8 +112,8 @@ def append_CRC(arr: npt.NDArray):
     return np.pad(arr, (0, 2))
 
 
-def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
-           len_CRC: int = 32, num_termination_bits: int = 2) -> npt.NDArray:
+def slicer(arr: BitArray, code_rate: Fraction, include_crc: bool = False,
+           len_CRC: int = 32, num_termination_bits: int = 2) -> BitArray:
     """Slice the input array into information blocks, based on the code rate. """
 
     # For a code rate of 1/3, the information block size is 5006.
@@ -132,8 +133,8 @@ def slicer(arr: npt.NDArray, code_rate: Fraction, include_crc: bool = False,
     return arr
 
 
-def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction,
-               dtype: type[int] | type[float] = int) -> npt.NDArray[np.int_]:
+def unpuncture(encoded_sequence: BitArray, code_rate: Fraction,
+               dtype: type[int] | type[float] = int) -> BitArray:
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
         Fraction(1, 2): [1, 1, 0, 1, 1, 0],
@@ -154,8 +155,8 @@ def unpuncture(encoded_sequence: npt.NDArray[np.int_], code_rate: Fraction,
     return unpunctured_sequence
 
 
-def puncture(convoluted_bit_sequence: npt.NDArray[np.int_],
-             code_rate: Fraction, dtype: type[int] | type[float] = int) -> npt.NDArray[np.int_]:
+def puncture(convoluted_bit_sequence: npt.NDArray[np.int_ | np.float_],
+             code_rate: Fraction, dtype: type[int] | type[float] = int) -> BitArray:
     """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """
     puncture_scheme: dict[Fraction, list[int]] = {
         Fraction(1, 3): [1, 1, 1, 1, 1, 1],
@@ -167,7 +168,7 @@ def puncture(convoluted_bit_sequence: npt.NDArray[np.int_],
     # "3.8.2.3.2 The puncturing shall be accomplished using the following procedure:"
     # (See page 3-12 of the CCSDS 142.0-B-1 blue book, August 2019 edition)
 
-    convolutional_codewords: npt.NDArray[np.int_] = np.zeros(
+    convolutional_codewords: BitArray = np.zeros(
         (convoluted_bit_sequence.shape[0], int(convoluted_bit_sequence.shape[1] / (3 * float(code_rate)))), dtype=dtype
     )
     P = puncture_scheme[code_rate]
@@ -181,12 +182,12 @@ def puncture(convoluted_bit_sequence: npt.NDArray[np.int_],
     return convolutional_codewords
 
 
-def zero_terminate(arr: npt.NDArray, num_termination_bits: int = 2) -> npt.NDArray:
+def zero_terminate(arr: BitArray, num_termination_bits: int = 2) -> BitArray:
     zero_bits = np.zeros((arr.shape[0], num_termination_bits), dtype=int)
     return np.hstack((arr, zero_bits))
 
 
-def accumulate(arr: npt.NDArray) -> npt.NDArray:
+def accumulate(arr: BitArray) -> BitArray:
     """Accumulate XOR-wise `arr` with itself. """
     n_j = np.zeros_like(arr)
     n_j[0] = arr[0]
@@ -197,8 +198,8 @@ def accumulate(arr: npt.NDArray) -> npt.NDArray:
 
 
 def convolve(
-        arr: npt.NDArray[np.int_] | tuple[int, ...],
-        initial_state: tuple[int, int] = (0, 0)) -> tuple[npt.NDArray[np.int_], tuple[int, ...]]:
+        arr: BitArray | tuple[int, ...],
+        initial_state: tuple[int, int] = (0, 0)) -> tuple[BitArray, tuple[int, ...]]:
     """Use a convolutional shift register to generate a convoluted codeword.
     
     For more details on the convolutional encoder see CCSDS blue book 142.0-B-1, section 3.8.2 (August 2019)"""
@@ -206,11 +207,11 @@ def convolve(
     # convolutional codeword
 
     num_windows: int = arr.shape[0] if isinstance(arr, np.ndarray) else len(arr)
-    convolutional_codeword: npt.NDArray[np.int_] = np.zeros(3 * num_windows, dtype=int)
+    convolutional_codeword: BitArray = np.zeros(3 * num_windows, dtype=int)
 
     # To initialize `arr`, add the initial state.
     arr = np.hstack((tuple(reversed(initial_state)), arr))
-    f: npt.NDArray[np.int_] = np.array([])
+    f: BitArray = np.array([])
 
     for i in range(num_windows):
         f = arr[i:i + 3]
@@ -223,7 +224,7 @@ def convolve(
     return convolutional_codeword, terminal_state
 
 
-def map_PPM_symbols(arr, m: int):
+def map_PPM_symbols(arr: list[int] | BitArray, m: int):
     """Map input array of bits to PPM symbols. """
     # Input validation
     validate_PPM_order(2**m)
@@ -255,7 +256,7 @@ def map_PPM_symbols(arr, m: int):
     return output_arr
 
 
-def bit_interleave(arr: npt.NDArray, dtype: type[int] | type[float] = int) -> npt.NDArray:
+def bit_interleave(arr: BitArray, dtype: type[int] | type[float] = int) -> BitArray:
     """Shuffle some bits around to make a so-called bit-interleaved codeword.
 
     Note: works only with 15120 element arrays. The modulo 15120 is hard coded for a reason.
@@ -275,14 +276,14 @@ def bit_interleave(arr: npt.NDArray, dtype: type[int] | type[float] = int) -> np
     return interleaved_output
 
 
-def bit_deinterleave(arr: np.ndarray | list[float], dtype: Any = int) -> npt.NDArray[np.int_]:
+def bit_deinterleave(arr: BitArray | list[float], dtype: Any = int) -> BitArray:
     """De-interleave the interleaved array `arr`.
 
     Note: works only with 15120 element arrays. """
 
     assert len(arr) == 15120, "Input array should have length 15120"
 
-    deinterleaved_array: np.ndarray = np.zeros_like(arr).astype(dtype)
+    deinterleaved_array: BitArray = np.zeros_like(arr).astype(dtype)
 
     # pi_j is the new index for the interleaved array
     for j in range(deinterleaved_array.shape[0]):
@@ -292,7 +293,7 @@ def bit_deinterleave(arr: np.ndarray | list[float], dtype: Any = int) -> npt.NDA
     return deinterleaved_array
 
 
-def channel_interleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray[np.int_]:
+def channel_interleave(arr: BitArray, B: int, N: int) -> BitArray:
     """Use N slots of linear shift registers to interleave the PPM symbols.
 
     - Input:
@@ -322,12 +323,12 @@ def channel_interleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray
         else:
             output.append(arr[i])
 
-    output_array: npt.NDArray[np.int_] = np.array(output, dtype=int)
+    output_array: BitArray = np.array(output, dtype=int)
 
     return output_array
 
 
-def get_remap_indices(input_array, B, N):
+def get_remap_indices(input_array: BitArray, B: int, N: int):
     remap_indeces: list[int] = []
 
     remap_indeces.append(0)
@@ -340,7 +341,7 @@ def get_remap_indices(input_array, B, N):
     return remap_indeces
 
 
-def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArray[np.int_]:
+def channel_deinterleave(arr: BitArray, B: int, N: int) -> BitArray:
     """Use N slots of linear shift registers to interleave the PPM symbols.
 
     - Input:
@@ -349,7 +350,7 @@ def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArr
         - `N`: Number of rows
     """
     arr = np.array(arr, dtype=int)
-    output: list = []
+    output: list[npt.NDArray[np.int_]] = []
     interleaver_remap_indices = get_remap_indices(arr, B, N)
 
     # Indeces < 0 indicate initial interleaver state bits, which is set at 0.
@@ -366,12 +367,12 @@ def channel_deinterleave(arr: npt.NDArray[np.int_], B: int, N: int) -> npt.NDArr
         else:
             output.append(arr[i])
 
-    output_arr: npt.NDArray[np.int_] = np.array(output, dtype=int)
+    output_arr: BitArray = np.array(output, dtype=int)
 
     return output_arr
 
 
-def get_csm(M: int = 16) -> npt.NDArray[np.int_]:
+def get_csm(M: int = 16) -> BitArray:
     validate_PPM_order(M)
 
     match M:
@@ -385,7 +386,7 @@ def get_csm(M: int = 16) -> npt.NDArray[np.int_]:
     return w
 
 
-def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True) -> npt.NDArray[np.int_]:
+def slot_map(ppm_symbols: npt.NDArray[np.int_] | list[int], M: int, insert_guardslots: bool = True) -> BitArray:
     """Convert each PPM symbol to a list of ones and zeros, where the one indicates the position of the PPM pulse.
 
     For example, with a PPM order of 4, and a PPM symbol 3, the slot mapped vector would be [0, 0, 0, 1, 0]"""
@@ -399,7 +400,7 @@ def slot_map(ppm_symbols, M: int, insert_guardslots: bool = True) -> npt.NDArray
     if not np.all(ppm_symbols < M):
         raise ValueError(f"All PPM symbols should be smaller than {M}")
 
-    slot_mapped: npt.NDArray[np.int_] = np.zeros((len(ppm_symbols), M), dtype=int)
+    slot_mapped: BitArray = np.zeros((len(ppm_symbols), M), dtype=int)
     for j in range(len(ppm_symbols)):
         slot_mapped[j, ppm_symbols[j]] = 1
 
