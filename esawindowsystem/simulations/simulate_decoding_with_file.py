@@ -13,14 +13,14 @@ from numpy.random import default_rng
 from PIL import Image
 from scipy.signal import find_peaks
 
-from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
-from core.demodulation_functions import demodulate
-from core.encoder_functions import map_PPM_symbols
-from ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, M, slot_length, num_samples_per_slot,
+from esawindowsystem.core.BCJR_decoder_functions import ppm_symbols_to_bit_array
+from esawindowsystem.core.demodulation_functions import demodulate
+from esawindowsystem.core.encoder_functions import map_PPM_symbols
+from esawindowsystem.ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, M, slot_length, num_samples_per_slot,
                             sample_size_awg, num_slots_per_symbol, symbol_length)
-from core.scppm_decoder import DecoderError, decode
-from core.trellis import Trellis
-from core.utils import flatten
+from esawindowsystem.core.scppm_decoder import DecoderError, decode
+from esawindowsystem.core.trellis import Trellis
+from esawindowsystem.core.utils import flatten
 
 
 def print_parameter(parameter_str: str, parameter, spacing: int = 30):

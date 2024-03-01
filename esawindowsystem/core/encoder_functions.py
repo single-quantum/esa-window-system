@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from core.shift_register import CRC
+from esawindowsystem.core.shift_register import CRC
 
 
 def validate_PPM_order(M: int):
@@ -197,13 +197,15 @@ def accumulate(arr: npt.NDArray) -> npt.NDArray:
 
 
 def convolve(
-        arr: npt.NDArray[np.int_],
-        initial_state: tuple[int, int] = (0, 0)) -> tuple[npt.NDArray[np.int_], tuple[Any, ...]]:
-    """Use a convolutional shift register to generate a convoluted codeword. """
+        arr: npt.NDArray[np.int_] | tuple[int, ...],
+        initial_state: tuple[int, int] = (0, 0)) -> tuple[npt.NDArray[np.int_], tuple[int, ...]]:
+    """Use a convolutional shift register to generate a convoluted codeword.
+    
+    For more details on the convolutional encoder see CCSDS blue book 142.0-B-1, section 3.8.2 (August 2019)"""
     # Number of sliding windows that are iterated over to generate the
     # convolutional codeword
 
-    num_windows: int = arr.shape[0]
+    num_windows: int = arr.shape[0] if isinstance(arr, np.ndarray) else len(arr)
     convolutional_codeword: npt.NDArray[np.int_] = np.zeros(3 * num_windows, dtype=int)
 
     # To initialize `arr`, add the initial state.
@@ -216,7 +218,7 @@ def convolve(
         h = [f[2] ^ f[0], f[0] ^ f[1] ^ f[2], f[0] ^ f[1] ^ f[2]]
         convolutional_codeword[3 * i:3 * i + 3] = h
 
-    terminal_state: tuple[Any, ...] = tuple(np.flip(f[1:]))
+    terminal_state: tuple[int, ...] = tuple(np.flip(f[1:]))
 
     return convolutional_codeword, terminal_state
 

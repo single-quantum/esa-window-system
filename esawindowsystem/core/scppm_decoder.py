@@ -4,12 +4,12 @@ from fractions import Fraction
 import numpy as np
 import numpy.typing as npt
 
-from core.BCJR_decoder_functions import (pi_ck, ppm_symbols_to_bit_array,
+from esawindowsystem.core.BCJR_decoder_functions import (pi_ck, ppm_symbols_to_bit_array,
                                          predict, predict_iteratively)
-from core.encoder_functions import (bit_deinterleave, channel_deinterleave,
+from esawindowsystem.core.encoder_functions import (bit_deinterleave, channel_deinterleave,
                                     get_csm, randomize, slot_map, unpuncture)
-from core.trellis import Trellis
-from core.utils import (bpsk_encoding, generate_outer_code_edges,
+from esawindowsystem.core.trellis import Trellis
+from esawindowsystem.core.utils import (bpsk_encoding, generate_outer_code_edges,
                         get_BER_before_decoding, poisson_noise)
 
 

@@ -8,13 +8,13 @@ import numpy as np
 import numpy.typing as npt
 import TimeTagger
 
-from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
-from core.data_converter import payload_to_bit_sequence
-from core.demodulation_functions import demodulate
-from core.encoder_functions import map_PPM_symbols
-from core.scppm_decoder import decode
-from core.utils import flatten
-from ppm_parameters import (CORRELATION_THRESHOLD, DEBUG_MODE, MESSAGE_IDX,
+from esawindowsystem.core.BCJR_decoder_functions import ppm_symbols_to_bit_array
+from esawindowsystem.core.data_converter import payload_to_bit_sequence
+from esawindowsystem.core.demodulation_functions import demodulate
+from esawindowsystem.core.encoder_functions import map_PPM_symbols
+from esawindowsystem.core.scppm_decoder import decode
+from esawindowsystem.core.utils import flatten
+from esawindowsystem.ppm_parameters import (CORRELATION_THRESHOLD, DEBUG_MODE, MESSAGE_IDX,
                             USE_INNER_ENCODER, USE_RANDOMIZER)
 
 """Read time tagger files from the Swabian Time Tagger Ultra. Required software for the time tagger can be found here:

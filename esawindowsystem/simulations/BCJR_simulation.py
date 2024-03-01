@@ -1,5 +1,4 @@
 # %%
-import itertools
 import math
 from fractions import Fraction
 
@@ -8,17 +7,17 @@ import numpy as np
 from numpy.random import default_rng
 from PIL import Image
 
-from core.BCJR_decoder_functions import (calculate_alphas, calculate_betas,
+from esawindowsystem.core.BCJR_decoder_functions import (calculate_alphas, calculate_betas,
                                          calculate_gammas, calculate_LLRs,
                                          ppm_symbols_to_bit_array)
-from core.encoder_functions import (bit_deinterleave, bit_interleave,
+from esawindowsystem.core.encoder_functions import (bit_deinterleave, bit_interleave,
                                     channel_deinterleave, channel_interleave,
                                     convolve, get_csm, map_PPM_symbols, slicer,
                                     zero_terminate)
 
-from core.trellis import Edge, Trellis
-from core.utils import AWGN, bpsk, bpsk_encoding, generate_outer_code_edges
-from simulations.viterbi import viterbi
+from esawindowsystem.core.trellis import Edge, Trellis
+from esawindowsystem.core.utils import AWGN, bpsk, bpsk_encoding, generate_outer_code_edges
+from esawindowsystem.simulations.viterbi import viterbi
 
 
 def rolling_window(a, size):

@@ -1,6 +1,6 @@
 from copy import copy, deepcopy
 
-from core.encoder_functions import map_PPM_symbols
+from esawindowsystem.core.encoder_functions import map_PPM_symbols
 
 
 class Edge:
@@ -24,8 +24,8 @@ class Edge:
             self,
             from_state: int,
             to_state: int,
-            edge_input: int | list[int],
-            edge_output: tuple,
+            edge_input: int | list[int] | tuple[int, ...],
+            edge_output: tuple[int, ...],
             gamma: float | None):
 
         self.from_state: int | None = from_state
@@ -101,6 +101,7 @@ class Trellis:
                   zero_terminated: bool = True
                   ) -> None:
         """Add edges to each state, as specified by the edges tuple. """
+        ending_state_labels: set[int]
         if zero_initiated:
             starting_state_labels: set[int] = {0}
 
@@ -111,7 +112,7 @@ class Trellis:
                     state = stage.states[state_label]
                     state.edges = deepcopy(edges[state.label])
 
-                ending_state_labels: set[int] = {e.to_state for e in state.edges if e.to_state}
+                ending_state_labels = {e.to_state for e in state.edges if e.to_state}
                 starting_state_labels = ending_state_labels
 
         start: int = self.memory_size if zero_initiated else 0
@@ -135,6 +136,6 @@ class Trellis:
             for state_label in starting_state_labels:
                 state_edges: list[Edge] = list(filter(lambda e: e.edge_input == 0, edges[state_label]))
                 stage.states[state_label].edges = deepcopy(state_edges)
-                ending_state_labels = ending_state_labels.union({e.to_state for e in state_edges})
+                ending_state_labels = ending_state_labels.union({e.to_state for e in state_edges if e.to_state})
 
             starting_state_labels = ending_state_labels

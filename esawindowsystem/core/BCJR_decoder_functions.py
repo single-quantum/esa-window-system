@@ -10,13 +10,13 @@ import numpy.typing as npt
 from numpy import dot
 from tqdm import tqdm
 
-from core.encoder_functions import (bit_deinterleave, bit_interleave,
+from esawindowsystem.core.encoder_functions import (bit_deinterleave, bit_interleave,
                                     channel_deinterleave, get_csm,
                                     get_remap_indices,
                                     randomize, unpuncture)
-from core.scppm_encoder import puncture
-from core.trellis import Trellis, Edge
-from core.utils import (flatten, generate_inner_encoder_edges,
+from esawindowsystem.core.scppm_encoder import puncture
+from esawindowsystem.core.trellis import Trellis, Edge
+from esawindowsystem.core.utils import (flatten, generate_inner_encoder_edges,
                         generate_outer_code_edges, poisson_noise)
 
 

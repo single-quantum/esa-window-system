@@ -1,7 +1,7 @@
 import os
 import re
 import pandas as pd
-import decode_from_time_tagger
+import esawindowsystem.decode_from_time_tagger as decode_from_time_tagger
 import matplotlib.pyplot as plt
 import numpy as np
 

@@ -8,9 +8,9 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
-from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
-from core.utils import tobits
-from ppm_parameters import GREYSCALE
+from esawindowsystem.core.BCJR_decoder_functions import ppm_symbols_to_bit_array
+from esawindowsystem.core.utils import tobits
+from esawindowsystem.ppm_parameters import GREYSCALE
 
 IMG_SUFFIXES: list[str] = [".png", ".jpg", ".jpeg"]
 

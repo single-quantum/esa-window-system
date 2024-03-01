@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-from core.BCJR_decoder_functions import predict_iteratively
-from core.data_converter import payload_to_bit_sequence
-from core.encoder_functions import (map_PPM_symbols, channel_deinterleave, slot_map)
-from core.scppm_encoder import encoder, get_csm
+from esawindowsystem.core.BCJR_decoder_functions import predict_iteratively
+from esawindowsystem.core.data_converter import payload_to_bit_sequence
+from esawindowsystem.core.encoder_functions import (map_PPM_symbols, channel_deinterleave, slot_map)
+from esawindowsystem.core.scppm_encoder import encoder, get_csm
 
 ###################
 # User parameters #

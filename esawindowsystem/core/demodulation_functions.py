@@ -6,9 +6,9 @@ import numpy as np
 import numpy.typing as npt
 from scipy.signal import find_peaks
 
-from core.encoder_functions import get_csm, slot_map
-from core.parse_ppm_symbols import parse_ppm_symbols
-from core.utils import flatten, moving_average
+from esawindowsystem.core.encoder_functions import get_csm, slot_map
+from esawindowsystem.core.parse_ppm_symbols import parse_ppm_symbols
+from esawindowsystem.core.utils import flatten, moving_average
 
 
 def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) -> npt.NDArray[np.int_]:
