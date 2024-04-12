@@ -1,5 +1,8 @@
 from copy import copy, deepcopy
 
+import numpy.typing as npt
+import numpy as np
+
 from esawindowsystem.core.encoder_functions import map_PPM_symbols
 
 
@@ -25,7 +28,7 @@ class Edge:
             from_state: int,
             to_state: int,
             edge_input: int | list[int] | tuple[int, ...],
-            edge_output: tuple[int, ...],
+            edge_output: npt.NDArray[np.int_] | list[int] | tuple[int, ...],
             gamma: float | None):
 
         self.from_state: int | None = from_state

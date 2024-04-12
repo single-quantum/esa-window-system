@@ -54,7 +54,7 @@ def save_figure(plt, name, dir):
     plt.savefig(p / Path(dir) / name)
 
 
-def bpsk(s: list | tuple | npt.NDArray) -> tuple[int, ...]: return tuple(1 if i else -1 for i in s)
+def bpsk(s: list[int] | tuple[int, ...] | npt.NDArray) -> tuple[int, ...]: return tuple(1 if i else -1 for i in s)
 
 
 def bpsk_encoding(input_sequence):
@@ -130,7 +130,7 @@ def generate_inner_encoder_edges(num_input_bits, bpsk_encoding=True):
                 current_state = output_bit
 
             if bpsk_encoding:
-                output = bpsk(output)
+                output = list(bpsk(output))
 
             e = Edge()
             e.set_edge(initial_state, current_state, input_bits, output, gamma=None)
@@ -170,7 +170,7 @@ def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float,
     return output_sequence
 
 
-def flatten(list_of_lists: list[list]) -> list:
+def flatten(list_of_lists: list[list] | list[npt.NDArray]) -> list:
     """Convert a list of lists to a flat (1D) list. """
     return [i for sublist in list_of_lists for i in sublist]
 
