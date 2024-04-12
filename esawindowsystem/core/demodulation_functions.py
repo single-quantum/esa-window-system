@@ -1,5 +1,5 @@
 import copy
-from statistics import mean
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,7 +37,7 @@ def determine_CSM_time_shift(
         time_stamps: npt.NDArray[np.float_],
         slot_length: float,
         CSM: npt.NDArray[np.int_],
-        num_slots_per_symbol: int) -> npt.NDArray:
+        num_slots_per_symbol: int) -> npt.NDArray[np.float_]:
     """ Determine the time shift that is needed to shift the CSM times to the beginning of a slot.
 
     Because the CSM times are found with a correlation relative to a random time event,
@@ -86,14 +86,14 @@ def get_csm_correlation(
         CSM: npt.NDArray[np.int_],
         symbol_length: float,
         csm_correlation_threshold: float = 0.6,
-        **kwargs):
+        **kwargs: tuple[str, Any]) -> npt.NDArray[np.int_]:
     # + 0.5 slot length because pulse times should be in the middle of a slot.
     csm_time_stamps = np.array([slot_length * CSM[i] + i * symbol_length for i in range(len(CSM))]) + 0.5 * slot_length
 
     A = make_time_series(time_stamps, slot_length)
     B = make_time_series(csm_time_stamps, slot_length)
 
-    corr: npt.NDArray = np.correlate(A, B, mode='valid')
+    corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
     correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
     if kwargs.get('debug_mode'):
         plt.figure()
@@ -108,7 +108,12 @@ def get_csm_correlation(
     return corr
 
 
-def force_peak_amount_correlation(correlation_positions, correlation_heights, correlation_heights_ordered, peak_amount):
+def force_peak_amount_correlation(
+    correlation_positions: npt.NDArray[np.int_],
+    correlation_heights: npt.NDArray[np.int_],
+    correlation_heights_ordered: npt.NDArray[np.int_],
+    peak_amount
+) -> tuple[npt.NDArray[np.int_], float]:
     try:
         current_threshold = correlation_heights_ordered[int(peak_amount)-1]
     except IndexError as e:
@@ -124,9 +129,9 @@ def find_csm_times(
         slot_length: float,
         symbols_per_codeword: int,
         num_slots_per_symbol: int,
-        csm_correlation,
+        csm_correlation: npt.NDArray[np.int_],
         csm_correlation_threshold: float = 0.6,
-        **kwargs
+        **kwargs: tuple[str, Any]
 ) -> npt.NDArray[np.float_]:
     """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
 
@@ -150,6 +155,7 @@ def find_csm_times(
     where_corr_heights = where_corr_heights['peak_heights']
     where_corr_heights_ordered = -np.sort(-where_corr_heights)
     if (len(where_corr_heights_ordered) >= int(expected_number_codewords_in_data)):
+        where_corr: npt.NDArray[np.int_]
         where_corr, current_threshold = force_peak_amount_correlation(
             where_corr_positions, where_corr_heights, where_corr_heights_ordered, expected_number_codewords_in_data)
     else:
@@ -269,7 +275,7 @@ def find_and_parse_codewords(
         slot_length: float,
         symbol_length: float,
         M: int,
-        **kwargs):
+        **kwargs: tuple[str, Any]):
     """Using the CSM times, find and parse (demodulate) PPM codewords from the given PPM pulse timestamps. """
     len_codeword: int = symbols_per_codeword + len(CSM)
     len_codeword_no_CSM: int = symbols_per_codeword
@@ -371,12 +377,12 @@ def get_num_events_per_slot(
 
 
 def demodulate(
-    pulse_timestamps: npt.NDArray,
+    pulse_timestamps: npt.NDArray[np.float_],
     M: int,
     slot_length: float,
     symbol_length: float,
-    csm_correlation_threshold=0.6,
-    **kwargs
+    csm_correlation_threshold: float = 0.6,
+    **kwargs: dict[str, Any]
 ) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_]]:
     """Demodulate the PPM pulse time stamps (convert the time stamps to PPM symbols).
 

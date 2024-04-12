@@ -1,5 +1,6 @@
 import pickle
 from copy import deepcopy
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -150,7 +151,7 @@ def parse_ppm_symbols(
         symbol_length: float,
         M: int,
         num_darkcounts: int = 0,
-        **kwargs) -> tuple[list[float], int]:
+        **kwargs: tuple[str, Any]) -> tuple[list[float], int]:
 
     symbols: list[float] = []
     num_symbol_frames: int = int(round((stop_time - codeword_start_time) / symbol_length))

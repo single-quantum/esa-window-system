@@ -10,11 +10,11 @@ import numpy.typing as npt
 from numpy.random import default_rng
 from tabulate import tabulate
 
-from esawindowsystem.core.encoder_functions import convolve
+from esawindowsystem.core.encoder_functions import convolve, BitArray
 from esawindowsystem.core.trellis import Edge
 from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
-                            M, N_interleaver, num_samples_per_slot,
-                            num_slots_per_symbol)
+                                            M, N_interleaver, num_samples_per_slot,
+                                            num_slots_per_symbol)
 
 
 def print_ppm_parameters():
@@ -57,9 +57,9 @@ def save_figure(plt, name, dir):
 def bpsk(s: list[int] | tuple[int, ...] | npt.NDArray) -> tuple[int, ...]: return tuple(1 if i else -1 for i in s)
 
 
-def bpsk_encoding(input_sequence):
+def bpsk_encoding(input_sequence: list[int] | BitArray) -> BitArray:
     """Use BPSK to modulate the bit array. """
-    output = np.zeros_like(input_sequence)
+    output: BitArray = np.zeros_like(input_sequence)
 
     for i, ri in enumerate(input_sequence):
         if ri == 0:
@@ -70,10 +70,10 @@ def bpsk_encoding(input_sequence):
     return output
 
 
-def tobits(s):
-    result = []
-    for c in s:
-        bits = bin(ord(c))[2:]
+def tobits(input_string: str) -> list[int]:
+    result: list[int] = []
+    for char in input_string:
+        bits = bin(ord(char))[2:]
         bits = '00000000'[len(bits):] + bits
         result.extend([int(b) for b in bits])
     return result
