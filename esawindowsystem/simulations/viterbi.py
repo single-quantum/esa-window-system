@@ -6,7 +6,8 @@ import itertools
 
 import numpy as np
 from tqdm import tqdm
-from core.utils import flatten
+from esawindowsystem.core.utils import flatten
+
 
 def euclidean_distance(a, b):
     return np.sqrt(sum([(a[i] - b[i])**2 for i in range(len(a))]))

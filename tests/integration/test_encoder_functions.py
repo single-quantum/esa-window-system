@@ -1,8 +1,8 @@
 import numpy as np
 
-from core.encoder_functions import (bit_deinterleave, bit_interleave,
-                               channel_deinterleave, channel_interleave)
-from ppm_parameters import B_interleaver, M, N_interleaver
+from esawindowsystem.core.encoder_functions import (bit_deinterleave, bit_interleave,
+                                                    channel_deinterleave, channel_interleave)
+from esawindowsystem.ppm_parameters import B_interleaver, M, N_interleaver
 
 
 def test_channel_interleaving():

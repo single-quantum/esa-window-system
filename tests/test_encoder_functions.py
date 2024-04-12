@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from core.encoder_functions import map_PPM_symbols, slot_map
+from esawindowsystem.core.encoder_functions import map_PPM_symbols, slot_map
 
 
 def test_map_PPM_symbols_3_bits_0():

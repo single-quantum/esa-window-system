@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 from numpy.random import default_rng
 
-from core.demodulation_functions import demodulate, determine_CSM_time_shift, make_time_series, find_csm_times, get_csm_correlation, find_and_parse_codewords
-from core.encoder_functions import get_csm
-from core.parse_ppm_symbols import parse_ppm_symbols
+from esawindowsystem.core.demodulation_functions import demodulate, determine_CSM_time_shift, make_time_series, find_csm_times, get_csm_correlation, find_and_parse_codewords
+from esawindowsystem.core.encoder_functions import get_csm
+from esawindowsystem.core.parse_ppm_symbols import parse_ppm_symbols
 import matplotlib.pyplot as plt
 
 

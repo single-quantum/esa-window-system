@@ -1,10 +1,10 @@
 from fractions import Fraction
 
 import numpy.typing as npt
-from numpy import log2
+from numpy import log2, int_
 from PIL import Image
 
-from core.encoder_functions import get_csm
+from esawindowsystem.core.encoder_functions import get_csm
 
 num_samples_per_slot: int = 10          # Number of DAC samples in one slot
 M: int = 16                             # each m = 4 bits are mapped from 0 to M = 16
@@ -54,7 +54,7 @@ BIT_INTERLEAVE: bool = True
 
 num_slots_per_symbol: int = int(slot_factor * M)
 
-CSM: npt.NDArray = get_csm(M)
+CSM: npt.NDArray[int_] = get_csm(M)
 
 sample_size_awg: float = 1 / DAC_DATA_RATE * 1E12       # Time duration of 1 DAC sample in ps
 slot_length: float = sample_size_awg * 1E-12 * num_samples_per_slot  # Length of 1 bin in time
