@@ -4,12 +4,12 @@ from fractions import Fraction
 import numpy as np
 import numpy.typing as npt
 
-from core.encoder_functions import (accumulate, bit_interleave,
+from esawindowsystem.core.encoder_functions import (accumulate, bit_interleave,
                                     channel_interleave, convolve, get_csm,
                                     map_PPM_symbols, puncture, randomize,
                                     slicer, slot_map, zero_terminate)
 
-from core.utils import ppm_symbols_to_bit_array
+from esawindowsystem.core.utils import ppm_symbols_to_bit_array
 
 
 def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction, **kwargs) -> npt.NDArray[np.int_]:

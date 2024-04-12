@@ -6,9 +6,9 @@ import numpy as np
 import numpy.typing as npt
 from scipy.signal import find_peaks
 
-from core.encoder_functions import get_csm, slot_map
-from core.parse_ppm_symbols import parse_ppm_symbols
-from core.utils import flatten, moving_average
+from esawindowsystem.core.encoder_functions import get_csm, slot_map
+from esawindowsystem.core.parse_ppm_symbols import parse_ppm_symbols
+from esawindowsystem.core.utils import flatten, moving_average
 
 
 def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) -> npt.NDArray[np.int_]:
@@ -131,8 +131,8 @@ def find_csm_times(
     """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
 
     correlation_threshold: int = int(np.max(csm_correlation) * csm_correlation_threshold)
-    amount_of_slots = len(make_time_series(time_stamps, slot_length))
-    print('the above line is double work')
+    amount_of_slots = round((time_stamps[-1]-time_stamps[0])/slot_length)
+
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
     where_corr: npt.NDArray[np.int_]
@@ -199,7 +199,6 @@ def find_csm_times(
         val = np.average(vals % 1)
         print(len(message_start_idxs))
         if (val <= (expected_number_messages % 1)):
-            print("yes")
             message_start_idxs, current_threshold = force_peak_amount_correlation(
                 message_start_postions, message_start_heights, message_start_heights_ordered, expected_number_messages+1)
 

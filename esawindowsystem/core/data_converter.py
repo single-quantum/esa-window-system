@@ -8,9 +8,9 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
-from core.BCJR_decoder_functions import ppm_symbols_to_bit_array
-from core.utils import tobits
-from ppm_parameters import GREYSCALE
+from esawindowsystem.core.BCJR_decoder_functions import ppm_symbols_to_bit_array
+from esawindowsystem.core.utils import tobits
+from esawindowsystem.ppm_parameters import GREYSCALE
 
 IMG_SUFFIXES: list[str] = [".png", ".jpg", ".jpeg"]
 
@@ -41,13 +41,13 @@ class DataConverter:
 
         return np.array(tobits(user_data))
 
-    def from_image(self, filepath: Path, greyscale=True) -> npt.NDArray[np.int_]:
+    def from_image(self, filepath: Path, greyscale: bool = True) -> npt.NDArray[np.int_]:
         """Take a filepath and convert the image to a bit stream. """
         _validate(filepath, Path)
         if filepath.suffix not in IMG_SUFFIXES:
             raise ValueError("File does not have the correct filetype. Should be one of .png, .jpg, or .jpeg")
 
-        img_mode = "L" if greyscale else "1"
+        img_mode: str = "L" if greyscale else "1"
 
         # In the case of greyscale, each pixel has a value from 0 to 255.
         # This would be the same as saying that each pixel is a symbol, which should be mapped to an 8 bit sequence.
@@ -55,8 +55,9 @@ class DataConverter:
             img_arr = np.asarray(Image.open(filepath).convert(img_mode))
             bit_array = ppm_symbols_to_bit_array(img_arr.flatten(), 8)
         else:
-            img = cv2.imread(str(filepath), 2)
-            ret, bw_img = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
+            bw_img: npt.NDArray[np.int_]
+            img: npt.NDArray[np.int_] = cv2.imread(str(filepath), 2)
+            _, bw_img = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
             bw_img = np.asarray(bw_img/255, dtype=int)
             
             # converting to its binary form

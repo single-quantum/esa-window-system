@@ -3,10 +3,10 @@ from fractions import Fraction
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from core.data_converter import payload_to_bit_sequence
-from core.encoder_functions import map_PPM_symbols
-from core.scppm_decoder import decode
-from core.scppm_encoder import encoder
+from esawindowsystem.core.data_converter import payload_to_bit_sequence
+from esawindowsystem.core.encoder_functions import map_PPM_symbols
+from esawindowsystem.core.scppm_decoder import decode
+from esawindowsystem.core.scppm_encoder import encoder
 
 # Definitions:
 # - M: PPM order, should be increment of 2**m with m in [2, 3, 4, ...]
@@ -46,7 +46,7 @@ sent_bits = payload_to_bit_sequence(payload_type, filepath=payload_file_path)
 # Put the payload through the encoder
 # Some extra settings can be passed through the encoder and decoder, like the length of the channel interleaver
 # or whether or not to save the encoded bit sequence to a file for reference.
-slot_mapped_sequence = encoder(
+slot_mapped_sequence, _, _ = encoder(
     sent_bits,
     M,
     code_rate,
@@ -54,14 +54,20 @@ slot_mapped_sequence = encoder(
         'user_settings': user_settings,
         'save_encoded_sequence_to_file': True,
         'reference_file_prefix': 'pillars_greyscale',
-        'num_samples_per_slot': 16
+        'num_samples_per_slot': 16,
+        'use_inner_encoder': True,
+        'use_randomizer': True
     })
 
 decoded_message = decode(
     slot_mapped_sequence,
     M,
     code_rate,
-    **{'user_settings': user_settings}
+    **{
+        'user_settings': user_settings,
+        'use_inner_encoder': True,
+        'use_randomizer': True
+    }
 )
 
 if payload_type == 'image':

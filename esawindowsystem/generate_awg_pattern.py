@@ -6,10 +6,10 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from core.data_converter import payload_to_bit_sequence
-from core.encoder_functions import slot_map
-from core.scppm_encoder import encoder
-from ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
+from esawindowsystem.core.data_converter import payload_to_bit_sequence
+from esawindowsystem.core.encoder_functions import slot_map
+from esawindowsystem.core.scppm_encoder import encoder
+from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
                             GREYSCALE, IMG_FILE_PATH, IMG_SHAPE, PAYLOAD_TYPE,
                             USE_INNER_ENCODER, USE_RANDOMIZER, B_interleaver,
                             M, N_interleaver, m, num_samples_per_slot,

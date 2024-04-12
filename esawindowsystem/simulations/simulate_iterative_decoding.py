@@ -8,21 +8,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-from core.BCJR_decoder_functions import (calculate_alphas, calculate_betas,
-                                         calculate_outer_SISO_LLRs,
-                                         map_PPM_symbols, pi_ck,
-                                         ppm_symbols_to_bit_array,
-                                         predict_inner_SISO,
-                                         predict_iteratively,
-                                         set_outer_code_gammas)
-from core.data_converter import payload_to_bit_sequence
-from core.encoder_functions import (bit_deinterleave, bit_interleave,
-                                    channel_deinterleave, randomize, slot_map,
-                                    unpuncture)
-from core.scppm_encoder import encoder, get_csm, puncture
-from core.trellis import Trellis
-from core.utils import (generate_inner_encoder_edges,
-                        generate_outer_code_edges, poisson_noise)
+from esawindowsystem.core.BCJR_decoder_functions import predict_iteratively
+from esawindowsystem.core.data_converter import payload_to_bit_sequence
+from esawindowsystem.core.encoder_functions import (map_PPM_symbols, channel_deinterleave, slot_map)
+from esawindowsystem.core.scppm_encoder import encoder, get_csm
 
 ###################
 # User parameters #
@@ -32,7 +21,7 @@ ns: float = 2.5      # Average number of photons in the signal slot
 nb: float = 0.1    # Average number of photons in the noise slot
 code_rate = Fraction(2, 3)
 detection_efficiency = 0.85
-simulate_lost_symbols = True
+simulate_lost_symbols = False
 
 greyscale = True
 colormap = 'L' if greyscale else '1'
@@ -61,7 +50,7 @@ information_block_sizes = {
 num_bits_per_slice = information_block_sizes[code_rate]
 num_symbols_per_slice = int(num_bits_per_slice * 1 / code_rate / m)
 
-slot_mapped_sequence = encoder(
+slot_mapped_sequence, _, _ = encoder(
     bit_stream,
     M, code_rate,
     **{

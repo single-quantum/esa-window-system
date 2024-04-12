@@ -6,7 +6,7 @@ import pickle
 
 import TimeTagger
 
-from ppm_parameters import CODE_RATE, M, num_samples_per_slot, IMG_FILE_PATH, GREYSCALE, slot_length, symbol_length, PAYLOAD_TYPE, IMG_SHAPE, USE_INNER_ENCODER, USE_RANDOMIZER
+from esawindowsystem.ppm_parameters import CODE_RATE, M, num_samples_per_slot, IMG_FILE_PATH, GREYSCALE, slot_length, symbol_length, PAYLOAD_TYPE, IMG_SHAPE, USE_INNER_ENCODER, USE_RANDOMIZER
 
 # num_channels = 4
 # channels = [i+1 for i in range(num_channels)]

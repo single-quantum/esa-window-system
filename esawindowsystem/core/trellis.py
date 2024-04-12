@@ -1,6 +1,9 @@
 from copy import copy, deepcopy
 
-from core.encoder_functions import map_PPM_symbols
+import numpy.typing as npt
+import numpy as np
+
+from esawindowsystem.core.encoder_functions import map_PPM_symbols
 
 
 class Edge:
@@ -10,8 +13,8 @@ class Edge:
 
     def __init__(self):
 
-        self.from_state = None
-        self.to_state = None
+        self.from_state: int | None = None
+        self.to_state: int | None = None
         self.edge_input = None
         self.edge_output = None
         # Used for the BCJR algorithm
@@ -24,12 +27,12 @@ class Edge:
             self,
             from_state: int,
             to_state: int,
-            edge_input: int | list[int],
-            edge_output: tuple,
+            edge_input: int | list[int] | tuple[int, ...],
+            edge_output: npt.NDArray[np.int_] | list[int] | tuple[int, ...],
             gamma: float | None):
 
-        self.from_state = from_state
-        self.to_state = to_state
+        self.from_state: int | None = from_state
+        self.to_state: int | None = to_state
         self.edge_input = edge_input
         self.edge_output = edge_output
         if isinstance(edge_input, int):
@@ -62,11 +65,11 @@ class State:
 
 
 class Stage:
-    def __init__(self, num_states, num_input_bits, time_step):
+    def __init__(self, num_states: int, num_input_bits: int, time_step: int):
         self.time_step = time_step
 
         # Initiate states (States here do not have edges yet)
-        self.states = tuple(State(i, 2**num_input_bits) for i in range(num_states))
+        self.states: tuple[State, ...] = tuple(State(i, 2**num_input_bits) for i in range(num_states))
 
     def __lt__(self, other):
         if not self.time_step:
@@ -87,7 +90,7 @@ class Trellis:
         self.num_states = 2**memory_size
 
         # The time_steps + 1-th stage has all states, but no edges. This is needed to properly calculate beta
-        self.stages = tuple(
+        self.stages: tuple[Stage, ...] = tuple(
             Stage(self.num_states, num_input_bits, time_step) for time_step in range(time_steps + 1)
         )
         # self.stages = sorted(self.stages)
@@ -101,21 +104,22 @@ class Trellis:
                   zero_terminated: bool = True
                   ) -> None:
         """Add edges to each state, as specified by the edges tuple. """
+        ending_state_labels: set[int]
         if zero_initiated:
             starting_state_labels: set[int] = {0}
 
-            state: State
             for i in range(self.memory_size):
+                state: State = self.stages[0].states[0]
                 stage: Stage = self.stages[i]
                 for state_label in starting_state_labels:
                     state = stage.states[state_label]
                     state.edges = deepcopy(edges[state.label])
 
-                ending_state_labels = {e.to_state for e in state.edges}
+                ending_state_labels = {e.to_state for e in state.edges if e.to_state}
                 starting_state_labels = ending_state_labels
 
-        start = self.memory_size if zero_initiated else 0
-        end = len(self.stages) - 1 - self.memory_size if zero_terminated else None
+        start: int = self.memory_size if zero_initiated else 0
+        end: int = len(self.stages) - 1 - self.memory_size if zero_terminated else -1
 
         for stage in self.stages[start:end]:
             for label, state in enumerate(stage.states):
@@ -128,13 +132,13 @@ class Trellis:
             return
 
         starting_state_labels = set({s.label for s in self.stages[end].states})
-        ending_state_labels: set[int] = set()
+        ending_state_labels = set()
         # Since there is one more stage than time steps, the last stage has no
         # edges. There is only one state with beta value.
         for stage in self.stages[end:-1]:
             for state_label in starting_state_labels:
                 state_edges: list[Edge] = list(filter(lambda e: e.edge_input == 0, edges[state_label]))
                 stage.states[state_label].edges = deepcopy(state_edges)
-                ending_state_labels = ending_state_labels.union({e.to_state for e in state_edges})
+                ending_state_labels = ending_state_labels.union({e.to_state for e in state_edges if e.to_state})
 
             starting_state_labels = ending_state_labels
