@@ -1,22 +1,25 @@
 import numpy as np
+import numpy.typing as npt
 import pytest
 from numpy.random import default_rng
+from typing import Any
 
 from esawindowsystem.core.demodulation_functions import demodulate, determine_CSM_time_shift, make_time_series, find_csm_times, get_csm_correlation, find_and_parse_codewords
 from esawindowsystem.core.encoder_functions import get_csm
 from esawindowsystem.core.parse_ppm_symbols import parse_ppm_symbols
-import matplotlib.pyplot as plt
 
 
 @pytest.fixture
-def pulse_timestamps_no_csm():
+def pulse_timestamps_no_csm() -> tuple[npt.NDArray[np.float_], dict[str, Any]]:
+    print(pytest.__version__)
     M = 8
     symbol_length = 5 / 4 * M * 0.1E-6
     slot_length = 0.1E-6
     num_symbols = 10
     CSM = get_csm(M)
 
-    pulse_timestamps = np.arange(0.5 * slot_length, num_symbols * symbol_length + 0.5 * slot_length, symbol_length)
+    pulse_timestamps: npt.NDArray[np.float_] = np.arange(
+        0.5 * slot_length, num_symbols * symbol_length + 0.5 * slot_length, symbol_length)
     ppm_params = {'M': M, 'symbol_length': symbol_length,
                   'slot_length': slot_length, 'num_symbols': num_symbols, 'CSM': CSM}
 
@@ -24,7 +27,7 @@ def pulse_timestamps_no_csm():
 
 
 @pytest.fixture
-def pulse_timestamps_with_csm():
+def pulse_timestamps_with_csm() -> tuple[npt.NDArray[np.float_], dict[str, Any]]:
     M = 8
     slot_length = 0.1E-6
     symbol_length = 5 / 4 * M * slot_length
@@ -33,7 +36,7 @@ def pulse_timestamps_with_csm():
     ppm_params = {'M': M, 'symbol_length': symbol_length,
                   'slot_length': slot_length, 'num_symbols': num_symbols, 'CSM': CSM}
 
-    CSM_timestamps = []
+    CSM_timestamps: list[float] = []
     for i, symbol in enumerate(CSM):
         timestamp = i * symbol_length + symbol * slot_length + 0.5 * slot_length
         CSM_timestamps.append(timestamp)
@@ -49,7 +52,7 @@ def pulse_timestamps_with_csm():
 
 
 @pytest.fixture
-def pulse_timestamps_single_csm():
+def pulse_timestamps_single_csm() -> tuple[npt.NDArray[np.float_], float, int, float]:
     slot_length = 1E-9
     num_slots_per_symbol = 10
     symbol_length = num_slots_per_symbol*slot_length
@@ -125,14 +128,14 @@ def test_demodulate_empty_array_raises_exception():
         _ = demodulate(np.array([]), 16, 1, 1)
 
 
-def test_demodulate_no_csm_raises_value_error(pulse_timestamps_no_csm):
+def test_demodulate_no_csm_raises_value_error(pulse_timestamps_no_csm: tuple[npt.NDArray[np.float_], dict[str, Any]]):
     pulse_timestamps, ppm_params = pulse_timestamps_no_csm
     M, symbol_length, slot_length, _, _ = ppm_params.values()
     with pytest.raises(ValueError):
         _ = demodulate(pulse_timestamps, M, slot_length, symbol_length)
 
 
-def test_demodulate_happy_path(pulse_timestamps_with_csm):
+def test_demodulate_happy_path(pulse_timestamps_with_csm: tuple[npt.NDArray[np.float_], dict[str, Any]]):
     pulse_timestamps, ppm_params = pulse_timestamps_with_csm
     M, symbol_length, slot_length, num_symbols, CSM = ppm_params.values()
 
@@ -143,9 +146,9 @@ def test_demodulate_happy_path(pulse_timestamps_with_csm):
     assert slot_mapped_sequence.shape[1] == int(5 / 4 * M)
 
 
-def test_csm_time_shift_happy_path(pulse_timestamps_with_csm):
+def test_csm_time_shift_happy_path(pulse_timestamps_with_csm: tuple[npt.NDArray[np.float_], dict[str, Any]]):
     pulse_timestamps, ppm_params = pulse_timestamps_with_csm
-    M, symbol_length, slot_length, num_symbols, CSM = ppm_params.values()
+    M, _, slot_length, _, CSM = ppm_params.values()
     num_slots_per_symbol = int(5/4*M)
     csm_times = np.array([pulse_timestamps[0]])
 
@@ -174,7 +177,7 @@ def test_make_time_series():
     assert time_series[time_series == 1].shape[0] == 10
 
 
-def test_find_csm_times_one_csm_no_lost_symbols(pulse_timestamps_single_csm):
+def test_find_csm_times_one_csm_no_lost_symbols(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     CSM = get_csm(M=8)
 
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
@@ -187,7 +190,7 @@ def test_find_csm_times_one_csm_no_lost_symbols(pulse_timestamps_single_csm):
     assert len(csm_times) == 1
 
 
-def test_get_csm_correlation_one_csm_no_lost_symbols(pulse_timestamps_single_csm):
+def test_get_csm_correlation_one_csm_no_lost_symbols(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
     CSM = get_csm(M=8)
 
@@ -198,7 +201,7 @@ def test_get_csm_correlation_one_csm_no_lost_symbols(pulse_timestamps_single_csm
     assert np.max(csm_correlation) == len(CSM) - 1
 
 
-def test_get_csm_correlation_first_symbol_lost(pulse_timestamps_single_csm):
+def test_get_csm_correlation_first_symbol_lost(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
 
     time_stamps = np.delete(time_stamps, 50)
@@ -212,7 +215,7 @@ def test_get_csm_correlation_first_symbol_lost(pulse_timestamps_single_csm):
     assert np.max(csm_correlation) == len(CSM) - 1
 
 
-def test_get_csm_correlation_second_symbol_lost(pulse_timestamps_single_csm):
+def test_get_csm_correlation_second_symbol_lost(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
 
     time_stamps = np.delete(time_stamps, 51)
@@ -226,7 +229,7 @@ def test_get_csm_correlation_second_symbol_lost(pulse_timestamps_single_csm):
     assert np.max(csm_correlation) == len(CSM) - 2
 
 
-def test_get_csm_correlation_third_symbol_lost(pulse_timestamps_single_csm):
+def test_get_csm_correlation_third_symbol_lost(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
 
     time_stamps = np.delete(time_stamps, 52)
@@ -240,8 +243,8 @@ def test_get_csm_correlation_third_symbol_lost(pulse_timestamps_single_csm):
     assert np.max(csm_correlation) == len(CSM) - 2
 
 
-def test_get_csm_correlation_first_symbol_lost_and_noise(pulse_timestamps_single_csm):
-    time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
+def test_get_csm_correlation_first_symbol_lost_and_noise(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
+    time_stamps, slot_length, _, symbol_length = pulse_timestamps_single_csm
 
     time_stamps = np.delete(time_stamps, 52)
 
@@ -258,7 +261,7 @@ def test_get_csm_correlation_first_symbol_lost_and_noise(pulse_timestamps_single
     assert np.max(csm_correlation) == len(CSM) - 3
 
 
-def test_find_csm_times_one_csm_first_symbol_lost(pulse_timestamps_single_csm):
+def test_find_csm_times_one_csm_first_symbol_lost(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     CSM = get_csm(M=8)
 
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
@@ -273,7 +276,7 @@ def test_find_csm_times_one_csm_first_symbol_lost(pulse_timestamps_single_csm):
     assert len(csm_times) == 1
 
 
-def test_find_csm_times_and_demodulate_first_symbol_lost(pulse_timestamps_single_csm):
+def test_find_csm_times_and_demodulate_first_symbol_lost(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     CSM = get_csm(M=8)
 
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
@@ -291,7 +294,7 @@ def test_find_csm_times_and_demodulate_first_symbol_lost(pulse_timestamps_single
     assert np.all(symbols[0][:len(CSM)] == CSM)
 
 
-def test_find_csm_times_and_demodulate_second_symbol_lost(pulse_timestamps_single_csm):
+def test_find_csm_times_and_demodulate_second_symbol_lost(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     CSM = get_csm(M=8)
 
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
@@ -309,7 +312,7 @@ def test_find_csm_times_and_demodulate_second_symbol_lost(pulse_timestamps_singl
     assert np.sum(symbols[0][:len(CSM)] == CSM) == len(CSM)-1
 
 
-def test_find_csm_times_no_time_shift(pulse_timestamps_single_csm):
+def test_find_csm_times_no_time_shift(pulse_timestamps_single_csm: tuple[npt.NDArray[np.float_], float, int, float]):
     CSM = get_csm(M=8)
 
     time_stamps, slot_length, num_slots_per_symbol, symbol_length = pulse_timestamps_single_csm
