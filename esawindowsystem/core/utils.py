@@ -79,21 +79,21 @@ def tobits(input_string: str) -> list[int]:
     return result
 
 
-def frombits(bits):
-    chars = []
+def frombits(bits: list[int] | BitArray):
+    chars: list[str] = []
     for b in range(len(bits) // 8):
         byte = bits[b * 8:(b + 1) * 8]
         chars.append(chr(int(''.join([str(bit) for bit in byte]), 2)))
     return ''.join(chars)
 
 
-def generate_outer_code_edges(memory_size, bpsk_encoding=True):
-    input_bits = [0, 1]
-    edges = []
+def generate_outer_code_edges(memory_size: int, bpsk_encoding: bool = True) -> list[list[Edge]]:
+    input_bits: list[int] = [0, 1]
+    edges: list[list[Edge]] = []
     states = list(itertools.product([0, 1], repeat=memory_size))
 
     for i, initial_state in enumerate(states):
-        state_edges = []
+        state_edges: list[Edge] = []
         for input_bit in input_bits:
             from_state = i
             output, terminal_state = convolve((input_bit, ), initial_state=initial_state)
@@ -113,12 +113,12 @@ def generate_outer_code_edges(memory_size, bpsk_encoding=True):
 # and then put it in the Trellis constructor.
 
 
-def generate_inner_encoder_edges(num_input_bits, bpsk_encoding=True):
+def generate_inner_encoder_edges(num_input_bits: int, bpsk_encoding: bool = True) -> list[list[Edge]]:
     input_combinations: list[tuple[int, ...]] = list(itertools.product([0, 1], repeat=num_input_bits))
-    edges = []
-    input_bits: tuple[int]
+    edges: list[list[Edge]] = []
+    input_bits: tuple[int, ...]
     for initial_state in [0, 1]:
-        state_edges = []
+        state_edges: list[Edge] = []
         for input_bits in input_combinations:
             # initial_state = 1
             current_state = initial_state
