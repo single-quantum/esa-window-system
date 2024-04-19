@@ -5,9 +5,9 @@ import numpy as np
 import numpy.typing as npt
 
 from esawindowsystem.core.encoder_functions import (accumulate, bit_interleave,
-                                    channel_interleave, convolve, get_csm,
-                                    map_PPM_symbols, puncture, randomize,
-                                    slicer, slot_map, zero_terminate)
+                                                    channel_interleave, convolve, get_csm,
+                                                    map_PPM_symbols, puncture, randomize,
+                                                    slicer, slot_map, zero_terminate)
 
 from esawindowsystem.core.utils import ppm_symbols_to_bit_array
 
@@ -124,7 +124,7 @@ def encoder(
         M: int,
         code_rate: Fraction,
         **kwargs) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_], npt.NDArray[np.int_]]:
-    """Does some preprocessing to the bit_stream, puts it through the SCPPM_encoder and does some post-processing.
+    """Does some preprocessing steps to the bit_stream (slice bit stream into blocks, add CRC), puts it through the SCPPM_encoder and post-processing (interleave, add CSM).
 
     Returns a slot mapped binary vector.
     """

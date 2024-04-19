@@ -13,7 +13,7 @@ from tqdm import tqdm
 from esawindowsystem.core.encoder_functions import (bit_deinterleave, bit_interleave,
                                                     channel_deinterleave, get_csm,
                                                     get_remap_indices,
-                                                    randomize, unpuncture)
+                                                    randomize, unpuncture, BitArray)
 from esawindowsystem.core.scppm_encoder import puncture
 from esawindowsystem.core.trellis import Trellis, Edge
 from esawindowsystem.core.utils import (flatten, generate_inner_encoder_edges,
@@ -115,7 +115,7 @@ def calculate_alphas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = Fa
                 state.alpha = state.alpha / sum_of_alphas
 
 
-def calculate_alpha_inner_SISO(trellis, gamma_primes, log_bcjr=True):
+def calculate_alpha_inner_SISO(trellis: Trellis, gamma_primes, log_bcjr=True):
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
@@ -147,7 +147,7 @@ def calculate_alpha_inner_SISO(trellis, gamma_primes, log_bcjr=True):
                 state.alpha = max_star(a0, a1)
 
 
-def calculate_beta_inner_SISO(trellis, gamma_primes, log_bcjr=True):
+def calculate_beta_inner_SISO(trellis: Trellis, gamma_primes, log_bcjr: bool = True):
     """ Calculate the beta for each state in the trellis.
 
     Beta is a likelihood that has a forward recursion relation to next states.
@@ -177,7 +177,7 @@ def calculate_beta_inner_SISO(trellis, gamma_primes, log_bcjr=True):
             state.beta = max_star(b0, b1)
 
 
-def calculate_betas(trellis, log_bcjr=True, verbose=False) -> None:
+def calculate_betas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = False) -> None:
     if verbose:
         print('Calculating betas')
     # Betas are also likelihoods, but unlike alpha, they have a forward recursion relation.
@@ -224,7 +224,7 @@ def calculate_betas(trellis, log_bcjr=True, verbose=False) -> None:
 #     return np.sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLR[i] for i in range(len(bit_LLR))])
 
 
-def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bcjr=True, verbose=False):
+def calculate_gammas(trellis: Trellis, received_sequence, num_output_bits, Es, N0, log_bcjr=True, verbose=False):
     if verbose:
         print('Calculating gammas')
 
@@ -245,7 +245,7 @@ def calculate_gammas(trellis, received_sequence, num_output_bits, Es, N0, log_bc
                 edge.gamma = g
 
 
-def calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods):
+def calculate_gamma_inner_SISO(trellis: Trellis, symbol_bit_LLRs, channel_log_likelihoods):
     for k, stage in enumerate(trellis.stages[:-1]):
         for state in stage.states:
             for edge in state.edges:
@@ -267,7 +267,7 @@ def calculate_gamma_primes(trellis: Trellis):
     return gamma_prime
 
 
-def calculate_LLRs(trellis, log_bcjr=True, verbose=False) -> npt.NDArray[np.float_]:
+def calculate_LLRs(trellis: Trellis, log_bcjr=True, verbose=False) -> npt.NDArray[np.float_]:
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -313,7 +313,7 @@ def calculate_LLRs(trellis, log_bcjr=True, verbose=False) -> npt.NDArray[np.floa
     return LLR
 
 
-def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
+def calculate_inner_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs):
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -351,7 +351,7 @@ def calculate_inner_SISO_LLRs(trellis, symbol_bit_LLRs):
     return LLRs
 
 
-def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
+def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -411,7 +411,7 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
     return p_xk_O, p_uk_O
 
 
-def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=False):
+def predict(trellis: Trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=False):
     """Use the BCJR algorithm to predict the sent message, based on the received sequence. """
     time_steps = len(received_sequence)
 
@@ -431,7 +431,7 @@ def predict(trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=Fals
     return u_hat
 
 
-def predict_inner_SISO(trellis, channel_log_likelihoods, time_steps, m, symbol_bit_LLRs=None):
+def predict_inner_SISO(trellis: Trellis, channel_log_likelihoods, time_steps, m, symbol_bit_LLRs=None):
     if symbol_bit_LLRs is None:
         symbol_bit_LLRs = np.zeros((time_steps, m))
 
@@ -477,7 +477,7 @@ def pi_ak(PPM_symbol_vector, bit_LLRs):
     return sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
 
 
-def set_outer_code_gammas(trellis, symbol_log_likelihoods):
+def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods):
     symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
     for k, stage in enumerate(trellis.stages):
         for state in stage.states:
@@ -489,8 +489,8 @@ def set_outer_code_gammas(trellis, symbol_log_likelihoods):
                 # edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])
 
 
-def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=20,
-                        ns: float = 3, nb: float = 0.1, ber_stop_threshold=1E-7, **kwargs):
+def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 20,
+                        ns: float = 3, nb: float = 0.1, ber_stop_threshold: float = 1E-7, **kwargs):
     # Initialize outer trellis edges
     memory_size_outer = 2
     num_output_bits_outer = 3
@@ -504,7 +504,7 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
     num_input_bits = m
     inner_edges = generate_inner_encoder_edges(m, bpsk_encoding=False)
 
-    information_block_sizes = {
+    information_block_sizes: dict[Fraction, int] = {
         Fraction(1, 3): 5040,
         Fraction(1, 2): 7560,
         Fraction(2, 3): 10080
@@ -552,7 +552,7 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
     decoded_message = []
     decoded_message_array = np.zeros((max_num_iterations, num_slices, num_bits_per_slice))
 
-    sent_bit_sequence = kwargs.get('sent_bit_sequence_no_csm')
+    sent_bit_sequence: BitArray | None = kwargs.get('sent_bit_sequence_no_csm')
 
     bit_error_ratios = np.zeros((max_num_iterations, num_slices))
 
@@ -595,13 +595,14 @@ def predict_iteratively(slot_mapped_sequence, M, code_rate, max_num_iterations=2
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
 
-            ber = 1
+            ber: float = 1
+            sent_bits_codeword: BitArray
             if sent_bit_sequence is not None:
+                sent_bits_codeword = sent_bit_sequence[
+                    i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)
+                ]
                 ber = np.sum(
-                    [abs(x - y) for x, y in zip(
-                        u_hat, sent_bit_sequence[i * num_bits_per_slice -
-                                                 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)]
-                    )]
+                    [abs(x - y) for x, y in zip(u_hat, sent_bits_codeword)]
                 ) / num_bits_per_slice
                 print(
                     f"iteration = {iteration+1} ber: {ber:.3e} \t min likelihood: " +

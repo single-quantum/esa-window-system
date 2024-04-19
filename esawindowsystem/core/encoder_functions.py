@@ -9,6 +9,7 @@ from esawindowsystem.core.shift_register import CRC
 
 BitArray = npt.NDArray[np.int_]
 
+
 def validate_PPM_order(M: int):
     if M not in (4, 8, 16, 32, 64, 128, 256):
         raise ValueError("M should be one of 4, 8, 16, 32, 64, 128 or 256")
@@ -201,7 +202,7 @@ def convolve(
         arr: BitArray | tuple[int, ...],
         initial_state: tuple[int, int] = (0, 0)) -> tuple[BitArray, tuple[int, ...]]:
     """Use a convolutional shift register to generate a convoluted codeword.
-    
+
     For more details on the convolutional encoder see CCSDS blue book 142.0-B-1, section 3.8.2 (August 2019)"""
     # Number of sliding windows that are iterated over to generate the
     # convolutional codeword
@@ -224,7 +225,7 @@ def convolve(
     return convolutional_codeword, terminal_state
 
 
-def map_PPM_symbols(arr: list[int] | BitArray, m: int):
+def map_PPM_symbols(arr: list[int] | tuple[int, ...] | BitArray, m: int):
     """Map input array of bits to PPM symbols. """
     # Input validation
     validate_PPM_order(2**m)
