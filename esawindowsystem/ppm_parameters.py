@@ -11,7 +11,7 @@ M: int = 16                             # each m = 4 bits are mapped from 0 to M
 CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
-IMG_FILE_PATH = "sample_payloads/herbig-haro-211-small.png"
+IMG_FILE_PATH = "esawindowsystem/sample_payloads/herbig-haro-211-small.png"
 img = Image.open(IMG_FILE_PATH)
 IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
 GREYSCALE: bool = True
