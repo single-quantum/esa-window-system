@@ -11,13 +11,13 @@ from numpy import dot
 from tqdm import tqdm
 
 from esawindowsystem.core.encoder_functions import (bit_deinterleave, bit_interleave,
-                                    channel_deinterleave, get_csm,
-                                    get_remap_indices,
-                                    randomize, unpuncture)
+                                                    channel_deinterleave, get_csm,
+                                                    get_remap_indices,
+                                                    randomize, unpuncture)
 from esawindowsystem.core.scppm_encoder import puncture
 from esawindowsystem.core.trellis import Trellis, Edge
 from esawindowsystem.core.utils import (flatten, generate_inner_encoder_edges,
-                        generate_outer_code_edges, poisson_noise)
+                                        generate_outer_code_edges, poisson_noise)
 
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
@@ -59,14 +59,14 @@ def max_star_recursive(arr: list | npt.NDArray) -> float:
     return result
 
 
-def calculate_alphas(trellis: Trellis, log_bcjr: bool=True, verbose: bool=False) -> None:
+def calculate_alphas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = False) -> None:
     """ Calculate the alpha for each state in the trellis.
 
     Alpha is a likelihood that has a backward recursion relation to previous states.
     It says something about the likelihood of being in that state,
     given the history of the received sequence up to that state.
     Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. 
-    
+
     `log_bcjr` determines whether or not to take the log of alpha, which turns a multiplication into a sum. 
     For more information, see Moison and Hamkins (2005), section 3.C."""
     if verbose:
@@ -377,13 +377,15 @@ def calculate_outer_SISO_LLRs(trellis, symbol_bit_LLRs, log_bcjr=True):
                 edge.lmbda = state.alpha + edge.gamma + next_state.beta
 
     for k, stage in enumerate(trellis.stages[:-1]):
-        edges = flatten(list(map(lambda s: s.edges, stage.states)))
+        edges: list[Edge] = flatten(list(map(lambda s: s.edges, stage.states)))
 
         for i in range(trellis.num_output_bits):
             # First, select all edges with 0 (or 1) at the i-th output bit, then of those edges, take the lambda value.
             # This is a code efficient implementation, even though there is slightly more overhead compared to a simple for loop.
-            zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
-            ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
+            zero_edges_lmbdas: list[float] = list(
+                map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
+            ones_edges_lmbdas: list[float] = list(
+                map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
 
             if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
                 p_xk_O[k, i] = max_star(zero_edges_lmbdas[0], -np.infty) - \
@@ -456,13 +458,13 @@ def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt
 
 def pi_ck(input_sequence, ns, nb):
     """Calculate symbol log likelihood, based on likelihoods from the channel (Poisson statistics). 
-    
+
     This formula is given in Moision on page 12, below formula 13. 
     """
     output_sequence = deepcopy(input_sequence)
 
     for i, channel_likelihoods in enumerate(output_sequence):
-        # I don't know why, but the equation for pi_ck (), seemingly needs to be corrected with log(ns/nb). 
+        # I don't know why, but the equation for pi_ck (), seemingly needs to be corrected with log(ns/nb).
         output_sequence[i] = np.array([cl*np.log(1+ns/nb) for cl in channel_likelihoods])/np.log(ns/nb)
 
     return output_sequence
@@ -470,7 +472,7 @@ def pi_ck(input_sequence, ns, nb):
 
 def pi_ak(PPM_symbol_vector, bit_LLRs):
     """Calculate symbol log likelihood, based on bit likelihoods from outer SISO
-    
+
     This formula is given in Moision on page 9, below formula 10. """
     return sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
 
