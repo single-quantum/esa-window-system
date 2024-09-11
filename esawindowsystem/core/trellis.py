@@ -76,6 +76,8 @@ class State:
 
 
 class Stage:
+    __slots__ = ('time_step', 'states')
+
     def __init__(self, num_states: int, num_input_bits: int, time_step: int):
         self.time_step = time_step
 
@@ -89,12 +91,14 @@ class Stage:
 
 
 class Trellis:
+    __slots__ = ('memory_size', 'num_states', 'stages', 'num_input_bits', 'num_output_bits', 'edge_model', 'edges')
+
     def __init__(
             self,
             memory_size: int,
             num_output_bits: int,
             time_steps: int,
-            edges,
+            edges: list[list[Edge]],
             num_input_bits: int = 1):
 
         self.memory_size = memory_size
