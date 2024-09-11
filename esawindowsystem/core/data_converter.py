@@ -3,12 +3,12 @@ from pathlib import Path
 from typing import Any
 
 import cv2
-
 import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
-from esawindowsystem.core.BCJR_decoder_functions import ppm_symbols_to_bit_array
+from esawindowsystem.core.BCJR_decoder_functions import \
+    ppm_symbols_to_bit_array
 from esawindowsystem.core.utils import tobits
 from esawindowsystem.ppm_parameters import GREYSCALE
 
@@ -58,8 +58,8 @@ class DataConverter:
             bw_img: npt.NDArray[np.int_]
             img: npt.NDArray[np.int_] = cv2.imread(str(filepath), 2)
             _, bw_img = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
-            bw_img = np.asarray(bw_img/255, dtype=int)
-            
+            bw_img = np.asarray(bw_img / 255, dtype=int)
+
             # converting to its binary form
             bw = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
             bit_array = bw_img.flatten()
@@ -76,7 +76,7 @@ def payload_to_bit_sequence(payload_type: str, **kwargs) -> npt.NDArray[np.int_]
 
     match payload_type:
         case 'string':
-            d = DataConverter("Hello World!")
+            d = DataConverter(''.join(["Optical Communications Synchronization and Channel Coding"] * 10))
             return d.bit_array
         case 'image':
             filepath = kwargs.get('filepath')

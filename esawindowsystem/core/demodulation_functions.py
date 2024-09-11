@@ -261,7 +261,7 @@ def find_csm_times(
     csm_times: npt.NDArray[np.float_] = t0 + slot_length * where_csm_corr + 0.5 * slot_length
 
     time_shifts: npt.NDArray = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
-    print(np.array(time_shifts) / slot_length)
+    print(f'Time shift per codeword (slot lengths): {np.array(time_shifts) / slot_length}')
     csm_times += time_shifts - 0.5 * slot_length
 
     return csm_times

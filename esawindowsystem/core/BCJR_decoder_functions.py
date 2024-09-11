@@ -10,14 +10,17 @@ import numpy.typing as npt
 from numpy import dot
 from tqdm import tqdm
 
-from esawindowsystem.core.encoder_functions import (bit_deinterleave, bit_interleave,
-                                                    channel_deinterleave, get_csm,
+from esawindowsystem.core.encoder_functions import (BitArray, bit_deinterleave,
+                                                    bit_interleave,
+                                                    channel_deinterleave,
+                                                    get_CRC, get_csm,
                                                     get_remap_indices,
-                                                    randomize, unpuncture, BitArray)
+                                                    randomize, unpuncture)
 from esawindowsystem.core.scppm_encoder import puncture
-from esawindowsystem.core.trellis import Trellis, Edge
+from esawindowsystem.core.trellis import Edge, Trellis
 from esawindowsystem.core.utils import (flatten, generate_inner_encoder_edges,
-                                        generate_outer_code_edges, poisson_noise)
+                                        generate_outer_code_edges,
+                                        poisson_noise)
 
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
@@ -45,7 +48,7 @@ def max_star(a: float, b: float) -> float:
     elif a == -np.inf or b == -np.inf:
         return max(a, b) + np.log(2)
     else:
-        return max(a, b) + max_log_lookup[(int(round(a)), int(round(b)))]
+        return max(a, b) + max_log_lookup[(round(a), round(b))]
 
 
 def max_star_recursive(arr: list | npt.NDArray) -> float:
@@ -65,9 +68,9 @@ def calculate_alphas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = Fa
     Alpha is a likelihood that has a backward recursion relation to previous states.
     It says something about the likelihood of being in that state,
     given the history of the received sequence up to that state.
-    Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma. 
+    Alpha is calculated by taking each edge that is connected to the previous state and weighing it with gamma.
 
-    `log_bcjr` determines whether or not to take the log of alpha, which turns a multiplication into a sum. 
+    `log_bcjr` determines whether or not to take the log of alpha, which turns a multiplication into a sum.
     For more information, see Moison and Hamkins (2005), section 3.C."""
     if verbose:
         print('Calculating alphas')
@@ -341,7 +344,8 @@ def calculate_inner_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs):
         edges = flatten(list(map(lambda s: s.edges, stage.states)))
 
         for i in range(trellis.num_input_bits):
-            # This is a code efficient implementation, even though there is slightly more overhead compared to a simple for loop.
+            # This is a code efficient implementation, even though there is slightly
+            # more overhead compared to a simple for loop.
             zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
             ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
 
@@ -381,7 +385,8 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
 
         for i in range(trellis.num_output_bits):
             # First, select all edges with 0 (or 1) at the i-th output bit, then of those edges, take the lambda value.
-            # This is a code efficient implementation, even though there is slightly more overhead compared to a simple for loop.
+            # This is a code efficient implementation, even though there is slightly
+            # more overhead compared to a simple for loop.
             zero_edges_lmbdas: list[float] = list(
                 map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
             ones_edges_lmbdas: list[float] = list(
@@ -457,15 +462,15 @@ def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt
 
 
 def pi_ck(input_sequence, ns, nb):
-    """Calculate symbol log likelihood, based on likelihoods from the channel (Poisson statistics). 
+    """Calculate symbol log likelihood, based on likelihoods from the channel (Poisson statistics).
 
-    This formula is given in Moision on page 12, below formula 13. 
+    This formula is given in Moision on page 12, below formula 13.
     """
     output_sequence = deepcopy(input_sequence)
 
     for i, channel_likelihoods in enumerate(output_sequence):
         # I don't know why, but the equation for pi_ck (), seemingly needs to be corrected with log(ns/nb).
-        output_sequence[i] = np.array([cl*np.log(1+ns/nb) for cl in channel_likelihoods])/np.log(ns/nb)
+        output_sequence[i] = np.array([cl * np.log(1 + ns / nb) for cl in channel_likelihoods]) / np.log(ns / nb)
 
     return output_sequence
 
@@ -477,16 +482,17 @@ def pi_ak(PPM_symbol_vector, bit_LLRs):
     return sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
 
 
-def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods):
+def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods: npt.NDArray[np.float_]):
     symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
     for k, stage in enumerate(trellis.stages):
         for state in stage.states:
             for edge in state.edges:
-                edge.gamma = sum([
-                    0.5 * (-1)**edge.edge_output[0] * symbol_log_likelihoods[k, 0],
-                    0.5 * (-1)**edge.edge_output[1] * symbol_log_likelihoods[k, 1],
-                    0.5 * (-1)**edge.edge_output[2] * symbol_log_likelihoods[k, 2]])
-                # edge.gamma = np.sum(edge.edge_output * symbol_log_likelihoods[k, :])
+                # edge_output: npt.NDArray[np.int_] = edge.edge_output
+                # symbol_llrs = symbol_log_likelihoods[k]
+                # edge.gamma = 0.5 * (-1)**edge_output[0] * symbol_llrs[0] +\
+                #     0.5 * (-1)**edge_output[1] * symbol_llrs[1] +\
+                #     0.5 * (-1)**edge_output[2] * symbol_llrs[2]
+                edge.gamma = np.sum(0.5 * (-1)**edge.edge_output * symbol_log_likelihoods[k, :])
 
 
 def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 20,
@@ -576,6 +582,7 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
         u_hat = []
 
         for iteration in range(max_num_iterations):
+            print(f'Iteration {iteration+1}/{max_num_iterations}')
             p_ak_O = predict_inner_SISO(inner_trellis, channel_log_likelihoods,
                                         time_steps_inner, m, symbol_bit_LLRs=symbol_bit_LLRs)
             p_xk_I = bit_deinterleave(p_ak_O.flatten(), dtype=float)
@@ -592,6 +599,9 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
             symbol_bit_LLRs = deepcopy(p_ak_I.reshape(-1, m))
 
             u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
+            ABC = randomize(np.array(u_hat[:-34], dtype=int))
+            crc = get_CRC(np.array(u_hat[:-34]))
+
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
 
