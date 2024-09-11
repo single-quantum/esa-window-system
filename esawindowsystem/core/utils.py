@@ -206,7 +206,7 @@ def get_BER_before_decoding(bit_sequence_file_path, received_bits, sent_bit_sequ
     else:
         sent_bits = sent_bit_sequence
 
-    BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)])
+    BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)])/len(sent_bits)
 
     return BER_before_decoding
 
