@@ -94,23 +94,29 @@ def randomize(information_blocks: BitArray) -> BitArray:
     return output_array
 
 
+def get_CRC(arr: BitArray) -> BitArray:
+    CRC_size: int = 32
+
+    # Initialize the CRC shift register
+    seed: list[int] = [1] * CRC_size
+    sr = CRC(seed, [3, 14, 18, 29])
+
+    for j in range(arr.shape[0] - CRC_size):
+        sr.next(arr[j] ^ sr.state[-1])
+
+    return sr.state
+
+
 def append_CRC(arr: BitArray):
     # Fill the input array `arr` with 32 zeros, so that the CRC can be attached
     CRC_size = 32
-    arr = np.pad(arr, (0, CRC_size))
+    arr = np.concatenate((arr, np.zeros((arr.shape[0], CRC_size), dtype=arr.dtype)), axis=1)
 
-    seed = [1] * CRC_size
+    for i in range(arr.shape[0]):
+        # Attach to the arr
+        arr[i, -CRC_size:] = get_CRC(arr[i, :])
 
-    # Initialize the CRC shift register
-    sr = CRC(seed, [3, 14, 18, 29])
-    for i in range(1, CRC_size + 1):
-        sr.next(arr[-i] ^ sr.state[-1])
-
-    # Attach to the arr
-    arr[-CRC_size:] = sr.state
-
-    # Add the two termination bits
-    return np.pad(arr, (0, 2))
+    return arr
 
 
 def slicer(arr: BitArray, code_rate: Fraction, include_crc: bool = False,
@@ -123,7 +129,7 @@ def slicer(arr: BitArray, code_rate: Fraction, include_crc: bool = False,
 
     # If the CRC is not used, add 32 more bits to the information block.
     if not include_crc:
-        information_block_size += 32
+        information_block_size += len_CRC
 
     if arr.shape[0] % information_block_size != 0:
         # Number of bits that need to be added such that the array is a multiple of the information block size
