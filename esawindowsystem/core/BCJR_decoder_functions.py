@@ -486,12 +486,8 @@ def pi_ck(
     This formula is given in Moision on page 12, below formula 13.
     """
     output_sequence = deepcopy(input_sequence)
-
-    # for i, channel_likelihoods in enumerate(output_sequence):
-    #     # I don't know why, but the equation for pi_ck (), seemingly needs to be corrected with log(ns/nb).
-    #     # output_sequence[i] = np.array([cl * np.log(1 + ns / nb) for cl in channel_likelihoods]) / np.log(ns / nb)
-    #     output_sequence[i] = channel_likelihoods*np.log(1+ns/nb)/np.log(ns/nb)
     output_sequence = output_sequence*np.log(1+ns/nb)/np.log(ns/nb)
+
     return output_sequence
 
 
