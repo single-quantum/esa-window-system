@@ -193,3 +193,4 @@ settings.json
 /experimental results
 
 .vscode/launch.json
+profiling/
