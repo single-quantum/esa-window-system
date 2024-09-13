@@ -1,4 +1,6 @@
 import numpy as np
+import pytest
+import time
 
 from esawindowsystem.core import utils
 
@@ -13,18 +15,23 @@ def test_tobits_a():
     assert bit_array == [0, 1, 1, 0, 0, 0, 0, 1]
 
 
-def test_bpsk_encoding_empty_list():
-    encoded_array = utils.bpsk_encoding([])
+def test_bpsk_encoding_empty_list(benchmark):
+    encoded_array = benchmark(utils.bpsk_encoding, [])
     assert encoded_array.size == 0
 
 
-def test_bpsk_encoding_list_input():
-    encoded_array = utils.bpsk_encoding([1, 2, 3])
+def test_bpsk_encoding_list_input(benchmark):
+    encoded_array = benchmark(utils.bpsk_encoding, [1, 2, 3])
     assert np.all(encoded_array == 1)
 
 
-def test_bpsk_encoding_all_zeros():
-    encoded_array = utils.bpsk_encoding(np.zeros(5, dtype=int))
+def test_bpsk_encoding_all_zeros_np_array(benchmark):
+    encoded_array = benchmark(utils.bpsk_encoding, np.zeros(5, dtype=int))
+    assert np.all(encoded_array == -1)
+
+
+def test_bpsk_encoding_all_zeros_py_list(benchmark):
+    encoded_array = benchmark(utils.bpsk_encoding, [0, 0, 0, 0, 0])
     assert np.all(encoded_array == -1)
 
 
