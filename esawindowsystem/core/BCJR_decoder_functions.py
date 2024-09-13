@@ -22,6 +22,8 @@ from esawindowsystem.core.utils import (flatten, generate_inner_encoder_edges,
                                         generate_outer_code_edges,
                                         poisson_noise)
 
+from esawindowsystem.core.max_star import max_star, max_star_recursive
+
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
 def log_gamma(r, v, Es, N0): return Es / N0 * 2 * dot(r, v)
@@ -33,33 +35,32 @@ for key in keys:
     max_log_lookup[key] = np.log(1 + np.exp(-abs(key[0] - key[1])))
 
 
-@lru_cache(maxsize=256)
-def max_star(a: float, b: float) -> float:
-    """Calculate the max star of a and b, which is a modified max function.
+# @lru_cache(maxsize=256)
+# def max_star(a: float, b: float) -> float:
+#     """Calculate the max star of a and b, which is a modified max function.
 
-    This function is used mostly for optimization. The formal definition of max star is max*(a, b) = log(exp(a)+exp(b)).
-    Since this calculation comes up all the time in calculating LLRs and is relatively expensive, it is approximated by
-    max*(a, b) ~= max(a, b) + log(1+exp(-|a-b|)), where the second term serves as a correction to the max.
-    The second term is cached for optimization reasons.
-    """
-    # When a or b is > 5, the correction term is already so small that we can discard it.
-    if abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
-        return max(a, b)
-    elif a == -np.inf or b == -np.inf:
-        return max(a, b) + np.log(2)
-    else:
-        return max(a, b) + max_log_lookup[(round(a), round(b))]
+#     This function is used mostly for optimization. The formal definition of max star is max*(a, b) = log(exp(a)+exp(b)).
+#     Since this calculation comes up all the time in calculating LLRs and is relatively expensive, it is approximated by
+#     max*(a, b) ~= max(a, b) + log(1+exp(-|a-b|)), where the second term serves as a correction to the max.
+#     The second term is cached for optimization reasons.
+#     """
+#     # When a or b is > 5, the correction term is already so small that we can discard it.
+#     if abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
+#         return max(a, b)
+#     elif a == -np.inf or b == -np.inf:
+#         return max(a, b) + np.log(2)
+#     else:
+#         return max(a, b) + max_log_lookup[(round(a), round(b))]
 
 
-def max_star_recursive(arr: list | npt.NDArray) -> float:
-    """Recursive implementation of the max star operator. """
-    result = max_star(arr[0], arr[1])
-    i = 2
-    while i < len(arr):
-        result = max_star(result, arr[i])
-        i += 1
+# def max_star_recursive(arr: list | npt.NDArray) -> float:
+#     """Recursive implementation of the max star operator. """
+#     result = max_star(arr[0], arr[1])
 
-    return result
+#     for i in range(2, len(arr)):
+#         result = max_star(result, arr[i])
+
+#     return result
 
 
 def calculate_alphas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = False) -> None:
@@ -92,10 +93,12 @@ def calculate_alphas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = Fa
 
             # Get a list of all edges in the previous stage
             previous_states = trellis.stages[i - 1].states
-            previous_edges = list(chain(*map(lambda s: s.edges, previous_states)))
+            # previous_edges = list(chain(*map(lambda s: s.edges, previous_states)))
+            previous_edges: list[Edge] = flatten([s.edges for s in previous_states])
 
             # Find all the edges that go to the current state
-            edges: list[Edge] = list(filter(lambda e: e.to_state == state.label, previous_edges))
+            edges: list[Edge] = [e for e in previous_edges if e.to_state == state.label]
+            # edges: list[Edge] = list(filter(lambda e: e.to_state == state.label, previous_edges))
 
             for edge in edges:
                 previous_state = previous_states[edge.from_state]
@@ -261,8 +264,9 @@ def calculate_gamma_primes(trellis: Trellis):
     combinations = list(itertools.product([0, 1], repeat=2))
     for k, stage in enumerate(trellis.stages[:-1]):
         for i, j in combinations:
-            edges = filter(lambda e: e.from_state == i and e.to_state == j, stage.states[i].edges)
-            gammas = list(map(lambda e: e.gamma, edges))
+            # edges = filter(lambda e: e.from_state == i and e.to_state == j, stage.states[i].edges)
+            # gammas = list(map(lambda e: e.gamma, edges))
+            gammas = [e.gamma for e in stage.states[i].edges if (e.from_state == i and e.to_state == j)]
             if not gammas:
                 continue
             gamma_prime[i, j, k] = max_star_recursive(gammas)
@@ -346,13 +350,19 @@ def calculate_inner_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs):
         for i in range(trellis.num_input_bits):
             # This is a code efficient implementation, even though there is slightly
             # more overhead compared to a simple for loop.
-            zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
-            ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
+            # zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
+            # ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
+            zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_input[i] == 0]
+            ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_input[i] == 1]
 
             LLRs[k, i] = max_star_recursive(zero_edges_lmbdas) - \
                 max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
 
     return LLRs
+
+
+def get_lmbda_from_edge(edge):
+    return edge.lmbda
 
 
 def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
@@ -387,10 +397,13 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
             # First, select all edges with 0 (or 1) at the i-th output bit, then of those edges, take the lambda value.
             # This is a code efficient implementation, even though there is slightly
             # more overhead compared to a simple for loop.
-            zero_edges_lmbdas: list[float] = list(
-                map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
-            ones_edges_lmbdas: list[float] = list(
-                map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
+            # zero_edges_lmbdas: list[float] = list(
+            #     map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
+            # ones_edges_lmbdas: list[float] = list(
+            #     map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
+
+            zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_output[i] == 0]
+            ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_output[i] == 1]
 
             if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
                 p_xk_O[k, i] = max_star(zero_edges_lmbdas[0], -np.infty) - \
@@ -403,8 +416,11 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
             p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - \
                 max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
 
-        zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
-        ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
+        # zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
+        # ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
+
+        zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_input == 0]
+        ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_input == 1]
 
         if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
             p_uk_O[k] = max_star(zero_edges_lmbdas[0], -np.infty) - max_star(ones_edges_lmbdas[0], -np.infty)
@@ -461,17 +477,21 @@ def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt
     return received_sequence
 
 
-def pi_ck(input_sequence, ns, nb):
+def pi_ck(
+        input_sequence: npt.NDArray[np.float_],
+        ns: float,
+        nb: float) -> npt.NDArray[np.float_]:
     """Calculate symbol log likelihood, based on likelihoods from the channel (Poisson statistics).
 
     This formula is given in Moision on page 12, below formula 13.
     """
     output_sequence = deepcopy(input_sequence)
 
-    for i, channel_likelihoods in enumerate(output_sequence):
-        # I don't know why, but the equation for pi_ck (), seemingly needs to be corrected with log(ns/nb).
-        output_sequence[i] = np.array([cl * np.log(1 + ns / nb) for cl in channel_likelihoods]) / np.log(ns / nb)
-
+    # for i, channel_likelihoods in enumerate(output_sequence):
+    #     # I don't know why, but the equation for pi_ck (), seemingly needs to be corrected with log(ns/nb).
+    #     # output_sequence[i] = np.array([cl * np.log(1 + ns / nb) for cl in channel_likelihoods]) / np.log(ns / nb)
+    #     output_sequence[i] = channel_likelihoods*np.log(1+ns/nb)/np.log(ns/nb)
+    output_sequence = output_sequence*np.log(1+ns/nb)/np.log(ns/nb)
     return output_sequence
 
 
@@ -482,17 +502,21 @@ def pi_ak(PPM_symbol_vector, bit_LLRs):
     return sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
 
 
+edge_gamma_partial: dict[tuple[int, int, int], npt.NDArray[np.int_]] = {}
+for idx, _ in np.ndenumerate(np.zeros((2, 2, 2))):
+    edge_gamma_partial[(idx[0], idx[1], idx[2])] = (-1)**np.array([idx[0], idx[1], idx[2]])
+
+
 def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods: npt.NDArray[np.float_]):
     symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
-    for k, stage in enumerate(trellis.stages):
+
+    for k, stage in enumerate(trellis.stages[:-1]):
+        symbol_llrs = symbol_log_likelihoods[k, :]
         for state in stage.states:
             for edge in state.edges:
-                # edge_output: npt.NDArray[np.int_] = edge.edge_output
-                # symbol_llrs = symbol_log_likelihoods[k]
-                # edge.gamma = 0.5 * (-1)**edge_output[0] * symbol_llrs[0] +\
-                #     0.5 * (-1)**edge_output[1] * symbol_llrs[1] +\
-                #     0.5 * (-1)**edge_output[2] * symbol_llrs[2]
-                edge.gamma = np.sum(0.5 * (-1)**edge.edge_output * symbol_log_likelihoods[k, :])
+                e: npt.NDArray[np.int_] = edge.edge_output
+                gamma_partial: npt.NDArray[np.int_] = edge_gamma_partial[(e[0], e[1], e[2])]
+                edge.gamma = np.sum(0.5 * gamma_partial * symbol_llrs)
 
 
 def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 20,

@@ -5,12 +5,12 @@ import numpy as np
 import numpy.typing as npt
 
 from esawindowsystem.core.BCJR_decoder_functions import (pi_ck, ppm_symbols_to_bit_array,
-                                         predict, predict_iteratively)
+                                                         predict, predict_iteratively)
 from esawindowsystem.core.encoder_functions import (bit_deinterleave, channel_deinterleave,
-                                    get_csm, randomize, slot_map, unpuncture)
+                                                    get_csm, randomize, slot_map, unpuncture)
 from esawindowsystem.core.trellis import Trellis
 from esawindowsystem.core.utils import (bpsk_encoding, generate_outer_code_edges,
-                        get_BER_before_decoding, poisson_noise)
+                                        get_BER_before_decoding, poisson_noise)
 
 
 class DecoderError(Exception):
@@ -128,7 +128,7 @@ def decode(
         predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
     else:
         predicted_msg, _, _ = predict_iteratively(deinterleaved_slot_mapped_sequence, M,
-                                                  CODE_RATE, max_num_iterations=5, **kwargs)
+                                                  CODE_RATE, max_num_iterations=2, **kwargs)
     information_block_sizes = {
         Fraction(1, 3): 5040,
         Fraction(1, 2): 7560,

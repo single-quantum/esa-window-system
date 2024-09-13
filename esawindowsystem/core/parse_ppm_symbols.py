@@ -155,7 +155,6 @@ def parse_ppm_symbols(
 
     symbols: list[float] = []
     num_symbol_frames: int = int(round((stop_time - codeword_start_time) / symbol_length))
-    residuals = []
 
     message_pulse_times = pulse_times[(pulse_times >= codeword_start_time) & (pulse_times < stop_time)]
 
@@ -198,9 +197,7 @@ def parse_ppm_symbols(
             symbols.append(0)
             continue
         rounded_symbols = np.round(symbol_frame_symbols)
-        symbol_residuals = symbol_frame_symbols - rounded_symbols
         occurences = []
-        residuals.append(np.mean(symbol_residuals))
 
         for symbol in np.unique(rounded_symbols):
             occurences.append(np.count_nonzero(rounded_symbols == symbol))

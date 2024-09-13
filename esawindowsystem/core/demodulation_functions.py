@@ -9,6 +9,27 @@ from scipy.signal import find_peaks
 from esawindowsystem.core.encoder_functions import get_csm, slot_map
 from esawindowsystem.core.parse_ppm_symbols import parse_ppm_symbols
 from esawindowsystem.core.utils import flatten, moving_average
+# from esawindowsystem.core.numba_utils import get_num_events
+
+
+def get_num_events(
+        i: int,
+        num_events_per_slot: npt.NDArray[np.int_],
+        num_slots_per_codeword: int,
+        message_peak_locations: npt.NDArray[np.float_],
+        slot_starts: npt.NDArray[np.float_]) -> npt.NDArray[np.int_]:
+
+    for j in range(num_slots_per_codeword):
+        idx_arr_1: npt.NDArray[np.bool] = message_peak_locations >= slot_starts[j]
+        idx_arr_2: npt.NDArray[np.bool] = message_peak_locations < slot_starts[j+1]
+        events = message_peak_locations[
+            (idx_arr_1) & (idx_arr_2)
+        ]
+
+        num_events: int = events.shape[0]
+        num_events_per_slot[i, j] = num_events
+
+    return num_events_per_slot
 
 
 def make_time_series(time_stamps: npt.NDArray[np.float_], slot_length: float) -> npt.NDArray[np.int_]:
@@ -336,19 +357,18 @@ def find_and_parse_codewords(
 
 
 def get_num_events_per_slot(
-        csm_times,
-        peak_locations: npt.NDArray[np.int_],
+        csm_times: npt.NDArray[np.float_],
+        peak_locations: npt.NDArray[np.float_],
         CSM: npt.NDArray[np.int_],
         symbols_per_codeword: int,
         slot_length: float,
-        symbol_length: float,
-        M: float) -> npt.NDArray[np.int_]:
+        M: int) -> npt.NDArray[np.int_]:
     """This function determines how many detection events there were for each slot. """
 
     # The factor 5/4 is determined by the protocol, which states that there
     # shall be M/4 guard slots for each PPM symbol.
     num_slots_per_codeword = int((symbols_per_codeword + len(CSM)) * 5 / 4 * M)
-    num_events_per_slot = np.zeros((len(csm_times), num_slots_per_codeword))
+    num_events_per_slot: npt.NDArray[np.int_] = np.zeros((len(csm_times), num_slots_per_codeword), dtype=np.int_)
 
     for i in range(len(csm_times)):
         csm_time = csm_times[i]
@@ -361,18 +381,13 @@ def get_num_events_per_slot(
         else:
             message_peak_locations = peak_locations[peak_locations >= csm_times[i]]
 
-        for j in range(num_slots_per_codeword):
-            slot_start = csm_time + j * slot_length
-            slot_end = csm_time + (j + 1) * slot_length
+        slot_starts = csm_time + np.arange(num_slots_per_codeword+1)*slot_length
 
-            events = message_peak_locations[
-                (message_peak_locations >= slot_start) & (message_peak_locations < slot_end)
-            ]
+        num_events_per_slot = get_num_events(
+            i, num_events_per_slot, num_slots_per_codeword, message_peak_locations, slot_starts)
 
-            num_events = events.shape[0]
-            num_events_per_slot[i, j] = num_events
+    num_events_per_slot = num_events_per_slot.flatten()
 
-    num_events_per_slot = num_events_per_slot.flatten().astype(int)
     return num_events_per_slot
 
 
@@ -406,7 +421,7 @@ def demodulate(
     msg_pulse_timestamps = pulse_timestamps[(pulse_timestamps >= csm_times[0]) & (pulse_timestamps <= msg_end_time)]
 
     events_per_slot: npt.NDArray[np.int_] = get_num_events_per_slot(csm_times, msg_pulse_timestamps,
-                                                                    CSM, symbols_per_codeword, slot_length, symbol_length, M)
+                                                                    CSM, symbols_per_codeword, slot_length, M)
 
     num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
         pulse_timestamps <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]

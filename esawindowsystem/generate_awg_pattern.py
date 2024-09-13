@@ -104,9 +104,11 @@ def generate_awg_pattern(pulse_width: int = 10):
     print(f'PPM order: {M}')
     print(f'num symbols sent: {num_PPM_symbols}')
     print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols:.3e}')
+    print(f'Number of bits per message: {num_bits_sent}')
     print(f'Number of codewords: {num_codewords}')
-    print(f'Datarate: {datarate:.2f} Mbps')
+    print(f'Datarate: {datarate:.3f} Mbps')
     print(f'Message time span: {message_time_microseconds:.3f} microseconds')
+    print(f'Message time span: {message_time_microseconds/1000:.3f} milliseconds')
     print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microseconds')
 
     # Generate AWG pattern file
@@ -154,13 +156,13 @@ def generate_awg_pattern(pulse_width: int = 10):
             filepath = base_dir / Path(f'ppm_message_SQ_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
                                        f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv')
         case 'image' if not GREYSCALE:
-            filepath = f'ppm_message_SQ_tiny_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
-                f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1_{cr}-code-rate.csv'
+            filepath = base_dir / Path(f'ppm_message_SQ_tiny_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
+                                       f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv')
         case 'string':
-            filepath = 'ppm_message_Hello_World_no_ASM.csv'
+            filepath = base_dir / Path('ppm_message_Hello_World_no_ASM.csv')
         case 'calibration':
-            filepath = f'ppm_calibration_message_{len(msg_PPM_symbols)}_' +\
-                f'symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM.csv'
+            filepath = base_dir / Path(f'ppm_calibration_message_{len(msg_PPM_symbols)}_' +
+                                       f'symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM.csv')
         case _:
             raise ValueError("Payload type not recognized. Should be one of ['image', 'string', 'calibration']")
 
