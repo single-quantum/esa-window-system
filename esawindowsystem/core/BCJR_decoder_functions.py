@@ -226,10 +226,6 @@ def calculate_betas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = Fal
             pbar.update(1)
 
 
-# def pi_k(PPM_symbol_vector, bit_LLR):
-#     return np.sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLR[i] for i in range(len(bit_LLR))])
-
-
 def calculate_gammas(trellis: Trellis, received_sequence, num_output_bits, Es, N0, log_bcjr=True, verbose=False):
     if verbose:
         print('Calculating gammas')
@@ -244,7 +240,6 @@ def calculate_gammas(trellis: Trellis, received_sequence, num_output_bits, Es, N
 
                 if log_bcjr:
                     g = log_gamma(r, edge_output, Es, N0)
-                    # g = pi_k(edge.edge_output, received_codeword)
                 else:
                     g = gamma_awgn(r, edge_output, Es, N0)
 
@@ -264,8 +259,6 @@ def calculate_gamma_primes(trellis: Trellis):
     combinations = list(itertools.product([0, 1], repeat=2))
     for k, stage in enumerate(trellis.stages[:-1]):
         for i, j in combinations:
-            # edges = filter(lambda e: e.from_state == i and e.to_state == j, stage.states[i].edges)
-            # gammas = list(map(lambda e: e.gamma, edges))
             gammas = [e.gamma for e in stage.states[i].edges if (e.from_state == i and e.to_state == j)]
             if not gammas:
                 continue
@@ -348,10 +341,7 @@ def calculate_inner_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs):
         edges = flatten(list(map(lambda s: s.edges, stage.states)))
 
         for i in range(trellis.num_input_bits):
-            # This is a code efficient implementation, even though there is slightly
-            # more overhead compared to a simple for loop.
-            # zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 0, edges)))
-            # ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input[i] == 1, edges)))
+            # Get all lambdas for edges that have 0 / 1 as input
             zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_input[i] == 0]
             ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_input[i] == 1]
 
@@ -359,10 +349,6 @@ def calculate_inner_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs):
                 max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
 
     return LLRs
-
-
-def get_lmbda_from_edge(edge):
-    return edge.lmbda
 
 
 def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
@@ -395,13 +381,6 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
 
         for i in range(trellis.num_output_bits):
             # First, select all edges with 0 (or 1) at the i-th output bit, then of those edges, take the lambda value.
-            # This is a code efficient implementation, even though there is slightly
-            # more overhead compared to a simple for loop.
-            # zero_edges_lmbdas: list[float] = list(
-            #     map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 0, edges)))
-            # ones_edges_lmbdas: list[float] = list(
-            #     map(lambda e: e.lmbda, filter(lambda e: e.edge_output[i] == 1, edges)))
-
             zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_output[i] == 0]
             ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_output[i] == 1]
 
@@ -415,9 +394,6 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
 
             p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - \
                 max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
-
-        # zero_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 0, edges)))
-        # ones_edges_lmbdas = list(map(lambda e: e.lmbda, filter(lambda e: e.edge_input == 1, edges)))
 
         zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_input == 0]
         ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_input == 1]
@@ -435,9 +411,6 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
 def predict(trellis: Trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, verbose=False):
     """Use the BCJR algorithm to predict the sent message, based on the received sequence. """
     time_steps = len(received_sequence)
-
-    alpha = np.zeros((trellis.num_states, time_steps + 1))
-    beta = np.zeros((trellis.num_states, time_steps + 1))
 
     # Calculate alphas, betas, gammas and LLRs
     calculate_gammas(trellis, received_sequence, trellis.num_output_bits, Es, N0, log_bcjr=LOG_BCJR)
@@ -619,8 +592,6 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
             symbol_bit_LLRs = deepcopy(p_ak_I.reshape(-1, m))
 
             u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
-            ABC = randomize(np.array(u_hat[:-34], dtype=int))
-            crc = get_CRC(np.array(u_hat[:-34]))
 
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
