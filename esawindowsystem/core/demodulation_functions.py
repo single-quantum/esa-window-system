@@ -19,14 +19,15 @@ def get_num_events(
         message_peak_locations: npt.NDArray[np.float_],
         slot_starts: npt.NDArray[np.float_]) -> npt.NDArray[np.int_]:
 
+    message_peak_locations = np.concatenate(([message_peak_locations[0] + 0.001E-7], message_peak_locations))
+
     for j in range(num_slots_per_codeword):
         idx_arr_1: npt.NDArray[np.bool] = message_peak_locations >= slot_starts[j]
         idx_arr_2: npt.NDArray[np.bool] = message_peak_locations < slot_starts[j+1]
-        events = message_peak_locations[
-            (idx_arr_1) & (idx_arr_2)
-        ]
+        events = message_peak_locations[(idx_arr_1) & (idx_arr_2)]
 
         num_events: int = events.shape[0]
+        # num_events_2 = np.nonzero((idx_arr_1) & (idx_arr_2))[0].shape[0]
         num_events_per_slot[i, j] = num_events
 
     return num_events_per_slot
