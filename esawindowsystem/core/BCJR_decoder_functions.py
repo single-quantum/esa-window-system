@@ -9,6 +9,9 @@ import numpy.typing as npt
 from numpy import dot
 from tqdm import tqdm
 
+# from esawindowsystem.core.max_star import max_star, max_star_recursive
+from esawindowsystem.core.BCJR_decoder_utils import (max_star_lru,
+                                                     max_star_recursive)
 from esawindowsystem.core.encoder_functions import (BitArray, bit_deinterleave,
                                                     bit_interleave,
                                                     channel_deinterleave,
@@ -20,9 +23,6 @@ from esawindowsystem.core.trellis import Edge, Trellis
 from esawindowsystem.core.utils import (flatten, generate_inner_encoder_edges,
                                         generate_outer_code_edges,
                                         poisson_noise)
-
-# from esawindowsystem.core.max_star import max_star, max_star_recursive
-from esawindowsystem.core.BCJR_decoder_utils import max_star_lru, max_star_recursive
 
 
 def gamma_awgn(r, v, Es, N0): return exp(Es / N0 * 2 * dot(r, v))
@@ -423,7 +423,7 @@ def pi_ck(
     This formula is given in Moision on page 12, below formula 13.
     """
     output_sequence = deepcopy(input_sequence)
-    output_sequence = output_sequence*np.log(1+ns/nb)/np.log(ns/nb)
+    output_sequence = output_sequence * np.log(1 + ns / nb) / np.log(ns / nb)
 
     return output_sequence
 
@@ -452,7 +452,17 @@ def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods: npt.NDArray[
                 edge.gamma = np.sum(0.5 * gamma_partial * symbol_llrs)
 
 
-def make_edge_output_array(states):
+def set_outer_code_gammas_arr(
+        trellis: Trellis,
+        edge_outputs: npt.NDArray[np.int_],
+        symbol_log_likelihoods: npt.NDArray[np.float_]) -> None:
+    """Set outer code gammas based on edge output array. """
+
+    symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
+    edge_gammas: npt.NDArray[np.float_] = np.sum(0.5 * ((-1)**edge_outputs) * symbol_log_likelihoods, axis=3)
+
+
+def get_edge_output_array(trellis: Trellis) -> npt.NDArray[np.int_]:
     num_stages = len(trellis.stages) - 1
     stage = trellis.stages[0]
     num_states = len(stage.states)
@@ -469,8 +479,7 @@ def make_edge_output_array(states):
                 edge_outputs[i, j, k, :] = edge.edge_output
 
     edge_outputs = np.transpose(edge_outputs, (2, 1, 0, 3))
-
-    edge_gammas = np.sum(0.5*((-1)**edge_outputs)*symbol_log_likelihoods[:num_stages, :], axis=3)
+    return edge_outputs
 
 
 def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 20,

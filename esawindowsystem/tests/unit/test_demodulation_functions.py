@@ -1,15 +1,38 @@
 import numpy as np
+import pytest
 
-from esawindowsystem.core.demodulation_functions import get_num_events
+from esawindowsystem.core.demodulation_functions import (get_num_events,
+                                                         get_num_events_2)
 
 
-def test_get_num_events():
-    slot_starts = np.array([0, 1E-6, 2E-6])
-    num_slots_per_codeword = 10
-    num_events_per_slot = np.zeros((2, num_slots_per_codeword))
+@pytest.fixture
+def short_message():
+    num_slots_per_codeword = 1000
+    slot_length = 1E-6
+    slot_starts = np.arange(0, (num_slots_per_codeword + 1) * slot_length, slot_length)
+
     message_peak_locations = np.array([0, 0.1E-7, 1.1E-6, 2.1E-6, 2.2E-6, 2.3E-6])
 
-    result = get_num_events(0, num_events_per_slot,
-                            num_slots_per_codeword, message_peak_locations, slot_starts)
+    return num_slots_per_codeword, slot_starts, message_peak_locations
+
+
+def test_get_num_events(short_message, benchmark):
+    num_slots_per_codeword, slot_starts, message_peak_locations = short_message
+
+    num_events_per_slot = np.zeros((2, num_slots_per_codeword))
+
+    result = benchmark(get_num_events, 0, num_events_per_slot,
+                       num_slots_per_codeword, message_peak_locations, slot_starts)
 
     assert result[0, 0] == 2
+
+
+def test_get_num_events_2(short_message, benchmark):
+    _, slot_starts, message_peak_locations = short_message
+
+    result = benchmark(get_num_events_2, message_peak_locations, slot_starts)
+
+    # Looking at the timestamps above, this should be easy to deduce
+    assert result[0] == 2
+    assert result[1] == 1
+    assert result[2] == 3
