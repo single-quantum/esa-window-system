@@ -162,7 +162,7 @@ def unpuncture(encoded_sequence: BitArray, code_rate: Fraction,
     return unpunctured_sequence
 
 
-def puncture(convoluted_bit_sequence: npt.NDArray[np.int_ | np.float_],
+def puncture(convoluted_bit_sequence: npt.NDArray[np.int_ | np.float64],
              code_rate: Fraction, dtype: type[int] | type[float] = int) -> BitArray:
     """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """
     puncture_scheme: dict[Fraction, list[int]] = {

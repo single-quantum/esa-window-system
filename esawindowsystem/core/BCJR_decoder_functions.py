@@ -111,7 +111,7 @@ def calculate_alpha_inner_SISO(trellis: Trellis, gamma_primes, log_bcjr=True):
         for state in stage.states:
             a0 = previous_states[0].alpha + gamma_primes[0, state.label, k - 1]
             if k == 1:
-                state.alpha = max_star_lru(a0, -np.infty)
+                state.alpha = max_star_lru(a0, -np.inf)
             else:
                 a1 = previous_states[1].alpha + gamma_primes[1, state.label, k - 1]
                 state.alpha = max_star_lru(a0, a1)
@@ -231,7 +231,7 @@ def calculate_gamma_primes(trellis: Trellis):
     return gamma_prime
 
 
-def calculate_LLRs(trellis: Trellis, log_bcjr=True, verbose=False) -> npt.NDArray[np.float_]:
+def calculate_LLRs(trellis: Trellis, log_bcjr=True, verbose=False) -> npt.NDArray[np.float64]:
     """ Calculate the Log likelihoods given a set of alphas, gammas and betas.
 
     The Log-likelihood Ratio (LLR) is the ratio between two a posteriori probabilies.
@@ -349,8 +349,8 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
             ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_output[i] == 1]
 
             if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
-                p_xk_O[k, i] = max_star_lru(zero_edges_lmbdas[0], -np.infty) - \
-                    max_star_lru(ones_edges_lmbdas[0], -np.infty) - symbol_bit_LLRs[k, i]
+                p_xk_O[k, i] = max_star_lru(zero_edges_lmbdas[0], -np.inf) - \
+                    max_star_lru(ones_edges_lmbdas[0], -np.inf) - symbol_bit_LLRs[k, i]
                 continue
             if len(ones_edges_lmbdas) == 0 and len(zero_edges_lmbdas) != 0:
                 p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - symbol_bit_LLRs[k, i]
@@ -363,7 +363,7 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
         ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_input == 1]
 
         if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
-            p_uk_O[k] = max_star_lru(zero_edges_lmbdas[0], -np.infty) - max_star_lru(ones_edges_lmbdas[0], -np.infty)
+            p_uk_O[k] = max_star_lru(zero_edges_lmbdas[0], -np.inf) - max_star_lru(ones_edges_lmbdas[0], -np.inf)
         elif len(ones_edges_lmbdas) == 0 and len(zero_edges_lmbdas) != 0:
             p_uk_O[k] = max_star_recursive(zero_edges_lmbdas)
         else:
@@ -415,9 +415,9 @@ def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt
 
 
 def pi_ck(
-        input_sequence: npt.NDArray[np.float_],
+        input_sequence: npt.NDArray[np.float64],
         ns: float,
-        nb: float) -> npt.NDArray[np.float_]:
+        nb: float) -> npt.NDArray[np.float64]:
     """Calculate symbol log likelihood, based on likelihoods from the channel (Poisson statistics).
 
     This formula is given in Moision on page 12, below formula 13.
@@ -440,7 +440,7 @@ for idx, _ in np.ndenumerate(np.zeros((2, 2, 2))):
     edge_gamma_partial[(idx[0], idx[1], idx[2])] = (-1)**np.array([idx[0], idx[1], idx[2]])
 
 
-def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods: npt.NDArray[np.float_]):
+def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods: npt.NDArray[np.float64]):
     symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
 
     for k, stage in enumerate(trellis.stages[:-1]):
@@ -455,11 +455,12 @@ def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods: npt.NDArray[
 def set_outer_code_gammas_arr(
         trellis: Trellis,
         edge_outputs: npt.NDArray[np.int_],
-        symbol_log_likelihoods: npt.NDArray[np.float_]) -> None:
+        symbol_log_likelihoods: npt.NDArray[np.float64]) -> None:
     """Set outer code gammas based on edge output array. """
 
     symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
-    edge_gammas: npt.NDArray[np.float_] = np.sum(0.5 * ((-1)**edge_outputs) * symbol_log_likelihoods, axis=3)
+    edge_gammas: npt.NDArray[np.float64] = np.sum(0.5 * ((-1)**edge_outputs) * symbol_log_likelihoods, axis=3)
+    return edge_gammas
 
 
 def get_edge_output_array(trellis: Trellis) -> npt.NDArray[np.int_]:

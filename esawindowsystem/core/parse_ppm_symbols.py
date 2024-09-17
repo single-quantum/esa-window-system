@@ -109,9 +109,9 @@ def plot_symbol_times(
 def find_pulses_within_symbol_frame(
     i: int,
     symbol_length: float,
-    bin_times: npt.NDArray[np.float_],
+    bin_times: npt.NDArray[np.float64],
     start_time: float
-) -> tuple[npt.NDArray[np.float_], float, float]:
+) -> tuple[npt.NDArray[np.float64], float, float]:
     """Find all time events (pulses) within the given symbol frame, defined by i and the symbol length.
 
     Returns a list of time events within the frame, as well as the symbol start and end time.
@@ -119,7 +119,7 @@ def find_pulses_within_symbol_frame(
     symbol_start: float = start_time + i * symbol_length
     symbol_end: float = start_time + (i + 1) * symbol_length
 
-    symbol_frame_pulses: npt.NDArray[np.float_] = bin_times[np.logical_and(
+    symbol_frame_pulses: npt.NDArray[np.float64] = bin_times[np.logical_and(
         bin_times >= symbol_start, bin_times <= symbol_end)]
 
     return symbol_frame_pulses, symbol_start, symbol_end
@@ -144,7 +144,7 @@ def check_timing_requirement(pulse: float, symbol_start: float, slot_length: flo
 
 
 def parse_ppm_symbols(
-        pulse_times: npt.NDArray[np.float_],
+        pulse_times: npt.NDArray[np.float64],
         codeword_start_time: float,
         stop_time: float,
         slot_length: float,
