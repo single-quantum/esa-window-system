@@ -21,7 +21,8 @@ from esawindowsystem.core.scppm_decoder import DecoderError, decode
 from esawindowsystem.core.trellis import Trellis
 from esawindowsystem.core.utils import flatten
 from esawindowsystem.generate_awg_pattern import generate_awg_pattern
-from esawindowsystem.ppm_parameters import (CODE_RATE, GREYSCALE, IMG_SHAPE, IMG_FILE_PATH, M,
+from esawindowsystem.ppm_parameters import (CODE_RATE, GREYSCALE,
+                                            IMG_FILE_PATH, IMG_SHAPE, M,
                                             num_samples_per_slot,
                                             num_slots_per_symbol,
                                             sample_size_awg, slot_length,
@@ -87,7 +88,7 @@ def simulate_darkcounts_timestamps(rng, lmbda: float, msg_peaks: npt.NDArray[np.
 
 def get_simulated_message_peak_locations(
         msg_peaks: npt.NDArray[np.int_],
-        time_series: npt.NDArray[np.float_],
+        time_series: npt.NDArray[np.float64],
         simulate_noise_peaks: bool,
         simulate_lost_symbols: bool,
         simulate_darkcounts: bool,
@@ -193,8 +194,8 @@ bit_error_ratios_before_std = []
 mean_SNRs = []
 
 msg_peaks: npt.NDArray[np.int_] = np.array([])
-time_series: npt.NDArray[np.float_] = np.array([])
-peak_locations: npt.NDArray[np.float_] = np.array([])
+time_series: npt.NDArray[np.float64] = np.array([])
+peak_locations: npt.NDArray[np.float64] = np.array([])
 
 if use_test_file:
     if not Path.is_file(Path(time_events_filename)):
@@ -368,8 +369,8 @@ for df, detection_efficiency in enumerate([0.70]):
         # plt.show()
 
         # print()
-    BERS_after_arr: npt.NDArray[np.float_] = np.array(BERS_after, dtype=float)
-    BERS_before_arr: npt.NDArray[np.float_] = np.array(BERS_before, dtype=float)
+    BERS_after_arr: npt.NDArray[np.float64] = np.array(BERS_after, dtype=float)
+    BERS_before_arr: npt.NDArray[np.float64] = np.array(BERS_before, dtype=float)
 
     # BERS_after = BERS_after[np.where(BERS_after <= 3 * np.std(BERS_after))[0]]
     if plot_BER_distribution:
