@@ -452,15 +452,26 @@ def set_outer_code_gammas(trellis: Trellis, symbol_log_likelihoods: npt.NDArray[
                 edge.gamma = np.sum(0.5 * gamma_partial * symbol_llrs)
 
 
-def set_outer_code_gammas_arr(
-        trellis: Trellis,
+def get_outer_code_gammas_arr(
         edge_outputs: npt.NDArray[np.int_],
-        symbol_log_likelihoods: npt.NDArray[np.float64]) -> None:
+        symbol_log_likelihoods: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """Set outer code gammas based on edge output array. """
 
     symbol_log_likelihoods = symbol_log_likelihoods.reshape((-1, 3))
-    edge_gammas: npt.NDArray[np.float64] = np.sum(0.5 * ((-1)**edge_outputs) * symbol_log_likelihoods, axis=3)
+    edge_gammas: npt.NDArray[np.float64] = np.sum(
+        0.5 * ((-1)**np.transpose(edge_outputs, (2, 1, 0, 3))) * symbol_log_likelihoods, axis=3)
+
+    # Transpose, such that the structure is (stages, states, edges)
+    edge_gammas = np.transpose(edge_gammas, (2, 1, 0))
+
     return edge_gammas
+
+
+def set_outer_code_gammas_arr(trellis: Trellis, edge_gammas: npt.NDArray[np.float64]) -> None:
+    for i, stage in enumerate(trellis.stages[:-1]):
+        for j, state in enumerate(stage.states):
+            for k, edge in enumerate(state.edges):
+                edge.gamma = edge_gammas[i, j, k]
 
 
 def get_edge_output_array(trellis: Trellis) -> npt.NDArray[np.int_]:
@@ -479,7 +490,6 @@ def get_edge_output_array(trellis: Trellis) -> npt.NDArray[np.int_]:
             for k, edge in enumerate(state.edges):
                 edge_outputs[i, j, k, :] = edge.edge_output
 
-    edge_outputs = np.transpose(edge_outputs, (2, 1, 0, 3))
     return edge_outputs
 
 
@@ -557,6 +567,8 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
                             num_bits_per_slice, outer_edges, num_input_bits_outer)
     outer_trellis.set_edges(outer_edges)
 
+    outer_code_edge_outputs: npt.NDArray[np.int8] = get_edge_output_array(outer_trellis)
+
     for i in range(num_slices):
         print(f'Decoding slice {i+1}/{num_slices}')
         # Generate a vector with a poisson distributed number of photons per slot
@@ -577,7 +589,10 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
 
             p_xk_I = unpuncture(p_xk_I, code_rate, dtype=float)
 
-            set_outer_code_gammas(outer_trellis, p_xk_I)
+            edge_gammas = get_outer_code_gammas_arr(outer_code_edge_outputs, p_xk_I)
+            set_outer_code_gammas_arr(outer_trellis, edge_gammas)
+            # set_outer_code_gammas(outer_trellis, p_xk_I)
+
             calculate_alphas(outer_trellis)
             calculate_betas(outer_trellis)
             p_xk_O, LLRs_u = calculate_outer_SISO_LLRs(outer_trellis, p_xk_I)
