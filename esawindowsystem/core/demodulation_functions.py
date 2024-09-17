@@ -21,108 +21,6 @@ def get_num_events(
         message_peak_locations: npt.NDArray[np.float64],
         slot_starts: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
 
-    for j in range(num_slots_per_codeword):
-        idx_arr_1: npt.NDArray[np.bool] = message_peak_locations >= slot_starts[j]
-        idx_arr_2: npt.NDArray[np.bool] = message_peak_locations < slot_starts[j + 1]
-        events = message_peak_locations[(idx_arr_1) & (idx_arr_2)]
-
-        num_events: int = events.shape[0]
-        # num_events_2 = np.nonzero((idx_arr_1) & (idx_arr_2))[0].shape[0]
-        num_events_per_slot[i, j] = num_events
-
-    return num_events_per_slot
-
-
-def initialize_arr(slot_starts, message_peak_locations):
-    # Negligible execution time
-    message_peak_locations_copied = np.empty((slot_starts.shape[0], message_peak_locations.shape[0]))
-    return message_peak_locations_copied
-
-
-def copy_rows(output_arr, input_arr):
-    output_arr[...] = input_arr
-    return output_arr
-
-
-def transpose_arr(input_arr):
-    # Negligible execution time
-    return np.transpose(input_arr)
-
-
-def find_larger_than(message_peak_locations_copied, slot_starts):
-    larger_than = message_peak_locations_copied >= slot_starts
-    return larger_than
-
-
-def find_less_than(message_peak_locations_copied, slot_starts):
-    less_than = message_peak_locations_copied < slot_starts
-    return less_than
-
-
-def sum_arr(arr1, arr2):
-    return np.sum((arr1 & arr2), axis=0)
-
-
-def roll_arr(arr, idx, axis):
-    return np.roll(arr, idx, axis=axis)
-
-
-def get_num_events_2(
-        message_peak_locations: npt.NDArray[np.float64],
-        slot_starts: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
-
-    num_slots: int = slot_starts.shape[0]
-    chunk_size = 5000
-    num_chunks: int = ceil(num_slots/chunk_size)
-
-    num_events = np.empty((num_slots,), dtype=np.int_)
-
-    message_peak_locations_copied = np.empty((chunk_size, message_peak_locations.shape[0]))
-    message_peak_locations_copied[:] = message_peak_locations
-    message_peak_locations_copied = np.transpose(message_peak_locations_copied)
-
-    i = 0
-    for i in range(num_chunks):
-        remainder = slot_starts.shape[0] - i*chunk_size
-
-        if remainder < chunk_size:
-            A = message_peak_locations_copied[:, :remainder] >= slot_starts[i*chunk_size:(i+1)*chunk_size]
-            B = message_peak_locations_copied[:, :remainder] < slot_starts[i*chunk_size:(i+1)*chunk_size]
-        else:
-            A = message_peak_locations_copied >= slot_starts[i*chunk_size:(i+1)*chunk_size]
-            B = message_peak_locations_copied < slot_starts[i*chunk_size:(i+1)*chunk_size]
-
-        B = roll_arr(B, -1, 1)
-
-        num_events[i*chunk_size:(i+1)*chunk_size] = np.sum((A & B), axis=0)
-
-    return num_events
-
-
-def get_num_events_2_profiling(
-        message_peak_locations: npt.NDArray[np.float64],
-        slot_starts: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
-
-    message_peak_locations_copied = initialize_arr(slot_starts, message_peak_locations)
-    message_peak_locations_copied = copy_rows(message_peak_locations_copied, message_peak_locations)
-    message_peak_locations_copied = transpose_arr(message_peak_locations_copied)
-    # message_peak_locations_copied = np.tile(message_peak_locations, (slot_starts.shape[0], 1))
-
-    A = find_larger_than(message_peak_locations_copied, slot_starts)
-    B = find_less_than(message_peak_locations_copied, slot_starts)
-    B = roll_arr(B, -1, 1)
-    num_events = sum_arr(A, B)
-
-    return num_events
-
-
-def get_num_events_3(
-        i: int,
-        num_events_per_slot: npt.NDArray[np.int_],
-        num_slots_per_codeword: int,
-        message_peak_locations: npt.NDArray[np.float64],
-        slot_starts: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
-
     message_peak_locations = np.insert(message_peak_locations, 0, message_peak_locations[0]+1E-10)
 
     for j in range(message_peak_locations.shape[0]):
@@ -488,7 +386,7 @@ def get_num_events_per_slot(
 
         slot_starts = csm_time + np.arange(num_slots_per_codeword + 1) * slot_length
 
-        num_events_per_slot = get_num_events_3(
+        num_events_per_slot = get_num_events(
             i, num_events_per_slot, num_slots_per_codeword, message_peak_locations, slot_starts)
         # num_events = get_num_events(message_peak_locations, slot_starts, 2000)
         # num_events_per_slot[i, :] = num_events[:-1]
