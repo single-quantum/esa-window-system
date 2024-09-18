@@ -10,6 +10,7 @@ from numpy import dot
 from tqdm import tqdm
 
 # from esawindowsystem.core.max_star import max_star, max_star_recursive
+from esawindowsystem.core.numba_utils import max_star_recursive_numba
 from esawindowsystem.core.BCJR_decoder_utils import (max_star_lru,
                                                      max_star_recursive)
 from esawindowsystem.core.encoder_functions import (BitArray, bit_deinterleave,
@@ -72,7 +73,7 @@ def calculate_alphas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = Fa
                     alpha_ji.append(previous_state.alpha * edge.gamma)
 
             if log_bcjr and len(alpha_ji) > 1:
-                state.alpha = max_star_recursive(alpha_ji)
+                state.alpha = max_star_recursive_numba(np.array(alpha_ji))
             elif log_bcjr and alpha_ji:
                 state.alpha = alpha_ji[0]
             else:
@@ -176,7 +177,7 @@ def calculate_betas(trellis: Trellis, log_bcjr: bool = True, verbose: bool = Fal
                         beta_ji.append(next_stage.states[edge.to_state].beta * edge.gamma)
 
                 if log_bcjr and len(beta_ji) > 1:
-                    state.beta = max_star_recursive(beta_ji)
+                    state.beta = max_star_recursive_numba(np.array(beta_ji))
                 elif log_bcjr and beta_ji:
                     state.beta = beta_ji[0]
                 else:
@@ -218,15 +219,31 @@ def calculate_gamma_inner_SISO(trellis: Trellis, symbol_bit_LLRs, channel_log_li
                     channel_log_likelihoods[k, edge.edge_output_label]
 
 
+def calculate_gamma_inner_SISO_arr(trellis: Trellis, edge_inputs: npt.NDArray[np.int8], symbol_bit_LLRs: npt.NDArray[np.int8], channel_log_likelihoods):
+    edge_inputs_T: npt.NDArray[np.int8] = np.transpose(edge_inputs, (2, 1, 0, 3))
+    edge_gamma: npt.NDArray[np.float64] = np.sum(0.5*(-1)**edge_inputs_T*symbol_bit_LLRs, axis=3)
+
+    for i, stage in enumerate(trellis.stages[:-1]):
+        for j, state in enumerate(stage.states):
+            for k, edge in enumerate(state.edges):
+                # if not np.all(symbol_bit_LLRs[k] == 0):
+                #     xyz = 1
+                edge.gamma = edge_gamma[k, j, i] + channel_log_likelihoods[i, edge.edge_output_label]
+
+
+def set_gamma_inner_SISO():
+    return
+
+
 def calculate_gamma_primes(trellis: Trellis):
     gamma_prime = np.zeros((2, 2, len(trellis.stages[:-1])))
     combinations = list(itertools.product([0, 1], repeat=2))
     for k, stage in enumerate(trellis.stages[:-1]):
         for i, j in combinations:
-            gammas = [e.gamma for e in stage.states[i].edges if (e.from_state == i and e.to_state == j)]
-            if not gammas:
+            gammas = np.array([e.gamma for e in stage.states[i].edges if (e.from_state == i and e.to_state == j)])
+            if gammas.shape[0] == 0:
                 continue
-            gamma_prime[i, j, k] = max_star_recursive(gammas)
+            gamma_prime[i, j, k] = max_star_recursive_numba(gammas)
 
     return gamma_prime
 
@@ -272,7 +289,7 @@ def calculate_LLRs(trellis: Trellis, log_bcjr=True, verbose=False) -> npt.NDArra
         elif len(numerator) == 0 and len(denomenator) >= 1:
             LLR[t] = -np.inf
         else:
-            LLR[t] = max_star_recursive(numerator) - max_star_recursive(denomenator)
+            LLR[t] = max_star_recursive_numba(np.array(numerator)) - max_star_recursive_numba(np.array(denomenator))
 
     return LLR
 
@@ -309,8 +326,8 @@ def calculate_inner_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs):
             zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_input[i] == 0]
             ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_input[i] == 1]
 
-            LLRs[k, i] = max_star_recursive(zero_edges_lmbdas) - \
-                max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
+            LLRs[k, i] = max_star_recursive_numba(np.array(zero_edges_lmbdas)) - \
+                max_star_recursive_numba(np.array(ones_edges_lmbdas)) - symbol_bit_LLRs[k, i]
 
     return LLRs
 
@@ -353,11 +370,11 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
                     max_star_lru(ones_edges_lmbdas[0], -np.inf) - symbol_bit_LLRs[k, i]
                 continue
             if len(ones_edges_lmbdas) == 0 and len(zero_edges_lmbdas) != 0:
-                p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - symbol_bit_LLRs[k, i]
+                p_xk_O[k, i] = max_star_recursive_numba(np.array(zero_edges_lmbdas)) - symbol_bit_LLRs[k, i]
                 continue
 
-            p_xk_O[k, i] = max_star_recursive(zero_edges_lmbdas) - \
-                max_star_recursive(ones_edges_lmbdas) - symbol_bit_LLRs[k, i]
+            p_xk_O[k, i] = max_star_recursive_numba(np.array(zero_edges_lmbdas)) - \
+                max_star_recursive_numba(np.array(ones_edges_lmbdas)) - symbol_bit_LLRs[k, i]
 
         zero_edges_lmbdas = [e.lmbda for e in edges if e.edge_input == 0]
         ones_edges_lmbdas = [e.lmbda for e in edges if e.edge_input == 1]
@@ -365,9 +382,10 @@ def calculate_outer_SISO_LLRs(trellis: Trellis, symbol_bit_LLRs, log_bcjr=True):
         if len(zero_edges_lmbdas) == 1 and len(ones_edges_lmbdas) == 1:
             p_uk_O[k] = max_star_lru(zero_edges_lmbdas[0], -np.inf) - max_star_lru(ones_edges_lmbdas[0], -np.inf)
         elif len(ones_edges_lmbdas) == 0 and len(zero_edges_lmbdas) != 0:
-            p_uk_O[k] = max_star_recursive(zero_edges_lmbdas)
+            p_uk_O[k] = max_star_recursive_numba(np.array(zero_edges_lmbdas))
         else:
-            p_uk_O[k] = max_star_recursive(zero_edges_lmbdas) - max_star_recursive(ones_edges_lmbdas)
+            p_uk_O[k] = max_star_recursive_numba(np.array(zero_edges_lmbdas)) - \
+                max_star_recursive_numba(np.array(ones_edges_lmbdas))
 
     return p_xk_O, p_uk_O
 
@@ -389,12 +407,13 @@ def predict(trellis: Trellis, received_sequence, LOG_BCJR=True, Es=10, N0=1, ver
     return u_hat
 
 
-def predict_inner_SISO(trellis: Trellis, channel_log_likelihoods, time_steps, m, symbol_bit_LLRs=None):
+def predict_inner_SISO(trellis: Trellis, edge_inputs, channel_log_likelihoods, time_steps: int, m: int, symbol_bit_LLRs=None):
     if symbol_bit_LLRs is None:
         symbol_bit_LLRs = np.zeros((time_steps, m))
 
     # Calculate alphas, betas, gammas and LLRs
-    calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods)
+    # calculate_gamma_inner_SISO(trellis, symbol_bit_LLRs, channel_log_likelihoods)
+    calculate_gamma_inner_SISO_arr(trellis, edge_inputs, symbol_bit_LLRs, channel_log_likelihoods)
     gamma_primes = calculate_gamma_primes(trellis)
 
     calculate_alpha_inner_SISO(trellis, gamma_primes)
@@ -432,7 +451,7 @@ def pi_ak(PPM_symbol_vector, bit_LLRs):
     """Calculate symbol log likelihood, based on bit likelihoods from outer SISO
 
     This formula is given in Moision on page 9, below formula 10. """
-    return sum([0.5 * (-1)**PPM_symbol_vector[i] * bit_LLRs[i] for i in range(len(bit_LLRs))])
+    return np.sum(0.5 * (-1)**PPM_symbol_vector * bit_LLRs)
 
 
 edge_gamma_partial: dict[tuple[int, int, int], npt.NDArray[np.int_]] = {}
@@ -491,6 +510,25 @@ def get_edge_output_array(trellis: Trellis) -> npt.NDArray[np.int_]:
                 edge_outputs[i, j, k, :] = edge.edge_output
 
     return edge_outputs
+
+
+def get_edge_input_array(trellis: Trellis) -> npt.NDArray[np.int8]:
+    num_stages = len(trellis.stages) - 1
+    stage = trellis.stages[0]
+    num_states = len(stage.states)
+    num_edges = len(stage.states[0].edges)
+
+    edge_inputs = np.empty(
+        (num_stages, num_states, num_edges, len(stage.states[0].edges[0].edge_output))
+    )
+    edge_inputs[:] = np.nan
+
+    for i, stage in enumerate(trellis.stages[:num_stages]):
+        for j, state in enumerate(stage.states):
+            for k, edge in enumerate(state.edges):
+                edge_inputs[i, j, k, :] = edge.edge_input
+
+    return edge_inputs
 
 
 def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 20,
@@ -568,6 +606,7 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
     outer_trellis.set_edges(outer_edges)
 
     outer_code_edge_outputs: npt.NDArray[np.int8] = get_edge_output_array(outer_trellis)
+    inner_code_edge_inputs: npt.NDArray[np.int8] = get_edge_input_array(inner_trellis)
 
     for i in range(num_slices):
         print(f'Decoding slice {i+1}/{num_slices}')
@@ -583,7 +622,7 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
 
         for iteration in range(max_num_iterations):
             print(f'Iteration {iteration+1}/{max_num_iterations}')
-            p_ak_O = predict_inner_SISO(inner_trellis, channel_log_likelihoods,
+            p_ak_O = predict_inner_SISO(inner_trellis, inner_code_edge_inputs, channel_log_likelihoods,
                                         time_steps_inner, m, symbol_bit_LLRs=symbol_bit_LLRs)
             p_xk_I = bit_deinterleave(p_ak_O.flatten(), dtype=float)
 

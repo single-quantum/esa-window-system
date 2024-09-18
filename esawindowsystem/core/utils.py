@@ -117,7 +117,7 @@ def generate_outer_code_edges(memory_size: int, bpsk_encoding: bool = True) -> l
 def generate_inner_encoder_edges(num_input_bits: int, bpsk_encoding: bool = True) -> list[list[Edge]]:
     input_combinations: list[tuple[int, ...]] = list(itertools.product([0, 1], repeat=num_input_bits))
     edges: list[list[Edge]] = []
-    input_bits: tuple[int, ...]
+    input_bits: tuple[int, ...] | npt.NDArray[np.int8]
     for initial_state in [0, 1]:
         state_edges: list[Edge] = []
         for input_bits in input_combinations:
@@ -134,7 +134,7 @@ def generate_inner_encoder_edges(num_input_bits: int, bpsk_encoding: bool = True
                 output = list(bpsk(output))
 
             e = Edge()
-            e.set_edge(initial_state, current_state, input_bits, output, gamma=None)
+            e.set_edge(initial_state, current_state, np.array(input_bits), output, gamma=None)
             state_edges.append(e)
 
         edges.append(state_edges)

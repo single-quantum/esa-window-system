@@ -29,10 +29,10 @@ def max_star_lru(a: float, b: float) -> float:
     The second term is cached for optimization reasons.
     """
     # When a or b is > 5, the correction term is already so small that we can discard it.
-    if abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
-        return max(a, b)
-    elif a == -np.inf or b == -np.inf:
+    if a == -np.inf or b == -np.inf:
         return max(a, b) + np.log(2)
+    elif abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
+        return max(a, b)
     else:
         return max(a, b) + max_log_lookup[(round(a), round(b))]
 

@@ -27,7 +27,7 @@ class Edge:
             self,
             from_state: int,
             to_state: int,
-            edge_input: int | list[int] | tuple[int, ...],
+            edge_input: int | list[int] | tuple[int, ...] | npt.NDArray[np.int8],
             edge_output: npt.NDArray[np.int_] | list[int] | tuple[int, ...],
             gamma: float | None):
 

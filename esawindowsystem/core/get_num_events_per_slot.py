@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import numpy.typing as npt
 from numba import jit, njit, prange, types
@@ -32,7 +34,7 @@ def get_num_events(
 
 
 @cc.export('get_num_events_numba', 'i4[:](f8[:], f8[:], i4)')
-@njit()
+@njit
 def get_num_events_2(
         message_peak_locations: npt.NDArray[np.float64],
         slot_starts: npt.NDArray[np.float64],
@@ -64,6 +66,51 @@ def get_num_events_2(
         num_events[i*chunk_size:(i+1)*chunk_size] = np.sum((A & B), axis=0)
 
     return num_events
+
+
+keys = list(itertools.product(range(-6, 6), repeat=2))
+
+size_arr: int = 12
+max_log_lookup_arr: npt.NDArray[np.float64] = np.zeros((size_arr, size_arr), dtype=np.float64)
+
+for key in keys:
+    idx1 = key[0]+6
+    idx2 = key[1]+6
+
+    max_log_lookup_arr[idx1, idx2] = np.log(1 + np.exp(-abs(key[0] - key[1])))
+
+
+@cc.export('max_star_numba', 'f8(f8, f8)')
+@njit
+def max_star_numba(a: float, b: float) -> float:
+    """Calculate the max star of a and b, which is a modified max function.
+
+    This function is used mostly for optimization. The formal definition of max star is max*(a, b) = log(exp(a)+exp(b)).
+    Since this calculation comes up all the time in calculating LLRs and is relatively expensive, it is approximated by
+    max*(a, b) ~= max(a, b) + log(1+exp(-|a-b|)), where the second term serves as a correction to the max.
+    The second term is cached for optimization reasons.
+    """
+    # When a or b is > 5, the correction term is already so small that we can discard it.
+    if a == -np.inf or b == -np.inf:
+        return max(a, b) + np.log(2)
+    elif abs(a) > 5 or abs(b) > 5 or abs(a - b) > 5:
+        return max(a, b)
+    else:
+        idx1 = int(round(a)+6)
+        idx2 = int(round(b)+6)
+        return max(a, b) + max_log_lookup_arr[idx1, idx2]
+
+
+@cc.export('max_star_recursive_numba', 'f8(f8[:])')
+@njit
+def max_star_recursive_numba(arr: list[float] | npt.NDArray[np.float64]) -> float:
+    """Recursive implementation of the max star operator. """
+    result = max_star_numba(arr[0], arr[1])
+
+    for i in range(2, len(arr)):
+        result = max_star_numba(result, arr[i])
+
+    return result
 
 
 if __name__ == "__main__":
