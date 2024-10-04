@@ -164,7 +164,7 @@ def test_csm_time_shift_happy_path(pulse_timestamps_with_csm: tuple[npt.NDArray[
 def test_make_time_series_all_ones():
     slot_length = 1E-9
     time_stamps = np.arange(slot_length, 10 * slot_length, slot_length)
-    time_series = make_time_series(time_stamps, slot_length)
+    time_series, _ = make_time_series(time_stamps, slot_length)
 
     assert len(time_series) == len(time_stamps)
     assert np.all(time_series) == 1
@@ -175,7 +175,7 @@ def test_make_time_series():
     symbol_length = 10 * slot_length
     time_stamps = np.arange(0, 10 * symbol_length, symbol_length)
 
-    time_series = make_time_series(time_stamps, slot_length)
+    time_series, _ = make_time_series(time_stamps, slot_length)
 
     assert time_series[time_series == 1].shape[0] == 10
 

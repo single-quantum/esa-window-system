@@ -41,8 +41,11 @@ def test_set_edges_trellis_zero_terminated():
     tr = Trellis(memory_size, num_output_bits, time_steps, edge_template, 1)
     tr.set_edges(edge_template, zero_terminated=True)
 
+    print('edges', [s.edges for s in tr.stages[-2].states])
+
     # Whether zero terminated or not, the last states should have no edges
     for i in range(4):
+        print('i', i)
         assert len(tr.stages[-1].states[i].edges) == 0
     # The first and third state in the second to last stage should have only one possible transition to be zero terminated
     assert len(tr.stages[-2].states[0].edges) == 1

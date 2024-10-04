@@ -58,6 +58,6 @@ def test_outer_code_gammas_arr_based(trellis_fixture, benchmark):
     trellis, edge_outputs, symbol_log_likelihoods = trellis_fixture
 
     benchmark(
-        decoder_functions.set_outer_code_gammas_arr,
-        trellis, edge_outputs, symbol_log_likelihoods)
+        decoder_functions.get_outer_code_gammas_arr,
+        edge_outputs, symbol_log_likelihoods)
     assert True

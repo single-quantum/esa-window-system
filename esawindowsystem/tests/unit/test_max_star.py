@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from esawindowsystem.core.max_star import max_star
+from esawindowsystem.core.numba_utils import max_star_numba
 
 
 @pytest.fixture(scope="module", params=[
@@ -20,5 +20,5 @@ def a_and_b_values(request):
 def test_max_star_compare_to_analytical(a_and_b_values, benchmark):
     a, b = a_and_b_values
     analytical_value = np.log(np.exp(a) + np.exp(b))
-    result = benchmark(max_star, a, b)
+    result = benchmark(max_star_numba, a, b)
     assert result == approx(analytical_value, rel=2E-2)

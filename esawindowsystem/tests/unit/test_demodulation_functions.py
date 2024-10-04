@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from esawindowsystem.core.demodulation_functions import (get_num_events,
-                                                         get_num_events_2)
+from esawindowsystem.core.demodulation_functions import get_num_events
 
 
 @pytest.fixture
@@ -25,14 +24,3 @@ def test_get_num_events(short_message, benchmark):
                        num_slots_per_codeword, message_peak_locations, slot_starts)
 
     assert result[0, 0] == 2
-
-
-def test_get_num_events_2(short_message, benchmark):
-    _, slot_starts, message_peak_locations = short_message
-
-    result = benchmark(get_num_events_2, message_peak_locations, slot_starts)
-
-    # Looking at the timestamps above, this should be easy to deduce
-    assert result[0] == 2
-    assert result[1] == 1
-    assert result[2] == 3
