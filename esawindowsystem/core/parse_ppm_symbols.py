@@ -15,6 +15,7 @@ def plot_symbol_times(
     demodulated_symbols: list[float],
     num_symbols_per_codeword: int,
     start_symbol_index: int = 0,
+    num_symbols: int = 5,
     **kwargs
 ):
     """Used for debugging, this function plots the PPM symbol locations in time.
@@ -25,7 +26,6 @@ def plot_symbol_times(
 
     codeword_idx = kwargs.get('codeword_idx', 0)
     sent_symbols = deepcopy(sent_symbols[codeword_idx * num_symbols_per_codeword:])
-    num_symbols = 6
     t0 = codeword_start_time + start_symbol_index * symbol_length
     te = t0 + num_symbols * symbol_length
 
@@ -66,43 +66,48 @@ def plot_symbol_times(
                                 (i - start_symbol_index) * symbol_length for i in range(start_symbol_index, start_symbol_index + num_symbols)]
 
     num_slots_per_symbol = round(symbol_length / slot_length)
+    num_guard_slots = int(num_slots_per_symbol/5)
 
     fig, axs = plt.subplots(2, 1)
 
     axs[0].plot(plot_time_vector - t0, y_received)
     axs[0].set_title(
-        f'Received symbols (codeword = {codeword_idx+1}, symbols {start_symbol_index+1}-{start_symbol_index+num_symbols+1})')
+        f'Received symbols (codeword = {codeword_idx+1}, symbols {start_symbol_index+1}-{start_symbol_index+num_symbols+1})', fontsize=16)
     for t in symbol_start_times:
         axs[0].axvline(t - t0, color='red', linewidth=1)
-    for i, t in enumerate(slot_start_times[:-2]):
-        if (i + 2) % num_slots_per_symbol == 0:
-            axs[0].axvspan(slot_start_times[i] - t0, slot_start_times[i + 2] - t0, alpha=0.4, color='grey')
+    for i, t in enumerate(slot_start_times[:-num_guard_slots]):
+        if (i + num_guard_slots) % num_slots_per_symbol == 0:
+            axs[0].axvspan(slot_start_times[i] - t0, slot_start_times[i +
+                           num_guard_slots] - t0, alpha=0.4, color='grey')
         if i % num_slots_per_symbol == 0:
             continue
         axs[0].axvline(t - t0, color='gold', linewidth=1, linestyle='--')
     for i, t in enumerate(demodulated_symbol_times):
         axs[0].text(t + 0.35 * slot_length, 1.01 * y_received.max(),
-                    str(int(demodulated_symbols[i + start_symbol_index])))
+                    str(int(demodulated_symbols[i + start_symbol_index])), fontsize=14)
     axs[0].set_xticks(symbol_start_times - t0)
-    axs[0].set_ylabel('Amplitude (a.u.)')
+    axs[0].tick_params(axis='both', which='major', labelsize=14)
+    axs[0].set_ylabel('Amplitude (a.u.)', fontsize=14)
 
     # Reference / sent symbols
     axs[1].plot(plot_time_vector - t0, y_sent)
-    axs[1].set_title('Sent symbols')
+    axs[1].set_title('Sent symbols', fontsize=16)
     for t in symbol_start_times:
         axs[1].axvline(t - t0, color='red', linewidth=1)
-    for i, t in enumerate(slot_start_times[:-2]):
-        if (i + 2) % num_slots_per_symbol == 0:
-            axs[1].axvspan(slot_start_times[i] - t0, slot_start_times[i + 2] - t0, alpha=0.4, color='grey')
+    for i, t in enumerate(slot_start_times[:-num_guard_slots]):
+        if (i + num_guard_slots) % num_slots_per_symbol == 0:
+            axs[1].axvspan(slot_start_times[i] - t0, slot_start_times[i +
+                           num_guard_slots] - t0, alpha=0.4, color='grey')
         if i % num_slots_per_symbol == 0:
             continue
         axs[1].axvline(t - t0, color='gold', linewidth=1, linestyle='--')
     for i, t in enumerate(sent_symbol_times[:num_symbols]):
         axs[1].text(t - start_symbol_index * symbol_length, 1.01 * y_sent.max(),
-                    str(int(sent_symbols[i + start_symbol_index])))
+                    str(int(sent_symbols[i + start_symbol_index])), fontsize=14)
     axs[1].set_xticks(symbol_start_times - t0)
-    axs[1].set_ylabel('Amplitude (a.u.)')
-    axs[1].set_xlabel('Time (s)')
+    axs[1].tick_params(axis='both', which='major', labelsize=14)
+    axs[1].set_ylabel('Amplitude (a.u.)', fontsize=14)
+    axs[1].set_xlabel('Time (s)', fontsize=14)
     plt.show()
 
 
@@ -185,6 +190,7 @@ def parse_ppm_symbols(
 
             # timing_requirement = check_timing_requirement(pulse, symbol_start, slot_length)
             # if not timing_requirement:
+            #     print('timing requirement not met')
             #     continue
             symbol_frame_symbols.append(symbol)
             # symbols.append(symbol)
