@@ -23,7 +23,7 @@ from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE,
                                             symbols_per_codeword)
 
 
-def generate_awg_pattern(pulse_width: int = 10):
+def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
     ADD_ASM: bool = True
 
     msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
@@ -122,7 +122,17 @@ def generate_awg_pattern(pulse_width: int = 10):
         if ADD_ASM:
             idx = i * num_samples_per_symbol + ppm_symbol_position * \
                 num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
-            pulse[idx:idx + pulse_width] = 30000
+
+            pulse_amplitude = 30000
+            match pulse_shape:
+                case 'gaussian':
+                    x = np.arange(idx, idx + pulse_width) + 1
+                    c = 2
+                    y = pulse_amplitude * np.exp(-((x - idx - pulse_width // 2) / c)**2)
+                    pulse[idx:idx + pulse_width] = y
+                case _:
+                    pulse[idx:idx + pulse_width] = pulse_amplitude
+
             continue
 
         # If no ASM is used, make the first peak a synchronisation peak
