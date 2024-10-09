@@ -148,7 +148,3 @@ def decode(
         information_blocks = np.hstack((information_blocks, 0))
 
     return information_blocks, BER_before_decoding
-
-
-def decode_iteratively(slot_mapped_sequence, m, code_rate, max_num_iterations=20, ns=2, nb=0.1):
-    return
