@@ -5,10 +5,11 @@ from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-# import TimeTagger
+import TimeTagger
 from numpy.random import default_rng
 from PIL import Image
 from scipy.signal import find_peaks
@@ -66,12 +67,24 @@ def simulate_symbol_loss(
     return peaks
 
 
-def simulate_darkcounts_timestamps(rng, lmbda: float, msg_peaks: npt.NDArray[np.int_]):
-    num_slots = int((time_series[msg_peaks][-1] - time_series[msg_peaks][0]) / slot_length)
-    p = rng.poisson(lmbda, num_slots)
+def simulate_darkcounts_timestamps(
+        lmbda: float,
+        msg_peaks: npt.NDArray[np.int_],
+        rng_seed: int = 777):
 
-    darkcounts_timestamps = []
+    rng = np.random.default_rng(rng_seed)
+
+    num_slots: int = int((time_series[msg_peaks][-1] - time_series[msg_peaks][0]) / slot_length)
+    p: npt.NDArray[np.int_] = rng.poisson(lmbda, num_slots)
+
+    darkcounts_timestamps: list[npt.NDArray[np.float64]] = []
     t0 = time_series[msg_peaks][0]
+
+    darkcounts: npt.NDArray[np.float64]
+    slot_start: float
+    slot_end: float
+    num_events: int
+
     for slot_idx, num_events in enumerate(p):
         if num_events == 0:
             continue
@@ -81,9 +94,11 @@ def simulate_darkcounts_timestamps(rng, lmbda: float, msg_peaks: npt.NDArray[np.
         darkcounts = rng.uniform(slot_start, slot_end, num_events)
         darkcounts_timestamps.append(darkcounts)
 
-    darkcounts_timestamps = np.array(flatten(darkcounts_timestamps))
+    darkcounts_timestamps_flat: npt.NDArray[np.float64]
+    darkcounts_timestamps_flat = np.array(flatten(darkcounts_timestamps))
+    print(f'Inserted {darkcounts_timestamps_flat.shape[0]:.1e} darkcounts')
 
-    return darkcounts_timestamps
+    return darkcounts_timestamps_flat
 
 
 def get_simulated_message_peak_locations(
@@ -92,8 +107,10 @@ def get_simulated_message_peak_locations(
         simulate_noise_peaks: bool,
         simulate_lost_symbols: bool,
         simulate_darkcounts: bool,
+        darkcounts_fraction: float,
         simulate_jitter: bool,
-        rng=np.random.default_rng()):
+        rng=np.random.default_rng(),
+        rng_seed: int = 777):
     # Simulate noise peaks before start and after end of message
     peaks: npt.NDArray[np.int_]
 
@@ -112,7 +129,7 @@ def get_simulated_message_peak_locations(
 
     timestamps = time_series[peaks]
     if simulate_darkcounts:
-        darkcounts_timestamps = simulate_darkcounts_timestamps(rng, 0.01, peaks)
+        darkcounts_timestamps = simulate_darkcounts_timestamps(darkcounts_fraction, peaks, rng_seed)
         timestamps = np.sort(np.hstack((timestamps, darkcounts_timestamps)))
 
     # timestamps = np.hstack((timestamps, rng.random(size=15) * timestamps[0]))
@@ -134,15 +151,15 @@ def get_simulated_message_peak_locations(
 
 
 simulate_noise_peaks: bool = True
-simulate_lost_symbols: bool = False
+simulate_lost_symbols: bool = True
 simulate_darkcounts: bool = False
 simulate_jitter: bool = False
 
 detection_efficiency_lower: float = 0.7
 detection_efficiency_upper: float = 0.8
 detection_efficiency_step_size = 0.1
-num_photons_per_pulse = 5
-darkcounts_factor: float = 0.05
+num_photons_per_pulse = 4
+darkcounts_factor: float = 0.0001
 detector_jitter = 50E-12
 
 use_test_file: bool = True
@@ -174,8 +191,8 @@ elif not use_test_file and use_latest_tt_file:
     files = sorted(files, key=lambda x: x.lstat().st_mtime)
     time_events_filename = tt_files_dir + re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'
 else:
-    time_events_filename = 'time tagger files/jupiter_tiny_greyscale' + \
-        '_16_samples_per_slot_CSM_0_interleaved_15-56-53.ttbin'
+    time_events_filename = 'experimental results\\24-11-2023\\Interleaved detector\\10 samples per slot - 16 ppm\\' + \
+        'JWST_2022-07-27_Jupiter_tiny_10-sps_16-PPM_2-3-code-rate_14-31-25_1700832685.ttbin'
 
 slot_width_ns = num_samples_per_slot * sample_size_awg / 1000
 symbol_length_ns = num_slots_per_symbol * slot_width_ns
@@ -211,7 +228,7 @@ if use_test_file:
 
     msg_peaks = find_peaks(samples_np_array, height=1, distance=2)[0]
 else:
-    detector_countrate = 80E6
+    detector_countrate = 4.41E7
     time_tagger_window_size = 50E-3
     num_events = detector_countrate * time_tagger_window_size
     fr = TimeTagger.FileReader(time_events_filename)
@@ -233,7 +250,7 @@ cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
 #         cached_trellis = pickle.load(f)
 
 
-for df, detection_efficiency in enumerate([0.70]):
+for df, detection_efficiency in enumerate([0.60]):
     print_header('PPM parameters')
 
     print_parameter('M (PPM order)', M)
@@ -269,11 +286,13 @@ for df, detection_efficiency in enumerate([0.70]):
         num_darkcounts: int = 0
         if use_test_file:
             peak_locations = get_simulated_message_peak_locations(
-                msg_peaks, time_series, simulate_noise_peaks, simulate_lost_symbols, simulate_darkcounts, simulate_jitter, rng)
+                msg_peaks, time_series, simulate_noise_peaks, simulate_lost_symbols,
+                simulate_darkcounts, darkcounts_factor, simulate_jitter, rng, SEED
+            )
 
         try:
-            slot_mapped_message, _ = demodulate(
-                peak_locations[:200000], M, slot_length, symbol_length, csm_correlation_threshold=0.75, **{'debug_mode': False})
+            slot_mapped_message, num_events_per_slot = demodulate(
+                peak_locations[:200000], M, slot_length, symbol_length, csm_correlation_threshold=0.70, **{'debug_mode': False})
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -290,6 +309,7 @@ for df, detection_efficiency in enumerate([0.70]):
                     'use_cached_trellis': False,
                     # 'cached_trellis_file_path': cached_trellis_file_path,
                     'user_settings': {'reference_file_path': reference_file_path},
+                    'num_events_per_slot': num_events_per_slot
                 })
         except DecoderError as e:
             print(e)
@@ -342,18 +362,29 @@ for df, detection_efficiency in enumerate([0.70]):
 
         BERS_after.append(BER_after_decoding)
 
-        if compare_with_original:
-            fig, axs = plt.subplots(1, 2, figsize=(5, 4))
-            plt.suptitle('Detector B')
-            axs[0].imshow(sent_img_array, cmap=CMAP)
-            axs[0].set_xlabel('Pixel number (x)')
-            axs[0].set_ylabel('Pixel number (y)')
-            axs[0].set_title('Original image')
+        difference_mask = np.where(sent_img_array != img_arr)
+        highlighted_image = img_arr.copy()
+        highlighted_image[difference_mask] = -1
 
-            axs[1].imshow(img_arr, cmap=CMAP)
-            axs[1].set_xlabel('Pixel number (x)')
-            axs[1].set_ylabel('Pixel number (y)')
-            axs[1].set_title('Decoded image')
+        custom_cmap = mpl.colormaps['Greys']
+        custom_cmap.set_under(color='r')
+
+        if compare_with_original:
+            label_font_size = 14
+            fig, axs = plt.subplots(1, 2, figsize=(5, 4))
+            plt.suptitle('SCPPM message comparison', fontsize=18)
+            axs[0].imshow(sent_img_array, cmap=CMAP)
+            axs[0].set_xlabel('Pixel number (x)', fontsize=label_font_size)
+            axs[0].set_ylabel('Pixel number (y)', fontsize=label_font_size)
+            axs[0].tick_params(axis='both', which='major', labelsize=label_font_size)
+            axs[0].set_title('Original image', fontsize=16)
+
+            axs[1].imshow(highlighted_image, cmap=custom_cmap, vmin=0)
+            axs[1].set_xlabel('Pixel number (x)', fontsize=label_font_size)
+            axs[1].set_ylabel('Pixel number (y)', fontsize=label_font_size)
+            axs[1].tick_params(axis='both', which='major', labelsize=label_font_size)
+
+            axs[1].set_title('Decoded image', fontsize=16)
             plt.show()
 
         # plt.figure()
@@ -381,7 +412,7 @@ for df, detection_efficiency in enumerate([0.70]):
         plt.ylabel('Occurences')
         plt.xlabel('Bit Error Ratio (-)')
         plt.legend()
-        plt.show(block=False)
+        plt.show()
 
     bit_error_ratios_after.append(np.mean(BERS_after_arr))
     bit_error_ratios_after_std.append(np.std(BERS_after_arr))
@@ -446,3 +477,5 @@ with open(f'var_dump_simulate_decoding_with_file_{now}', 'wb') as f:
     pickle.dump(log, f)
 
 # %%
+
+# input('done?')
