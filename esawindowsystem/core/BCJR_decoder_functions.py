@@ -50,11 +50,12 @@ def get_alphas_outer_trellis(
             selected_edges = edge_to_states[i-1, :] == j
             alphas = state_alphas[i-1, np.any(selected_edges, axis=1)] + \
                 edge_gammas[i-1, selected_edges]
-            if alphas.shape[0] == 0:
+            num_rows = alphas.shape[0]
+            if num_rows == 0:
                 continue
-            if alphas.shape[0] > 1:
+            if num_rows > 1:
                 state_alphas[i, j] = max_star_recursive_numba(alphas)
-            elif alphas.shape[0] == 1:
+            elif num_rows == 1:
                 state_alphas[i, j] = alphas[0]
 
     return state_alphas
