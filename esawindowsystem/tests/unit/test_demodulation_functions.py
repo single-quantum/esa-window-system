@@ -15,12 +15,12 @@ def short_message():
     return num_slots_per_codeword, slot_starts, message_peak_locations
 
 
-def test_get_num_events(short_message, benchmark):
+def test_get_num_events(short_message):
     num_slots_per_codeword, slot_starts, message_peak_locations = short_message
 
-    num_events_per_slot = np.zeros((2, num_slots_per_codeword))
+    num_events_per_slot = np.zeros((1, num_slots_per_codeword), dtype=int)
 
-    result = benchmark(get_num_events, 0, num_events_per_slot,
-                       num_slots_per_codeword, message_peak_locations, slot_starts)
+    result = get_num_events(0, num_events_per_slot,
+                            num_slots_per_codeword, message_peak_locations, slot_starts)
 
-    assert result[0, 0] == 2
+    assert np.all(result[0, :3] == np.array([2, 1, 3]))
