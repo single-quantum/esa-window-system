@@ -34,7 +34,7 @@ def get_num_events(
     return num_events_per_slot
 
 
-def make_time_series(time_stamps: npt.NDArray[np.float64], slot_length: float) -> npt.NDArray[np.int_]:
+def make_time_series(time_stamps: npt.NDArray[np.float64], slot_length: float) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.float64]]:
     """Digitize/discretize the array of time_stamps, so that it becomes a time series of zeros and ones. """
     time_vec: npt.NDArray[np.float64] = np.arange(
         time_stamps[0], time_stamps[-1] + 2 * slot_length, slot_length, dtype=float)
@@ -52,7 +52,7 @@ def make_time_series(time_stamps: npt.NDArray[np.float64], slot_length: float) -
         else:
             n += 1
 
-    return time_series
+    return time_series, time_vec
 
 
 def determine_CSM_time_shift(
@@ -113,8 +113,8 @@ def get_csm_correlation(
     # + 0.5 slot length because pulse times should be in the middle of a slot.
     csm_time_stamps = np.array([slot_length * CSM[i] + i * symbol_length for i in range(len(CSM))]) + 0.5 * slot_length
 
-    A = make_time_series(time_stamps, slot_length)
-    B = make_time_series(csm_time_stamps, slot_length)
+    A, time_vec = make_time_series(time_stamps, slot_length)
+    B, _ = make_time_series(csm_time_stamps, slot_length)
 
     corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
     correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
@@ -122,9 +122,13 @@ def get_csm_correlation(
         plt.figure()
         plt.plot(corr, label='CSM correlation')
         plt.axhline(correlation_threshold, color='r', linestyle='--', label='Correlation threshold')
-        plt.xlabel('Shift (A.U.)')
-        plt.ylabel('Correlation (-)')
-        plt.title('Message correlation with the CSM')
+        plt.xlabel('Shift (slots)', fontsize=14)
+        plt.ylabel('Correlation (-)', fontsize=14)
+        plt.title('Message correlation with the CSM', fontsize=16)
+
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+
         plt.legend(loc='lower left')
         plt.show()
 
