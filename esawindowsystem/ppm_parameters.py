@@ -12,6 +12,7 @@ CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
 IMG_FILE_PATH = "esawindowsystem/sample_payloads/pillars-of-creation-ultra-tiny.png"
+# IMG_FILE_PATH = "esawindowsystem/sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
 img = Image.open(IMG_FILE_PATH)
 IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
 GREYSCALE: bool = True
