@@ -10,10 +10,11 @@ import numpy.typing as npt
 from numpy.random import default_rng
 from tabulate import tabulate
 
-from esawindowsystem.core.encoder_functions import convolve, BitArray
+from esawindowsystem.core.encoder_functions import BitArray, convolve
 from esawindowsystem.core.trellis import Edge
-from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, B_interleaver,
-                                            M, N_interleaver, num_samples_per_slot,
+from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE,
+                                            B_interleaver, M, N_interleaver,
+                                            num_samples_per_slot,
                                             num_slots_per_symbol)
 
 
@@ -79,21 +80,21 @@ def tobits(input_string: str) -> list[int]:
     return result
 
 
-def frombits(bits):
-    chars = []
+def frombits(bits: list[int] | BitArray):
+    chars: list[str] = []
     for b in range(len(bits) // 8):
         byte = bits[b * 8:(b + 1) * 8]
         chars.append(chr(int(''.join([str(bit) for bit in byte]), 2)))
     return ''.join(chars)
 
 
-def generate_outer_code_edges(memory_size, bpsk_encoding=True):
-    input_bits = [0, 1]
-    edges = []
+def generate_outer_code_edges(memory_size: int, bpsk_encoding: bool = True) -> list[list[Edge]]:
+    input_bits: list[int] = [0, 1]
+    edges: list[list[Edge]] = []
     states = list(itertools.product([0, 1], repeat=memory_size))
 
     for i, initial_state in enumerate(states):
-        state_edges = []
+        state_edges: list[Edge] = []
         for input_bit in input_bits:
             from_state = i
             output, terminal_state = convolve((input_bit, ), initial_state=initial_state)
@@ -113,12 +114,12 @@ def generate_outer_code_edges(memory_size, bpsk_encoding=True):
 # and then put it in the Trellis constructor.
 
 
-def generate_inner_encoder_edges(num_input_bits, bpsk_encoding=True):
+def generate_inner_encoder_edges(num_input_bits: int, bpsk_encoding: bool = True) -> list[list[Edge]]:
     input_combinations: list[tuple[int, ...]] = list(itertools.product([0, 1], repeat=num_input_bits))
-    edges = []
-    input_bits: tuple[int]
+    edges: list[list[Edge]] = []
+    input_bits: tuple[int, ...] | npt.NDArray[np.int8]
     for initial_state in [0, 1]:
-        state_edges = []
+        state_edges: list[Edge] = []
         for input_bits in input_combinations:
             # initial_state = 1
             current_state = initial_state
@@ -133,7 +134,7 @@ def generate_inner_encoder_edges(num_input_bits, bpsk_encoding=True):
                 output = list(bpsk(output))
 
             e = Edge()
-            e.set_edge(initial_state, current_state, input_bits, output, gamma=None)
+            e.set_edge(initial_state, current_state, np.array(input_bits), output, gamma=None)
             state_edges.append(e)
 
         edges.append(state_edges)
@@ -158,7 +159,7 @@ def poisson_noise(input_sequence: npt.NDArray, ns: float, nb: float,
     if simulate_lost_symbols:
         lost_symbols = np.array(rng.random(input_sequence.shape[0]) >= detection_efficiency)
 
-    poisson_dist_signal_slots = rng.poisson(ns+nb, size=output_sequence.shape)
+    poisson_dist_signal_slots = rng.poisson(ns + nb, size=output_sequence.shape)
     poisson_dist_noise_slots = rng.poisson(nb, size=output_sequence.shape)
 
     for i, row in enumerate(output_sequence):
@@ -180,7 +181,7 @@ def moving_average(arr: npt.NDArray[Any], n: int = 3) -> npt.NDArray[Any]:
 
     Source:
     https://stackoverflow.com/questions/14313510/how-to-calculate-rolling-moving-average-using-python-numpy-scipy"""
-    ret: npt.NDArray[np.float_] = np.cumsum(arr, dtype=float)
+    ret: npt.NDArray[np.float64] = np.cumsum(arr, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
@@ -206,7 +207,7 @@ def get_BER_before_decoding(bit_sequence_file_path, received_bits, sent_bit_sequ
     else:
         sent_bits = sent_bit_sequence
 
-    BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)])
+    BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)]) / len(sent_bits)
 
     return BER_before_decoding
 

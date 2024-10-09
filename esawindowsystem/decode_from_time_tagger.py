@@ -15,7 +15,7 @@ from esawindowsystem.core.encoder_functions import map_PPM_symbols
 from esawindowsystem.core.scppm_decoder import decode
 from esawindowsystem.core.utils import flatten
 from esawindowsystem.ppm_parameters import (CORRELATION_THRESHOLD, DEBUG_MODE, MESSAGE_IDX,
-                            USE_INNER_ENCODER, USE_RANDOMIZER)
+                                            USE_INNER_ENCODER, USE_RANDOMIZER)
 
 """Read time tagger files from the Swabian Time Tagger Ultra. Required software for the time tagger can be found here:
 https://www.swabianinstruments.com/time-tagger/downloads/ . """
@@ -218,7 +218,7 @@ def analyze_data(time_events, metadata):
         BER_after_decoding = np.sum(
             np.abs(information_blocks[:len(sent_message)] - sent_message)) / len(sent_message)
 
-    print(f'BER after decoding: {BER_after_decoding }. ')
+    print(f'BER after decoding: {BER_after_decoding}. ')
 
     if DEBUG_MODE and PAYLOAD_TYPE == 'image':
         fig, axs = plt.subplots(1, 2)
@@ -267,7 +267,8 @@ if __name__ == '__main__':
         [0, 1, 2],
         [0, 1],
     ]
-    time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/15-12-2023/16 ppm/46 dBm (20)/'
+    # time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/15-12-2023/16 ppm/46 dBm (20)/'
+    time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/24-11-2023/Interleaved detector/10 samples per slot - 16 ppm/'
     # time_tagger_files_dir: str = 'time tagger files/'
 
     img_arrs = []

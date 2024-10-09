@@ -1,24 +1,29 @@
 # %%
 import math
 import pickle
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from pathlib import Path
 
 from esawindowsystem.core.data_converter import payload_to_bit_sequence
 from esawindowsystem.core.encoder_functions import slot_map
 from esawindowsystem.core.scppm_encoder import encoder
-from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE, CODE_RATE, CSM,
-                                            GREYSCALE, IMG_FILE_PATH, IMG_SHAPE, PAYLOAD_TYPE,
-                                            USE_INNER_ENCODER, USE_RANDOMIZER, B_interleaver,
-                                            M, N_interleaver, m, num_samples_per_slot,
-                                            num_slots_per_symbol, num_symbols_per_slice,
-                                            sample_size_awg, slot_length, symbols_per_codeword)
+from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE,
+                                            CODE_RATE, CSM, GREYSCALE,
+                                            IMG_FILE_PATH, IMG_SHAPE,
+                                            PAYLOAD_TYPE, USE_INNER_ENCODER,
+                                            USE_RANDOMIZER, B_interleaver, M,
+                                            N_interleaver, m,
+                                            num_samples_per_slot,
+                                            num_slots_per_symbol,
+                                            num_symbols_per_slice,
+                                            sample_size_awg, slot_length,
+                                            symbols_per_codeword)
 
 
-def generate_awg_pattern(pulse_width: int = 10):
+def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
     ADD_ASM: bool = True
 
     msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
@@ -99,9 +104,11 @@ def generate_awg_pattern(pulse_width: int = 10):
     print(f'PPM order: {M}')
     print(f'num symbols sent: {num_PPM_symbols}')
     print(f'Number of symbols per second: {1/(message_time_microseconds*1E-6)*num_PPM_symbols:.3e}')
+    print(f'Number of bits per message: {num_bits_sent}')
     print(f'Number of codewords: {num_codewords}')
-    print(f'Datarate: {datarate:.2f} Mbps')
+    print(f'Datarate: {datarate:.3f} Mbps')
     print(f'Message time span: {message_time_microseconds:.3f} microseconds')
+    print(f'Message time span: {message_time_microseconds/1000:.3f} milliseconds')
     print(f'Minimum window size needed: {2*message_time_microseconds:.3f} microseconds')
 
     # Generate AWG pattern file
@@ -115,7 +122,17 @@ def generate_awg_pattern(pulse_width: int = 10):
         if ADD_ASM:
             idx = i * num_samples_per_symbol + ppm_symbol_position * \
                 num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
-            pulse[idx:idx + pulse_width] = 30000
+
+            pulse_amplitude = 30000
+            match pulse_shape:
+                case 'gaussian':
+                    x = np.arange(idx, idx + pulse_width) + 1
+                    c = 2
+                    y = pulse_amplitude * np.exp(-((x - idx - pulse_width // 2) / c)**2)
+                    pulse[idx:idx + pulse_width] = y
+                case _:
+                    pulse[idx:idx + pulse_width] = pulse_amplitude
+
             continue
 
         # If no ASM is used, make the first peak a synchronisation peak
@@ -149,13 +166,13 @@ def generate_awg_pattern(pulse_width: int = 10):
             filepath = base_dir / Path(f'ppm_message_SQ_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
                                        f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv')
         case 'image' if not GREYSCALE:
-            filepath = f'ppm_message_SQ_tiny_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +\
-                f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_b1c1_{cr}-code-rate.csv'
+            filepath = base_dir / Path(f'ppm_message_SQ_tiny_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
+                                       f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv')
         case 'string':
-            filepath = 'ppm_message_Hello_World_no_ASM.csv'
+            filepath = base_dir / Path('ppm_message_Hello_World_no_ASM.csv')
         case 'calibration':
-            filepath = f'ppm_calibration_message_{len(msg_PPM_symbols)}_' +\
-                f'symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM.csv'
+            filepath = base_dir / Path(f'ppm_calibration_message_{len(msg_PPM_symbols)}_' +
+                                       f'symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM.csv')
         case _:
             raise ValueError("Payload type not recognized. Should be one of ['image', 'string', 'calibration']")
 
@@ -164,5 +181,6 @@ def generate_awg_pattern(pulse_width: int = 10):
     print(f'Wrote data to file {filepath}')
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
+    print('Generating AWG pattern file. ')
     generate_awg_pattern()

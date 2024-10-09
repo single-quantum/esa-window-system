@@ -27,7 +27,7 @@ class Edge:
             self,
             from_state: int,
             to_state: int,
-            edge_input: int | list[int] | tuple[int, ...],
+            edge_input: int | list[int] | tuple[int, ...] | npt.NDArray[np.int8],
             edge_output: npt.NDArray[np.int_] | list[int] | tuple[int, ...],
             gamma: float | None):
 
@@ -40,8 +40,19 @@ class Edge:
         else:
             self.edge_input_label = map_PPM_symbols(edge_input, len(edge_input))[0]
 
-        self.edge_output_label = map_PPM_symbols(edge_output, len(edge_output))[0]
+        self.set_edge_output_label()
         self.gamma = gamma
+
+    def set_edge_output_label(self):
+        """Set edge output label, based on edge output. Converts tuple of bits to number, based on bit value. """
+        if self.edge_output is None:
+            return
+
+        if any(i < 0 for i in self.edge_output):
+            self.edge_output_label = map_PPM_symbols(
+                tuple(0 if i < 0 else 1 for i in self.edge_output), len(self.edge_output))[0]
+        else:
+            self.edge_output_label = map_PPM_symbols(self.edge_output, len(self.edge_output))[0]
 
     # Not sure if this is necessary, but this way the edges can be sorted and
     # the 0 input is always the first item in the list of edges
@@ -65,6 +76,8 @@ class State:
 
 
 class Stage:
+    __slots__ = ('time_step', 'states')
+
     def __init__(self, num_states: int, num_input_bits: int, time_step: int):
         self.time_step = time_step
 
@@ -78,18 +91,21 @@ class Stage:
 
 
 class Trellis:
+    __slots__ = ('memory_size', 'num_states', 'stages', 'num_input_bits', 'num_output_bits', 'edge_model', 'edges')
+
     def __init__(
             self,
             memory_size: int,
             num_output_bits: int,
             time_steps: int,
-            edges,
+            edges: list[list[Edge]],
             num_input_bits: int = 1):
 
         self.memory_size = memory_size
         self.num_states = 2**memory_size
 
-        # The time_steps + 1-th stage has all states, but no edges. This is needed to properly calculate beta
+        # There are two stages for 1 timestep/transition, one for the initial state and one for the final state.
+        # The `time_steps + 1`-th stage has all states, but no edges. This is needed to properly calculate beta
         self.stages: tuple[Stage, ...] = tuple(
             Stage(self.num_states, num_input_bits, time_step) for time_step in range(time_steps + 1)
         )
@@ -108,6 +124,8 @@ class Trellis:
         if zero_initiated:
             starting_state_labels: set[int] = {0}
 
+            # Loop over the number of stages equal to the memory size, as it takes that many stages
+            # to fully develop the Trellis.
             for i in range(self.memory_size):
                 state: State = self.stages[0].states[0]
                 stage: Stage = self.stages[i]
@@ -115,7 +133,7 @@ class Trellis:
                     state = stage.states[state_label]
                     state.edges = deepcopy(edges[state.label])
 
-                ending_state_labels = {e.to_state for e in state.edges if e.to_state}
+                ending_state_labels = {e.to_state for e in state.edges if e.to_state is not None}
                 starting_state_labels = ending_state_labels
 
         start: int = self.memory_size if zero_initiated else 0
@@ -139,6 +157,7 @@ class Trellis:
             for state_label in starting_state_labels:
                 state_edges: list[Edge] = list(filter(lambda e: e.edge_input == 0, edges[state_label]))
                 stage.states[state_label].edges = deepcopy(state_edges)
-                ending_state_labels = ending_state_labels.union({e.to_state for e in state_edges if e.to_state})
+                ending_state_labels = ending_state_labels.union(
+                    {e.to_state for e in state_edges if e.to_state is not None})
 
             starting_state_labels = ending_state_labels

@@ -9,6 +9,7 @@ from esawindowsystem.core.shift_register import CRC
 
 BitArray = npt.NDArray[np.int_]
 
+
 def validate_PPM_order(M: int):
     if M not in (4, 8, 16, 32, 64, 128, 256):
         raise ValueError("M should be one of 4, 8, 16, 32, 64, 128 or 256")
@@ -93,23 +94,29 @@ def randomize(information_blocks: BitArray) -> BitArray:
     return output_array
 
 
+def get_CRC(arr: BitArray) -> BitArray:
+    CRC_size: int = 32
+
+    # Initialize the CRC shift register
+    seed: list[int] = [1] * CRC_size
+    sr = CRC(seed, [3, 14, 18, 29])
+
+    for j in range(arr.shape[0] - CRC_size):
+        sr.next(arr[j] ^ sr.state[-1])
+
+    return sr.state
+
+
 def append_CRC(arr: BitArray):
     # Fill the input array `arr` with 32 zeros, so that the CRC can be attached
     CRC_size = 32
-    arr = np.pad(arr, (0, CRC_size))
+    arr = np.concatenate((arr, np.zeros((arr.shape[0], CRC_size), dtype=arr.dtype)), axis=1)
 
-    seed = [1] * CRC_size
+    for i in range(arr.shape[0]):
+        # Attach to the arr
+        arr[i, -CRC_size:] = get_CRC(arr[i, :])
 
-    # Initialize the CRC shift register
-    sr = CRC(seed, [3, 14, 18, 29])
-    for i in range(1, CRC_size + 1):
-        sr.next(arr[-i] ^ sr.state[-1])
-
-    # Attach to the arr
-    arr[-CRC_size:] = sr.state
-
-    # Add the two termination bits
-    return np.pad(arr, (0, 2))
+    return arr
 
 
 def slicer(arr: BitArray, code_rate: Fraction, include_crc: bool = False,
@@ -122,7 +129,7 @@ def slicer(arr: BitArray, code_rate: Fraction, include_crc: bool = False,
 
     # If the CRC is not used, add 32 more bits to the information block.
     if not include_crc:
-        information_block_size += 32
+        information_block_size += len_CRC
 
     if arr.shape[0] % information_block_size != 0:
         # Number of bits that need to be added such that the array is a multiple of the information block size
@@ -155,7 +162,7 @@ def unpuncture(encoded_sequence: BitArray, code_rate: Fraction,
     return unpunctured_sequence
 
 
-def puncture(convoluted_bit_sequence: npt.NDArray[np.int_ | np.float_],
+def puncture(convoluted_bit_sequence: npt.NDArray[np.int_ | np.float64],
              code_rate: Fraction, dtype: type[int] | type[float] = int) -> BitArray:
     """If the code rate is not 1/3, puncture (remove) elements according to the scheme defined by the CCSDS. """
     puncture_scheme: dict[Fraction, list[int]] = {
@@ -201,7 +208,7 @@ def convolve(
         arr: BitArray | tuple[int, ...],
         initial_state: tuple[int, int] = (0, 0)) -> tuple[BitArray, tuple[int, ...]]:
     """Use a convolutional shift register to generate a convoluted codeword.
-    
+
     For more details on the convolutional encoder see CCSDS blue book 142.0-B-1, section 3.8.2 (August 2019)"""
     # Number of sliding windows that are iterated over to generate the
     # convolutional codeword
@@ -224,7 +231,7 @@ def convolve(
     return convolutional_codeword, terminal_state
 
 
-def map_PPM_symbols(arr: list[int] | BitArray, m: int):
+def map_PPM_symbols(arr: list[int] | tuple[int, ...] | BitArray, m: int):
     """Map input array of bits to PPM symbols. """
     # Input validation
     validate_PPM_order(2**m)
