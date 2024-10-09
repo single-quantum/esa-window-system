@@ -8,5 +8,5 @@ extensions = [
 ]
 
 setup(
-    ext_modules=cythonize(['demodulation_functions_c.pyx', 'max_star.pyx', 'get_num_events.pyx'])
+    ext_modules=cythonize(['max_star.pyx'])
 )
