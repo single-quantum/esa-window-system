@@ -21,8 +21,6 @@ def get_num_events(
         message_peak_locations: npt.NDArray[np.float64],
         slot_starts: npt.NDArray[np.float64]) -> npt.NDArray[np.int_]:
 
-    message_peak_locations = np.insert(message_peak_locations, 0, message_peak_locations[0]+1E-10)
-
     for j in range(message_peak_locations.shape[0]):
         idx_arr_1: npt.NDArray[np.bool] = message_peak_locations[j] >= slot_starts
         idx_arr_2: npt.NDArray[np.bool] = message_peak_locations[j] < slot_starts
@@ -200,17 +198,28 @@ def find_csm_times(
     # print(where_corr)
     # Make a moving average of the correlation to find out where the start and end is of the message
     # moving_avg_corr: npt.NDArray[np.int_] = moving_average(corr, n=1000)
-    moving_avg_corr: npt.NDArray[np.int_] = moving_average(csm_correlation, n=len(CSM) * num_slots_per_symbol)
+    moving_avg_corr: npt.NDArray[np.int_] = moving_average(csm_correlation, n=4 * num_slots_per_symbol)
     message_start_idxs: npt.NDArray[np.int_] = find_peaks(
         -(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1,
         height=(0.9, 1),
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
+    if kwargs.get('debug_mode'):
+        print(np.std(moving_avg_corr))
+
+        plt.figure()
+        plt.plot(-(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1)
+        plt.show()
+
+        plt.figure()
+        plt.close()
+
     if message_start_idxs.shape[0] == 0:
         raise ValueError("Could not find message start / end. ")
 
     if len(message_start_idxs) == 1:
-        expected_number_codewords_per_message = (time_stamps[-1] - time_stamps[0]) / slot_length / symbols_per_codeword
+        expected_number_codewords_per_message = (
+            (time_stamps[-1] - time_stamps[0]) / slot_length) / num_slots_per_symbol / symbols_per_codeword
     else:
         expected_number_codewords_per_message = round(
             (message_start_idxs[1] - message_start_idxs[0]) / (num_slots_per_symbol * symbols_per_codeword))
@@ -231,12 +240,12 @@ def find_csm_times(
         vals = message_start_idxs / (expected_number_codewords_per_message *
                                      num_slots_per_symbol * symbols_per_codeword)
         val = np.average(vals % 1)
-        print(len(message_start_idxs))
+        print('num message starts', len(message_start_idxs))
         if (val <= (expected_number_messages % 1)):
             message_start_idxs, current_threshold = force_peak_amount_correlation(
                 message_start_postions, message_start_heights, message_start_heights_ordered, expected_number_messages + 1)
 
-            print(len(message_start_idxs))
+            print('num message starts', len(message_start_idxs))
 
     else:
         current_threshold = (0.9, 1)
@@ -383,17 +392,15 @@ def get_num_events_per_slot(
         # Preselect those detection peaks that are within the csm times
         if i < len(csm_times) - 1:
             message_peak_locations = peak_locations[
-                (peak_locations >= csm_times[i]) & (peak_locations < csm_times[i + 1])
+                (peak_locations >= csm_time) & (peak_locations < csm_times[i + 1])
             ]
         else:
-            message_peak_locations = peak_locations[peak_locations >= csm_times[i]]
+            message_peak_locations = peak_locations[peak_locations >= csm_time]
 
         slot_starts = csm_time + np.arange(num_slots_per_codeword + 1) * slot_length
 
         num_events_per_slot = get_num_events(
             i, num_events_per_slot, num_slots_per_codeword, message_peak_locations, slot_starts)
-        # num_events = get_num_events(message_peak_locations, slot_starts, 2000)
-        # num_events_per_slot[i, :] = num_events[:-1]
 
     num_events_per_slot = num_events_per_slot.flatten()
 
