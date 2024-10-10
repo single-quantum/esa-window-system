@@ -34,6 +34,7 @@ def get_num_events(
 
 def make_time_series(time_stamps: npt.NDArray[np.float64], slot_length: float) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.float64]]:
     """Digitize/discretize the array of time_stamps, so that it becomes a time series of zeros and ones. """
+    # Naively assume the fist timestamp is a PPM symbol.
     time_vec: npt.NDArray[np.float64] = np.arange(
         time_stamps[0], time_stamps[-1] + 2 * slot_length, slot_length, dtype=float)
 
@@ -108,15 +109,16 @@ def get_csm_correlation(
         symbol_length: float,
         csm_correlation_threshold: float = 0.6,
         **kwargs: tuple[str, Any]) -> npt.NDArray[np.int_]:
+    """Discretize timestamps and return correlation of that vector with discretized CSM. """
     # + 0.5 slot length because pulse times should be in the middle of a slot.
     csm_time_stamps = np.array([slot_length * CSM[i] + i * symbol_length for i in range(len(CSM))]) + 0.5 * slot_length
 
-    A, time_vec = make_time_series(time_stamps, slot_length)
+    A, _ = make_time_series(time_stamps, slot_length)
     B, _ = make_time_series(csm_time_stamps, slot_length)
 
     corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
-    correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
     if kwargs.get('debug_mode'):
+        correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
         plt.figure()
         plt.plot(corr, label='CSM correlation')
         plt.axhline(correlation_threshold, color='r', linestyle='--', label='Correlation threshold')
@@ -218,8 +220,8 @@ def find_csm_times(
         raise ValueError("Could not find message start / end. ")
 
     if len(message_start_idxs) == 1:
-        expected_number_codewords_per_message = (
-            (time_stamps[-1] - time_stamps[0]) / slot_length) / num_slots_per_symbol / symbols_per_codeword
+        expected_number_codewords_per_message = round((
+            (time_stamps[-1] - time_stamps[0]) / slot_length) / num_slots_per_symbol / symbols_per_codeword)
     else:
         expected_number_codewords_per_message = round(
             (message_start_idxs[1] - message_start_idxs[0]) / (num_slots_per_symbol * symbols_per_codeword))
@@ -440,7 +442,7 @@ def demodulate(
                                                                     CSM, symbols_per_codeword, slot_length, M)
 
     num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
-        pulse_timestamps <= csm_times[-1] + symbols_per_codeword * symbol_length))[0].shape[0]
+        pulse_timestamps <= msg_end_time))[0].shape[0]
 
     print(f'Found {len(csm_times)} codewords. ')
     print(f'Number of detection events in message frame: {num_detection_events}')
