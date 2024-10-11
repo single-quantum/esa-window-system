@@ -26,8 +26,10 @@ def get_num_events(
         idx_arr_2: npt.NDArray[np.bool] = message_peak_locations[j] < slot_starts
         idx_arr_2 = np.roll(idx_arr_2, -1)
         # A time event should always fall into one slot and one slot only
-        where_slot = np.nonzero((idx_arr_1) & (idx_arr_2))[0][0]
-        num_events_per_slot[i, where_slot] += 1
+        where_slot = np.nonzero((idx_arr_1) & (idx_arr_2))
+        if where_slot[0].shape[0] > 0:
+            slot_idx = where_slot[0][0]
+            num_events_per_slot[i, slot_idx] += 1
 
     return num_events_per_slot
 
@@ -163,7 +165,6 @@ def find_csm_times(
     """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
 
     correlation_threshold: int = int(np.max(csm_correlation) * csm_correlation_threshold)
-    amount_of_slots = round((time_stamps[-1] - time_stamps[0]) / slot_length)
 
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
@@ -173,21 +174,6 @@ def find_csm_times(
         height=correlation_threshold,
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
-    expected_number_codewords_in_data = amount_of_slots / symbols_per_codeword / num_slots_per_symbol
-    where_corr_positions, where_corr_heights = find_peaks(
-        csm_correlation,
-        height=correlation_threshold / 2,
-        distance=symbols_per_codeword * num_slots_per_symbol)
-
-    where_corr_heights = where_corr_heights['peak_heights']
-    where_corr_heights_ordered = -np.sort(-where_corr_heights)
-    if (len(where_corr_heights_ordered) >= int(expected_number_codewords_in_data)):
-        where_corr: npt.NDArray[np.int_]
-        where_corr, current_threshold = force_peak_amount_correlation(
-            where_corr_positions, where_corr_heights, where_corr_heights_ordered, expected_number_codewords_in_data)
-    else:
-        current_threshold = correlation_threshold
-    # print(current_threshold,len(where_corr))
     # There is an edge case that if the CSM appears right at the start of the timestamps,
     # that find_peaks cannot find it, even if the correlation is high enough.
     # In that case, try a simple threshold check.
@@ -197,107 +183,8 @@ def find_csm_times(
     if where_corr.shape[0] == 0:
         raise ValueError("Could not find any CSM. ")
 
-    # print(where_corr)
-    # Make a moving average of the correlation to find out where the start and end is of the message
-    # moving_avg_corr: npt.NDArray[np.int_] = moving_average(corr, n=1000)
-    moving_avg_corr: npt.NDArray[np.int_] = moving_average(csm_correlation, n=4 * num_slots_per_symbol)
-    message_start_idxs: npt.NDArray[np.int_] = find_peaks(
-        -(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1,
-        height=(0.9, 1),
-        distance=symbols_per_codeword * num_slots_per_symbol)[0]
-
-    if kwargs.get('debug_mode'):
-        print(np.std(moving_avg_corr))
-
-        plt.figure()
-        plt.plot(-(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1)
-        plt.show()
-
-        plt.figure()
-        plt.close()
-
-    if message_start_idxs.shape[0] == 0:
-        raise ValueError("Could not find message start / end. ")
-
-    if len(message_start_idxs) == 1:
-        expected_number_codewords_per_message = round((
-            (time_stamps[-1] - time_stamps[0]) / slot_length) / num_slots_per_symbol / symbols_per_codeword)
-    else:
-        expected_number_codewords_per_message = round(
-            (message_start_idxs[1] - message_start_idxs[0]) / (num_slots_per_symbol * symbols_per_codeword))
-    expected_number_messages = expected_number_codewords_in_data / expected_number_codewords_per_message
-
-    message_start_postions, message_start_heights = find_peaks(
-        -(moving_avg_corr - min(moving_avg_corr)) / (max(moving_avg_corr) - min(moving_avg_corr)) + 1,
-        height=(0.8, 1.2),
-        distance=symbols_per_codeword * num_slots_per_symbol)
-
-    message_start_heights = message_start_heights['peak_heights']
-    message_start_heights_ordered = -np.sort(-message_start_heights)
-
-    if (len(message_start_heights_ordered) >= int(expected_number_messages)):
-        message_start_idxs, current_threshold = force_peak_amount_correlation(
-            message_start_postions, message_start_heights, message_start_heights_ordered, expected_number_messages)
-
-        vals = message_start_idxs / (expected_number_codewords_per_message *
-                                     num_slots_per_symbol * symbols_per_codeword)
-        val = np.average(vals % 1)
-        print('num message starts', len(message_start_idxs))
-        if (val <= (expected_number_messages % 1)):
-            message_start_idxs, current_threshold = force_peak_amount_correlation(
-                message_start_postions, message_start_heights, message_start_heights_ordered, expected_number_messages + 1)
-
-            print('num message starts', len(message_start_idxs))
-
-    else:
-        current_threshold = (0.9, 1)
-
-    # print(message_start_idxs)
-    if kwargs.get('debug_mode'):
-        fig, ax1 = plt.subplots()
-
-        ax1.plot(csm_correlation)
-        ax1.axhline(correlation_threshold, color='r', linestyle='--', label='Correlation threshold')
-
-        ax2 = ax1.twinx()
-
-        ax2.plot(-(moving_avg_corr - min(moving_avg_corr)) /
-                 (max(moving_avg_corr) - min(moving_avg_corr)) + 1, color='tab:red')
-        fig.tight_layout()
-        plt.show()
-
-    # If there is only one codeword, assume there is only one CSM, so the end
-    # of the message is equal to the end of the timestamps.
-    where_csm_corr: npt.NDArray[np.int_]
-    where_CSM_corr_per_message = []
-    if message_start_idxs.shape[0] == 1:
-        where_csm_corr = where_corr[where_corr >= message_start_idxs[0]]
-    else:
-        message_idx: list[int]
-        message_idx = kwargs.get('message_idx', [0, 1])
-        where_csm_corr = where_corr[(
-            where_corr >= message_start_idxs[message_idx[0]]) & (where_corr <= message_start_idxs[message_idx[1]])]
-        for i in range(0, len(message_start_idxs) - 1):
-            where_csm_corr2: npt.NDArray[np.int_]
-            where_csm_corr2 = where_corr[(
-                where_corr >= message_start_idxs[i]) & (where_corr <= message_start_idxs[i + 1])]
-            where_CSM_corr_per_message.append(where_csm_corr2)
-        where_csm_corr = where_CSM_corr_per_message[0]
-        for elem in where_CSM_corr_per_message:
-            if (len(elem) == expected_number_codewords_per_message):
-                where_csm_corr = elem
-                print('Selected one iteration')
-                break
-
-    # If where_csm_corr is empty, but where_corr is not empty, use that value for the CSM
-    if where_csm_corr.shape[0] == 0 and where_corr.shape[0] != 0:
-        where_csm_corr = where_corr
-    if (expected_number_codewords_per_message != len(where_csm_corr)):
-        print('number of codewords is different from expected')
-    print(where_CSM_corr_per_message, len(where_CSM_corr_per_message))
-
     t0: float = time_stamps[0]
-    csm_times: npt.NDArray[np.float64] = t0 + slot_length * where_csm_corr + 0.5 * slot_length
+    csm_times: npt.NDArray[np.float64] = t0 + slot_length * where_corr + 0.5 * slot_length
 
     time_shifts: npt.NDArray = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
     print(f'Time shift per codeword (slot lengths): {np.array(time_shifts) / slot_length}')
