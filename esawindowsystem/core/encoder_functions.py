@@ -26,10 +26,9 @@ def get_asm_bit_arr(asm_hex: str = '1ACFFC1D') -> BitArray:
 def prepend_asm(arr: BitArray) -> BitArray:
     """Prepend `arr` with the Attached Synchronization Marker. """
     ASM_arr = get_asm_bit_arr()
-    # Tile the ASM, such that it vertically, so that it can be stacked to the reshaped array
-    asm_bit_array = np.tile(ASM_arr, arr.shape[0]).reshape(arr.shape[0], -1)
 
-    return np.hstack((asm_bit_array, arr))
+    # Assume for now there is only one CCSDS transfer frame
+    return np.hstack((ASM_arr, arr))
 
 
 def generate_pseudo_randomized_sequence(seed: list[int] = [1] * 8) -> list[int]:
