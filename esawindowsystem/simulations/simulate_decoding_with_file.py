@@ -30,144 +30,38 @@ from esawindowsystem.ppm_parameters import (CODE_RATE, GREYSCALE,
                                             symbol_length)
 
 
-def print_parameter(parameter_str: str, parameter, spacing: int = 30):
-    print(f'{parameter_str:<{spacing}} {parameter}')
-
-
-def print_header(header: str, len_header: int = 50, filler='-'):
-    len_filler = (len_header - len(header)) // 2 - 2
-    if len(header) % 2 == 0:
-        print(f'{"#":{filler}<{len_filler}} {header} {"#":{filler}>{len_filler}}')
-    else:
-        print(f'{"#":{filler}<{len_filler}} {header} {"#":{filler}>{len_filler+1}}')
-
-
-def simulate_symbol_loss(
-        peaks: npt.NDArray,
-        num_photons_per_pulse: int,
-        detection_efficiency: float,
-        rng_gen=np.random.default_rng) -> npt.NDArray:
-    """ Simulate the loss of symbols, based on the number of photons per pulse and detection efficiency.
-
-    For each symbol, use the poisson distribution to determine how many photons arrived in each symbol pulse
-    Then, do n bernoulli trials (binomial distribution) and success probability p, where n the number of photons
-    per pulse and p is the detection efficiency. """
-
-    num_symbols = len(peaks)
-
-    num_photons_detected_per_pulse = rng_gen.binomial(
-        rng_gen.poisson(num_photons_per_pulse, size=num_symbols),
-        detection_efficiency)
-
-    idxs_to_be_removed = np.where(num_photons_detected_per_pulse == 0)[0]
-    print(f'Number of lost symbols: {len(idxs_to_be_removed):.0f}')
-    print(f'Percentage lost: {len(idxs_to_be_removed)/peaks.shape[0]*100}')
-    peaks = np.delete(peaks, idxs_to_be_removed)
-
-    return peaks
-
-
-def simulate_darkcounts_timestamps(
-        lmbda: float,
-        msg_peaks: npt.NDArray[np.int_],
-        rng_seed: int = 777):
-
-    rng = np.random.default_rng(rng_seed)
-
-    num_slots: int = int((time_series[msg_peaks][-1] - time_series[msg_peaks][0]) / slot_length)
-    p: npt.NDArray[np.int_] = rng.poisson(lmbda, num_slots)
-
-    darkcounts_timestamps: list[npt.NDArray[np.float64]] = []
-    t0 = time_series[msg_peaks][0]
-
-    darkcounts: npt.NDArray[np.float64]
-    slot_start: float
-    slot_end: float
-    num_events: int
-
-    for slot_idx, num_events in enumerate(p):
-        if num_events == 0:
-            continue
-        slot_start = t0 + slot_idx * slot_length
-        slot_end = t0 + (slot_idx + 1) * slot_length
-
-        darkcounts = rng.uniform(slot_start, slot_end, num_events)
-        darkcounts_timestamps.append(darkcounts)
-
-    darkcounts_timestamps_flat: npt.NDArray[np.float64]
-    darkcounts_timestamps_flat = np.array(flatten(darkcounts_timestamps))
-    print(f'Inserted {darkcounts_timestamps_flat.shape[0]:.1e} darkcounts')
-
-    return darkcounts_timestamps_flat
-
-
-def get_simulated_message_peak_locations(
-        msg_peaks: npt.NDArray[np.int_],
-        time_series: npt.NDArray[np.float64],
-        simulate_noise_peaks: bool,
-        simulate_lost_symbols: bool,
-        simulate_darkcounts: bool,
-        darkcounts_fraction: float,
-        simulate_jitter: bool,
-        rng=np.random.default_rng(),
-        rng_seed: int = 777):
-    # Simulate noise peaks before start and after end of message
-    peaks: npt.NDArray[np.int_]
-
-    if simulate_noise_peaks:
-        noise_peaks: npt.NDArray[np.int_] = np.sort(rng.integers(0, msg_peaks[0], 15))
-        noise_peaks[0] += 1
-        noise_peaks_end = np.sort(rng.integers(msg_peaks[-1], len(time_series), 15))
-        peaks = np.hstack((noise_peaks, msg_peaks, noise_peaks_end))
-    else:
-        peaks = msg_peaks
-
-    if simulate_lost_symbols:
-        peaks = simulate_symbol_loss(peaks, num_photons_per_pulse, detection_efficiency, rng_gen=rng)
-
-    num_symbols_received = len(peaks)
-
-    timestamps = time_series[peaks]
-    if simulate_darkcounts:
-        darkcounts_timestamps = simulate_darkcounts_timestamps(darkcounts_fraction, peaks, rng_seed)
-        timestamps = np.sort(np.hstack((timestamps, darkcounts_timestamps)))
-
-    # timestamps = np.hstack((timestamps, rng.random(size=15) * timestamps[0]))
-    # timestamps = np.sort(timestamps)
-
-    if simulate_jitter:
-        sigma = detector_jitter / 2.355
-        timestamps += rng.normal(0, sigma, size=len(timestamps))
-
-    if simulate_darkcounts and num_darkcounts > 0:
-        SNR = 10 * np.log10(num_symbols_received / num_darkcounts)
-        SNRs.append(SNR)
-        print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
-
-    peak_locations = timestamps
-    peak_locations = np.sort(peak_locations)
-
-    return peak_locations
+from esawindowsystem.simulations.simulation_utils import print_header, print_parameter, get_simulated_message_peak_locations
 
 
 simulate_noise_peaks: bool = True
 simulate_lost_symbols: bool = True
 simulate_darkcounts: bool = False
 simulate_jitter: bool = False
+use_test_file: bool = True
+use_latest_tt_file: bool = False
+demodulator_debug_mode: bool = False
+decoder_debug_mode: bool = False
 
-detection_efficiency_lower: float = 0.7
-detection_efficiency_upper: float = 0.8
-detection_efficiency_step_size = 0.1
+# Detector settings
+detection_efficiency_lower: float = 0.5
+detection_efficiency_upper: float = 0.9
+detection_efficiency_step_size = 0.05
 num_photons_per_pulse = 4
 darkcounts_factor: float = 0.0001
 detector_jitter = 50E-12
 
-use_test_file: bool = True
-use_latest_tt_file: bool = False
+num_samples_ppm_pulse = 10
+num_copies_message: int = 2         # When using CSV test file, use n copies of the same message
+
+
+# Plot settings
 compare_with_original: bool = False
 plot_BER_distribution: bool = False
-num_samples_ppm_pulse = 10
+plot_decoded_image: bool = False
+save_decoded_image: bool = False
 
+
+# Load timestamps from time tagger file or simulate time tags from CSV file
 time_events_filename: Path
 base_dir = Path.cwd() / Path('esawindowsystem') / Path('ppm_sample_messages')
 reference_file_path = Path.cwd(
@@ -197,10 +91,7 @@ else:
 slot_width_ns = num_samples_per_slot * sample_size_awg / 1000
 symbol_length_ns = num_slots_per_symbol * slot_width_ns
 
-# Seed that causes a CSM in the middle to be lost: 889
-# Seed that causes a CSM at the end to be lost: 777
-# both with cutting out 4500 symbols
-# SEED = 889
+
 bit_error_ratios_before = []
 bit_error_ratios_after = []
 
@@ -210,7 +101,7 @@ bit_error_ratios_before_std = []
 # The simulation is repeated a couple of times, so take the mean SNR for each set of simulations.
 mean_SNRs = []
 
-msg_peaks: npt.NDArray[np.int_] = np.array([])
+detection_events_indexes: npt.NDArray[np.int_] = np.array([])
 time_series: npt.NDArray[np.float64] = np.array([])
 peak_locations: npt.NDArray[np.float64] = np.array([])
 
@@ -222,11 +113,15 @@ if use_test_file:
     print(f'Decoding file: {time_events_filename}')
     samples_np_array: npt.NDArray[np.int_] = samples.to_numpy().flatten()
 
+    samples_np_array = np.tile(samples_np_array, num_copies_message)
+
+    samples_np_array = np.hstack((np.zeros(500, dtype=int), samples_np_array))
+
     # Make a time series based on the length of samples and how long one sample is in time
     time_series_end = len(samples_np_array) * sample_size_awg * 1E-12
     time_series = np.arange(0, time_series_end, sample_size_awg * 1E-12)
 
-    msg_peaks = find_peaks(samples_np_array, height=1, distance=2)[0]
+    detection_events_indexes = find_peaks(samples_np_array, height=1, distance=2)[0]
 else:
     detector_countrate = 4.41E7
     time_tagger_window_size = 50E-3
@@ -234,14 +129,18 @@ else:
     fr = TimeTagger.FileReader(time_events_filename)
     data = fr.getData(num_events)
     time_stamps = data.getTimestamps()
-    peak_locations = time_stamps * 1E-12
+    detection_events_timestamps = time_stamps * 1E-12
 
-    print(f'Number of events: {len(time_stamps)}')
+    print(f'Number of events: {len(detection_events_timestamps)}')
 
-detection_efficiencies = np.arange(detection_efficiency_lower,
-                                   detection_efficiency_upper,
-                                   detection_efficiency_step_size
-                                   )
+if detection_efficiency_lower == detection_efficiency_upper:
+    detection_efficiencies = [detection_efficiency_lower]
+else:
+    detection_efficiencies = np.arange(detection_efficiency_lower,
+                                       detection_efficiency_upper,
+                                       detection_efficiency_step_size
+                                       )
+
 cached_trellis: Trellis | None = None
 
 cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
@@ -250,7 +149,8 @@ cached_trellis_file_path = Path('cached_trellis_80640_timesteps')
 #         cached_trellis = pickle.load(f)
 
 
-for df, detection_efficiency in enumerate([0.60]):
+for df, detection_efficiency in enumerate(detection_efficiencies):
+    # Print the settings used for the simulation
     print_header('PPM parameters')
 
     print_parameter('M (PPM order)', M)
@@ -272,27 +172,37 @@ for df, detection_efficiency in enumerate([0.60]):
     irrecoverable: int = 0
     BERS_after = []
     BERS_before = []
-    SNRs = []
+    SNRs: list[float] = []
 
-    for z in range(0, 1):
+    for z in range(0, 6):
         print(f'num irrecoverable messages: {irrecoverable}')
         if irrecoverable > 3:
             raise StopIteration("Too many irrecoverable messages. ")
-        # SEED = 21189 + z**2
+
         SEED = 21190 + z**2
         print('Seed', SEED, 'z', z)
         rng = default_rng(SEED)
 
         num_darkcounts: int = 0
+
+        # Simulate detection efficiency / jitter / darkcounts
         if use_test_file:
-            peak_locations = get_simulated_message_peak_locations(
-                msg_peaks, time_series, simulate_noise_peaks, simulate_lost_symbols,
-                simulate_darkcounts, darkcounts_factor, simulate_jitter, rng, SEED
+            detection_events_timestamps = get_simulated_message_peak_locations(
+                detection_events_indexes, time_series, simulate_noise_peaks, simulate_lost_symbols,
+                simulate_darkcounts, darkcounts_factor, simulate_jitter, num_photons_per_pulse,
+                detection_efficiency, detector_jitter, rng, SEED
             )
+
+        num_symbols_received = len(detection_events_timestamps)
+
+        if simulate_darkcounts and num_darkcounts > 0:
+            SNR = 10 * np.log10(num_symbols_received / num_darkcounts)
+            SNRs.append(SNR)
+            print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
 
         try:
             slot_mapped_message, num_events_per_slot = demodulate(
-                peak_locations[:200000], M, slot_length, symbol_length, csm_correlation_threshold=0.70, **{'debug_mode': False})
+                detection_events_timestamps[:200000], M, slot_length, symbol_length, csm_correlation_threshold=0.70, **{'debug_mode': demodulator_debug_mode})
         except ValueError as e:
             irrecoverable += 1
             print(e)
@@ -309,8 +219,10 @@ for df, detection_efficiency in enumerate([0.60]):
                     'use_cached_trellis': False,
                     # 'cached_trellis_file_path': cached_trellis_file_path,
                     'user_settings': {'reference_file_path': reference_file_path},
-                    'num_events_per_slot': num_events_per_slot
+                    'num_events_per_slot': num_events_per_slot,
+                    'debug_mode': decoder_debug_mode
                 })
+
         except DecoderError as e:
             print(e)
             print(f'Something went wrong. Seed: {SEED} (z={z})')
@@ -387,17 +299,19 @@ for df, detection_efficiency in enumerate([0.60]):
             axs[1].set_title('Decoded image', fontsize=16)
             plt.show()
 
-        # plt.figure()
-        # plt.imshow(img_arr)
-        # plt.title('Decoded image of Jupiter (with bit and channel interleaving)')
-        # plt.xlabel('Pixel number (x)')
-        # plt.ylabel('Pixel number (y)')
-        # plt.text(x=2, y=90, s=f'BER={BER_after_decoding:.3f}', ha='left',
-        #          va='center', color='magenta', size=13, weight='bold')
-        # filename = f'BER simulation/decoded_img_64_samples_per_bin_interleaved_' +\
-        # f'{num_symbols_lost}_symbols_lost_seed_{SEED}_random_fill.png'
-        # # plt.savefig(filename)
-        # plt.show()
+        if plot_decoded_image:
+            plt.figure()
+            plt.imshow(img_arr)
+            plt.title('Decoded image of Jupiter (with bit and channel interleaving)')
+            plt.xlabel('Pixel number (x)')
+            plt.ylabel('Pixel number (y)')
+            plt.text(x=2, y=90, s=f'BER={BER_after_decoding:.3f}', ha='left',
+                     va='center', color='magenta', size=13, weight='bold')
+            filename = 'BER simulation/decoded_img_64_samples_per_bin_interleaved_' +\
+                f'{num_symbols_lost}_symbols_lost_seed_{SEED}_random_fill.png'
+            if save_decoded_image:
+                plt.savefig(filename)
+            plt.show()
 
         # print()
     BERS_after_arr: npt.NDArray[np.float64] = np.array(BERS_after, dtype=float)
@@ -425,31 +339,31 @@ print(f'Average BER before decoding: {bit_error_ratios_before} (std: {bit_error_
 print(f'Average BER after decoding: {bit_error_ratios_after} (std: {bit_error_ratios_after_std})')
 
 
-# axs2: plt.Axes
+axs2: plt.Axes
 
-# fig, axs2 = plt.subplots(1)
-# axs2.errorbar(
-#     detection_efficiencies, bit_error_ratios_before,
-#     bit_error_ratios_after_std, 0,
-#     capsize=2,
-#     label='Before decoding',
-#     marker='o',
-#     markersize=5)
+fig, axs2 = plt.subplots(1)
+axs2.errorbar(
+    detection_efficiencies, bit_error_ratios_before,
+    bit_error_ratios_after_std, 0,
+    capsize=2,
+    label='Before decoding',
+    marker='o',
+    markersize=5)
 
-# axs2.errorbar(
-#     detection_efficiencies, bit_error_ratios_after,
-#     bit_error_ratios_before_std, 0,
-#     capsize=2,
-#     label='After decoding',
-#     marker='o',
-#     markersize=5)
+axs2.errorbar(
+    detection_efficiencies, bit_error_ratios_after,
+    bit_error_ratios_before_std, 0,
+    capsize=2,
+    label='After decoding',
+    marker='o',
+    markersize=5)
 
-# axs2.set_yscale('log')
-# axs2.set_ylabel('Bit Error Ratio (-)')
-# axs2.set_xlabel('Signal to Noise Ratio (-)')
-# plt.title('BER as function of SNR')
-# plt.legend()
-# plt.show()
+axs2.set_yscale('log')
+axs2.set_ylabel('Bit Error Ratio (-)')
+axs2.set_xlabel('Detection efficiency (%)')
+plt.title('BER as function of detection efficiency')
+plt.legend()
+plt.show()
 
 print('done')
 print()
