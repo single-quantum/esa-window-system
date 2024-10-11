@@ -228,19 +228,8 @@ def find_and_parse_codewords(
             **{**kwargs, **{'codeword_idx': i}}
         )
 
-        # If `parse_ppm_symbols` did not manage to parse enough symbols from the
-        # peak locations, add random PPM symbols at the end of the codeword.
-        if len(symbols) < len_codeword:
-            diff = len_codeword - len(symbols)
-            symbols = np.hstack((symbols, 0))
-
-        if num_codewords_lost == 0 and len(symbols) > len_codeword:
-            symbols = symbols[:len_codeword]
-
         if num_codewords_lost >= 1:
-            diff = (num_codewords_lost + 1) * len_codeword_no_CSM - (len(symbols) - len(CSM))
-            if diff > 0:
-                symbols = np.hstack((symbols, 0))
+            symbols = np.hstack((symbols, np.zeros(int(num_codewords_lost)*len_codeword)))
 
         msg_symbols.append(np.round(symbols).astype(int))
 
@@ -258,6 +247,7 @@ def find_and_parse_codewords(
     msg_symbols.append(np.round(np.array(symbols)).astype(int))
 
     print(f'Estimated number of darkcounts in message frame: {num_darkcounts}')
+    print()
     return msg_symbols
 
 
