@@ -56,7 +56,7 @@ def decode(
         B_interleaver = int(15120 / m / N_interleaver)
 
     deinterleaved_ppm_symbols = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
-    num_zeros_interleaver: int = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
+    num_zeros_interleaver: int = (1 * B_interleaver * N_interleaver * (N_interleaver - 1))
     deinterleaved_slot_mapped_sequence = slot_map(deinterleaved_ppm_symbols[:len(
         deinterleaved_ppm_symbols) - num_zeros_interleaver], M, insert_guardslots=False)
 
@@ -98,6 +98,7 @@ def decode(
     deinterleaved_received_sequence = received_sequence.flatten()
 
     print('Setting up trellis')
+    print()
 
     num_output_bits: int = 3
     num_input_bits: int = 1
@@ -164,12 +165,12 @@ def decode(
         plt.figure()
         plt.close()
 
-    where_asms = np.where(asm_corr >= 18)[0]
+    where_asms = np.where(asm_corr >= 17.5)[0]
 
-    if where_asms.shape[0] == 1:
-        information_blocks = information_blocks[where_asms[0]+ASM_arr.shape[0]:]
-    else:
-        information_blocks = information_blocks[where_asms[0] +
-                                                ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits)]
+    if where_asms.shape[0] == 0:
+        raise DecoderError('ASM not found in message')
 
-    return information_blocks, BER_before_decoding
+    information_blocks = information_blocks[where_asms[0] +
+                                            ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits)]
+
+    return information_blocks, BER_before_decoding, where_asms

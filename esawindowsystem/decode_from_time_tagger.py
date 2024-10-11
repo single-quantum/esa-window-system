@@ -172,7 +172,7 @@ def analyze_data(time_events, metadata):
     BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)]) / len(sent_bits)
     print('BER before decoding', BER_before_decoding)
 
-    information_blocks, BER_before_decoding = decode(  # Problem, this resets the value for BER_before_decoding!
+    information_blocks, BER_before_decoding, _ = decode(  # Problem, this resets the value for BER_before_decoding!
         slot_mapped_message, M, CODE_RATE,
         use_inner_encoder=USE_INNER_ENCODER,
         **{

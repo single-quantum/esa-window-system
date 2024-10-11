@@ -633,9 +633,9 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
                 new_remapped_indices[i] = idx
 
         # reshaped_num_events = reshaped_num_events[new_remapped_indices]
-        num_zeros_interleaver = 2 * B_interleaver * N_interleaver * (N_interleaver - 1)
+        num_zeros_interleaver = B_interleaver * N_interleaver * (N_interleaver - 1)
         # reshaped_num_events = num_events_per_slot.reshape(num_slices, num_symbols_per_slice+len(CSM), int(5/4*M))[:, len(CSM):, :M]
-        channel_likelihoods = reshaped_num_events[:-num_zeros_interleaver].astype(int)
+        channel_likelihoods = reshaped_num_events.astype(int)
 
     else:
         channel_likelihoods = poisson_noise(

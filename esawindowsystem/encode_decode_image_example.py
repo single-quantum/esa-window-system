@@ -59,7 +59,7 @@ slot_mapped_sequence, _, _ = encoder(
         'use_randomizer': True
     })
 
-decoded_message = decode(
+decoded_message, _, _ = decode(
     slot_mapped_sequence,
     M,
     code_rate,
