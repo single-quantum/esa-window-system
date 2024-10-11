@@ -7,10 +7,14 @@ import numpy.typing as npt
 from esawindowsystem.core.BCJR_decoder_functions import (pi_ck, ppm_symbols_to_bit_array,
                                                          predict, predict_iteratively)
 from esawindowsystem.core.encoder_functions import (bit_deinterleave, channel_deinterleave,
-                                                    get_csm, randomize, slot_map, unpuncture)
+                                                    get_csm, randomize, slot_map, unpuncture, get_asm_bit_arr)
 from esawindowsystem.core.trellis import Trellis
 from esawindowsystem.core.utils import (bpsk_encoding, generate_outer_code_edges,
                                         get_BER_before_decoding, poisson_noise)
+
+from typing import Any
+
+import matplotlib.pyplot as plt
 
 
 class DecoderError(Exception):
@@ -21,10 +25,10 @@ def decode(
     slot_mapped_sequence: npt.NDArray[np.int_],
     M: int,
     CODE_RATE: Fraction,
-    CHANNEL_INTERLEAVE=True,
-    BIT_INTERLEAVE=True,
-    use_inner_encoder=False,
-    **kwargs
+    CHANNEL_INTERLEAVE: bool = True,
+    BIT_INTERLEAVE: bool = True,
+    use_inner_encoder: bool = False,
+    **kwargs: dict[str, Any]
 ) -> tuple[npt.NDArray[np.int_], float | None]:
     user_settings = kwargs.get('user_settings', {})
 
@@ -146,5 +150,26 @@ def decode(
 
     while information_blocks.shape[0] / 8 != information_blocks.shape[0] // 8:
         information_blocks = np.hstack((information_blocks, 0))
+
+    # For now, assume there is only one 32-bit ASM and remove it.
+    ASM_arr = get_asm_bit_arr()
+
+    asm_corr = np.correlate(information_blocks, ASM_arr, 'valid')
+
+    if kwargs.get('debug_mode'):
+        plt.figure()
+        plt.plot(asm_corr)
+        plt.show()
+
+        plt.figure()
+        plt.close()
+
+    where_asms = np.where(asm_corr >= 18)[0]
+
+    if where_asms.shape[0] == 1:
+        information_blocks = information_blocks[where_asms[0]+ASM_arr.shape[0]:]
+    else:
+        information_blocks = information_blocks[where_asms[0] +
+                                                ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits)]
 
     return information_blocks, BER_before_decoding

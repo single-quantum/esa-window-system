@@ -10,7 +10,7 @@ from esawindowsystem.core.encoder_functions import (accumulate, append_CRC,
                                                     convolve, get_csm,
                                                     map_PPM_symbols, puncture,
                                                     randomize, slicer,
-                                                    slot_map, zero_terminate)
+                                                    slot_map, zero_terminate, prepend_asm)
 from esawindowsystem.core.utils import ppm_symbols_to_bit_array
 
 
@@ -18,6 +18,7 @@ def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction,
     """This preprocessing function slices the bit stream in information blocks and attaches the CRC. """
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
+    bit_stream = prepend_asm(bit_stream)
     information_blocks = slicer(bit_stream, code_rate, include_crc=False, len_CRC=32, num_termination_bits=2)
     with open('sent_bit_sequence_no_csm', 'wb') as f:
         pickle.dump(information_blocks.flatten(), f)
@@ -32,7 +33,7 @@ def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction,
 
 
 def SCPPM_encoder(
-    information_blocks: npt.NDArray,
+    information_blocks: npt.NDArray[np.int_],
     M: int,
     code_rate: Fraction,
     BIT_INTERLEAVE: bool = True,
@@ -52,7 +53,7 @@ def SCPPM_encoder(
         convoluted_bit_sequence[i], _ = convolve(row)
 
     if code_rate != Fraction(1, 3):
-        convolutional_codewords: npt.NDArray = puncture(convoluted_bit_sequence, code_rate)
+        convolutional_codewords: npt.NDArray[np.int_] = puncture(convoluted_bit_sequence, code_rate)
     else:
         convolutional_codewords = convoluted_bit_sequence
 
@@ -68,7 +69,7 @@ def SCPPM_encoder(
 
     # The encoded message can be saved to a file, to compare the BER before
     # and after decoding
-    save_encoded_sequence_to_file = kwargs.get('save_encoded_sequence_to_file', False)
+    save_encoded_sequence_to_file: bool = kwargs.get('save_encoded_sequence_to_file', False)
 
     if save_encoded_sequence_to_file:
         reference_file_prefix: str = kwargs.get('reference_file_prefix', 'sample_payload')
