@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
+from esawindowsystem.core.encoder_functions import get_csm
+
 
 def plot_symbol_times(
     symbol_times: npt.NDArray,
@@ -156,10 +158,13 @@ def parse_ppm_symbols(
         symbol_length: float,
         M: int,
         num_darkcounts: int = 0,
-        **kwargs: tuple[str, Any]) -> tuple[list[float], int]:
+        **kwargs: dict[str, Any]) -> tuple[list[float], int]:
 
     symbols: list[float] = []
-    num_symbol_frames: int = int(round((stop_time - codeword_start_time) / symbol_length))
+
+    # There should always be this amount of PPM symbols in a codeword.
+    # Any pulse times falling outside of this timeframe are noise or belong to an adjacent codeword.
+    num_symbol_frames: int = int(15120/np.log2(M) + len(get_csm(M)))
 
     message_pulse_times = pulse_times[(pulse_times >= codeword_start_time) & (pulse_times < stop_time)]
 
@@ -211,9 +216,17 @@ def parse_ppm_symbols(
         best_symbol = np.unique(rounded_symbols[np.argmax(occurences)])[0]
         symbols.append(best_symbol)
 
-    codeword_idx = kwargs.get('codeword_idx', 0)
+    codeword_idx: int = kwargs.get('codeword_idx', 0)
     with open('sent_symbols', 'rb') as f:
         sent_symbols = pickle.load(f)
+
+    # Received more symbols than were sent.
+    if codeword_idx*num_symbol_frames >= len(sent_symbols):
+        return symbols, num_darkcounts
+
+    if kwargs.get('debug_mode'):
+        plot_symbol_times(pulse_times, symbol_length, slot_length,
+                          codeword_start_time, symbols, num_symbol_frames, start_symbol_index=6, **kwargs)
 
     num_symbol_errors = np.nonzero(
         np.round(np.array(symbols)) - sent_symbols[codeword_idx *
@@ -221,9 +234,5 @@ def parse_ppm_symbols(
     )[0].shape[0]
     symbol_error_ratio = num_symbol_errors / num_symbol_frames
     print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.3f}')
-
-    if kwargs.get('debug_mode'):
-        plot_symbol_times(pulse_times, symbol_length, slot_length,
-                          codeword_start_time, symbols, num_symbol_frames, start_symbol_index=6, **kwargs)
 
     return symbols, num_darkcounts
