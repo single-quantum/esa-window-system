@@ -1,5 +1,7 @@
-import numpy.typing as npt
+import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
+
 from esawindowsystem.core.utils import flatten
 
 
@@ -19,6 +21,7 @@ def simulate_symbol_loss(
         peaks: npt.NDArray,
         num_photons_per_pulse: int,
         detection_efficiency: float,
+        num_pixels: int = 4,
         rng_gen=np.random.default_rng) -> npt.NDArray:
     """ Simulate the loss of symbols, based on the number of photons per pulse and detection efficiency.
 
@@ -28,14 +31,42 @@ def simulate_symbol_loss(
 
     num_symbols = len(peaks)
 
-    num_photons_detected_per_pulse: npt.NDArray[np.int8] = rng_gen.binomial(
-        rng_gen.poisson(num_photons_per_pulse, size=num_symbols),
-        detection_efficiency)
+    # How many photons are present in a pulse
+    num_photons_per_pulse_arr = rng_gen.poisson(num_photons_per_pulse, size=num_symbols)
+    # num_photons_per_pulse = 4*np.ones(num_symbols, dtype=int)
+    # Array that keeps track of how many detection events happened
+    num_detections = np.zeros_like(num_photons_per_pulse_arr)
+
+    total_number_of_photons = np.sum(num_photons_per_pulse_arr)
+    absorbing_pixels = rng_gen.integers(0, num_pixels, total_number_of_photons)
+
+    for i in range(num_pixels):
+        num_photons_detected_per_pulse: npt.NDArray[np.int8] = rng_gen.binomial(
+            num_photons_per_pulse_arr,
+            detection_efficiency)
+
+        # Whenever there was more than 0 photons detected in a pulse, add a detection event
+        num_detections[num_photons_detected_per_pulse > 0] += 1
+
+        # The photon that was "absorbed", cannot be absorbed again by another pixel.
+        num_photons_per_pulse_arr[num_photons_detected_per_pulse > 0] -= 1
+        # Make sure there is always a positive amount of photons per pulse.
+        num_photons_per_pulse_arr[num_photons_per_pulse_arr < 0] = 0
 
     idxs_to_be_removed = np.where(num_photons_detected_per_pulse == 0)[0]
     print(f'Number of lost symbols: {len(idxs_to_be_removed):.0f}')
     print(f'Percentage lost: {len(idxs_to_be_removed)/peaks.shape[0]*100}')
-    peaks = np.delete(peaks, idxs_to_be_removed)
+
+    plt.figure()
+    plt.hist(num_detections, bins=[0, 1, 2, 3, 4])
+    plt.show()
+
+    plt.figure()
+    plt.close()
+
+    # Use the num detections array to make sure there is a timestamp for each detection event.
+    # When `num_detections` has a 0 element, it is removed from the `peaks` array
+    peaks = np.repeat(peaks, num_detections)
 
     return peaks
 
