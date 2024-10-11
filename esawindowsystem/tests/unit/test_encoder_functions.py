@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from esawindowsystem.core.encoder_functions import map_PPM_symbols, slot_map
+from esawindowsystem.core.encoder_functions import channel_interleave
 
 
 def test_map_PPM_symbols_3_bits_0():
@@ -64,3 +65,22 @@ def test_slot_map_PPM_symbol_too_large():
     input_symbols = [8]
     with pytest.raises(ValueError):
         _ = slot_map(input_symbols, 4)
+
+
+def test_channel_interleaver_one_codeword():
+    """Test whether the interleaver produces the correct amount of symbols"""
+    input_symbols = np.ones(100, dtype=int)
+
+    M = 8
+    m = np.log2(M)
+
+    N_interleaver = 3
+    B_interleaver = int((15120 / m) / N_interleaver)
+    interleaved_symbols = channel_interleave(input_symbols, B_interleaver, N_interleaver)
+
+    # Assert that there is still the same amount of symbols with the value 1 present in the
+    # interleaved codeword, as the interleaver only mixes symbols.
+    assert interleaved_symbols[interleaved_symbols == 1].shape[0] == input_symbols.shape[0]
+    # Also assert that an additional B*N*(N-1) of zeros were inserted, as specified by
+    # the CCSDS protocol
+    assert interleaved_symbols.shape[0] == input_symbols.shape[0] + B_interleaver*N_interleaver*(N_interleaver - 1)

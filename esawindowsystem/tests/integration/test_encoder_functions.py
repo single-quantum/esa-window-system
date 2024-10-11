@@ -23,6 +23,23 @@ def test_channel_interleaving():
     assert np.all(input_symbols == deinterleaved_symbols[:(len(deinterleaved_symbols) - 2 * interleaver_overhead)])
 
 
+def test_deinterleaving_longer_message_than_was_interleaved():
+    """The goal of this test is to show that when 2 codewords were interleaved, 
+    but 3 codewords are deinterleaved, that the symbols end up correctly anyway. """
+
+    M = 8
+
+    rng = np.random.default_rng(777)
+    ppm_symbols = rng.integers(0, M, 1000)
+    additional_ppm_symbols = rng.integers(0, M, 100)
+
+    interleaved_ppm_symbols = channel_interleave(ppm_symbols, B_interleaver, N_interleaver)
+
+    ppm_symbols_received = np.hstack((interleaved_ppm_symbols, additional_ppm_symbols))
+    deinterleaved_ppm_symbols = channel_deinterleave(ppm_symbols_received, B_interleaver, N_interleaver)
+    assert np.all(deinterleaved_ppm_symbols[:ppm_symbols.shape[0]] == ppm_symbols)
+
+
 def test_bit_interleaving():
     rng = np.random.default_rng()
 
