@@ -668,12 +668,12 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
     outer_trellis_edge_to_states[-2, 2, :] = -99
     outer_trellis_edge_to_states[-2, 3, :] = -99
 
-    # inner_trellis = Trellis(memory_size, num_output_bits, num_symbols_per_slice, inner_edges, num_input_bits)
-    # inner_trellis.set_edges(inner_edges, zero_terminated=False)
+    inner_trellis = Trellis(memory_size, num_output_bits, num_symbols_per_slice, inner_edges, num_input_bits)
+    inner_trellis.set_edges(inner_edges, zero_terminated=False)
 
-    # outer_trellis = Trellis(memory_size_outer, num_output_bits_outer,
-    #                         num_bits_per_slice, outer_edges, num_input_bits_outer)
-    # outer_trellis.set_edges(outer_edges)
+    outer_trellis = Trellis(memory_size_outer, num_output_bits_outer,
+                            num_bits_per_slice, outer_edges, num_input_bits_outer)
+    outer_trellis.set_edges(outer_edges)
 
     outer_code_edge_outputs: npt.NDArray[np.int8] = get_edge_output_array(outer_trellis)
     inner_code_edge_inputs: npt.NDArray[np.int8] = get_edge_input_array(inner_trellis)
