@@ -59,24 +59,7 @@ def simulate_symbol_loss(
 
         num_detections[i] = np.sum(absorbed)
 
-        # _, indeces = np.unique(pixels, return_index=True)
-        # mx = ma.masked_array(photons[np.argsort(pixels)], mask=1 - photons[np.argsort(pixels)])
-        # a = np.sum(mx)
-        # num_detections[i] = np.sum(rng_gen.binomial(photons[indeces], detection_efficiency))
         j += num_photons_per_pulse_arr[i]
-
-    # for i in range(num_pixels):
-    #     num_photons_detected_per_pulse: npt.NDArray[np.int8] = rng_gen.binomial(
-    #         num_photons_per_pulse_arr,
-    #         detection_efficiency)
-
-    #     # Whenever there was more than 0 photons detected in a pulse, add a detection event
-    #     num_detections[num_photons_detected_per_pulse > 0] += 1
-
-    #     # The photon that was "absorbed", cannot be absorbed again by another pixel.
-    #     num_photons_per_pulse_arr[num_photons_detected_per_pulse > 0] -= 1
-    #     # Make sure there is always a positive amount of photons per pulse.
-    #     num_photons_per_pulse_arr[num_photons_per_pulse_arr < 0] = 0
 
     idxs_to_be_removed = np.where(num_detections == 0)[0]
     print(f'Number of lost symbols: {len(idxs_to_be_removed):.0f}')
