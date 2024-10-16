@@ -1,20 +1,22 @@
 import pickle
 from fractions import Fraction
-
-import numpy as np
-import numpy.typing as npt
-
-from esawindowsystem.core.BCJR_decoder_functions import (pi_ck, ppm_symbols_to_bit_array,
-                                                         predict, predict_iteratively)
-from esawindowsystem.core.encoder_functions import (bit_deinterleave, channel_deinterleave,
-                                                    get_csm, randomize, slot_map, unpuncture, get_asm_bit_arr)
-from esawindowsystem.core.trellis import Trellis
-from esawindowsystem.core.utils import (bpsk_encoding, generate_outer_code_edges,
-                                        get_BER_before_decoding, poisson_noise)
-
 from typing import Any
 
 import matplotlib.pyplot as plt
+import numpy as np
+import numpy.typing as npt
+
+from esawindowsystem.core.BCJR_decoder_functions import (
+    pi_ck, ppm_symbols_to_bit_array, predict, predict_iteratively)
+from esawindowsystem.core.encoder_functions import (bit_deinterleave,
+                                                    channel_deinterleave,
+                                                    get_asm_bit_arr, get_csm,
+                                                    randomize, slot_map,
+                                                    unpuncture)
+from esawindowsystem.core.trellis import Trellis
+from esawindowsystem.core.utils import (bpsk_encoding,
+                                        generate_outer_code_edges,
+                                        get_BER_before_decoding, poisson_noise)
 
 
 class DecoderError(Exception):
@@ -56,9 +58,9 @@ def decode(
         B_interleaver = int(15120 / m / N_interleaver)
 
     deinterleaved_ppm_symbols = channel_deinterleave(ppm_mapped_message, B_interleaver, N_interleaver)
-    num_zeros_interleaver: int = (1 * B_interleaver * N_interleaver * (N_interleaver - 1))
-    deinterleaved_slot_mapped_sequence = slot_map(deinterleaved_ppm_symbols[:len(
-        deinterleaved_ppm_symbols) - num_zeros_interleaver], M, insert_guardslots=False)
+    num_zeros_interleaver: int = (2 * B_interleaver * N_interleaver * (N_interleaver - 1))
+    deinterleaved_slot_mapped_sequence = slot_map(deinterleaved_ppm_symbols[:(len(
+        deinterleaved_ppm_symbols) - num_zeros_interleaver)], M, insert_guardslots=False)
 
     if CHANNEL_INTERLEAVE:
 
@@ -170,7 +172,8 @@ def decode(
     if where_asms.shape[0] == 0:
         raise DecoderError('ASM not found in message')
 
+    # TODO: Make transfer frame size a setting.
     information_blocks = information_blocks[where_asms[0] +
-                                            ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits)]
+                                            ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits * 8)]
 
     return information_blocks, BER_before_decoding, where_asms
