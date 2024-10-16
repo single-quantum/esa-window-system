@@ -68,7 +68,7 @@ def plot_symbol_times(
                                 (i - start_symbol_index) * symbol_length for i in range(start_symbol_index, start_symbol_index + num_symbols)]
 
     num_slots_per_symbol = round(symbol_length / slot_length)
-    num_guard_slots = int(num_slots_per_symbol/5)
+    num_guard_slots = int(num_slots_per_symbol / 5)
 
     fig, axs = plt.subplots(2, 1)
 
@@ -157,6 +157,7 @@ def parse_ppm_symbols(
         slot_length: float,
         symbol_length: float,
         M: int,
+        num_codewords_lost: int,
         num_darkcounts: int = 0,
         **kwargs: dict[str, Any]) -> tuple[list[float], int]:
 
@@ -164,7 +165,8 @@ def parse_ppm_symbols(
 
     # There should always be this amount of PPM symbols in a codeword.
     # Any pulse times falling outside of this timeframe are noise or belong to an adjacent codeword.
-    num_symbol_frames: int = int(15120/np.log2(M) + len(get_csm(M)))
+    CSM = get_csm(M)
+    num_symbol_frames: int = int((15120 / np.log2(M) + len(CSM)) * (1 + num_codewords_lost))
 
     message_pulse_times = pulse_times[(pulse_times >= codeword_start_time) & (pulse_times < stop_time)]
 
@@ -221,16 +223,23 @@ def parse_ppm_symbols(
         sent_symbols = pickle.load(f)
 
     # Received more symbols than were sent.
-    if codeword_idx*num_symbol_frames >= len(sent_symbols):
+    if codeword_idx * num_symbol_frames >= len(sent_symbols):
         return symbols, num_darkcounts
 
+    # Default amount of symbol frames
+    num_symbol_frames = int(15120 / np.log2(M) + len(CSM))
+
     if kwargs.get('debug_mode'):
-        plot_symbol_times(pulse_times, symbol_length, slot_length,
-                          codeword_start_time, symbols, num_symbol_frames, start_symbol_index=6, **kwargs)
+        if len(symbols) > num_symbol_frames:
+            plot_symbol_times(pulse_times, symbol_length, slot_length,
+                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=num_symbol_frames + 4000, **kwargs)
+        else:
+            plot_symbol_times(pulse_times, symbol_length, slot_length,
+                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=6, **kwargs)
 
     num_symbol_errors = np.nonzero(
-        np.round(np.array(symbols)) - sent_symbols[codeword_idx *
-                                                   num_symbol_frames:(codeword_idx + 1) * num_symbol_frames]
+        np.round(np.array(symbols)) -
+        sent_symbols[codeword_idx * num_symbol_frames:(codeword_idx + 1 + num_codewords_lost) * num_symbol_frames]
     )[0].shape[0]
     symbol_error_ratio = num_symbol_errors / num_symbol_frames
     print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.3f}')

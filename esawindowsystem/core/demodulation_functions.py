@@ -1,6 +1,6 @@
 import copy
-from typing import Any
 from math import ceil
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,10 +8,9 @@ import numpy.typing as npt
 from scipy.signal import find_peaks
 
 from esawindowsystem.core.encoder_functions import get_csm, slot_map
+from esawindowsystem.core.numba_utils import get_num_events_numba
 from esawindowsystem.core.parse_ppm_symbols import parse_ppm_symbols
 from esawindowsystem.core.utils import flatten, moving_average
-
-from esawindowsystem.core.numba_utils import get_num_events_numba
 
 
 def get_num_events(
@@ -34,7 +33,8 @@ def get_num_events(
     return num_events_per_slot
 
 
-def make_time_series(time_stamps: npt.NDArray[np.float64], slot_length: float) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.float64]]:
+def make_time_series(time_stamps: npt.NDArray[np.float64],
+                     slot_length: float) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.float64]]:
     """Digitize/discretize the array of time_stamps, so that it becomes a time series of zeros and ones. """
     # Naively assume the fist timestamp is a PPM symbol.
     time_vec: npt.NDArray[np.float64] = np.arange(
@@ -210,6 +210,8 @@ def find_and_parse_codewords(
     num_darkcounts: int = 0
     symbols: list[float] | npt.NDArray[np.float64]
 
+    codeword_idx = 0
+
     for i in range(len(csm_times) - 1):
         start: float = csm_times[i]
         stop: float = csm_times[i + 1]
@@ -224,14 +226,17 @@ def find_and_parse_codewords(
             slot_length,
             symbol_length,
             M,
+            num_codewords_lost,
             num_darkcounts,
-            **{**kwargs, **{'codeword_idx': i}}
+            **{**kwargs, **{'codeword_idx': codeword_idx}}
         )
 
-        if num_codewords_lost >= 1:
-            symbols = np.hstack((symbols, np.zeros(int(num_codewords_lost)*len_codeword)))
+        # if num_codewords_lost >= 1:
+        #     symbols = np.hstack((symbols, np.zeros(int(num_codewords_lost)*len_codeword)))
 
         msg_symbols.append(np.round(symbols).astype(int))
+
+        codeword_idx += 1 + num_codewords_lost
 
     # Take the last CSM and parse until the end of the message.
     symbols, num_darkcounts = parse_ppm_symbols(
@@ -241,8 +246,9 @@ def find_and_parse_codewords(
         slot_length,
         symbol_length,
         M,
+        num_codewords_lost,
         num_darkcounts,
-        **{**kwargs, **{'codeword_idx': len(csm_times) - 1}}
+        **{**kwargs, **{'codeword_idx': codeword_idx}}
     )
     msg_symbols.append(np.round(np.array(symbols)).astype(int))
 
@@ -262,6 +268,30 @@ def get_num_events_per_slot(
 
     # The factor 5/4 is determined by the protocol, which states that there
     # shall be M/4 guard slots for each PPM symbol.
+
+    symbol_length = 5 / 4 * M * slot_length
+    codeword_length = symbol_length * symbols_per_codeword
+    # TODO: test if this works when the second CSM is lost.
+
+    i = 0
+    while i < (len(csm_times) - 1):
+        lost_codewords: list[int] = []
+        expected_next_csm_time = csm_times[i] + codeword_length
+        found_next_csm = expected_next_csm_time * 0.99 < csm_times[i + 1] < expected_next_csm_time * 1.01
+        if not found_next_csm:
+            lost_codewords.append(i + 1)
+
+            csm_times = np.insert(
+                csm_times,
+                lost_codewords,
+                csm_times[np.array(lost_codewords) - 1] + np.diff(csm_times)[0])
+
+            i = 0
+
+        i += 1
+
+    # csm_times = np.insert(csm_times, [5], csm_times[4] + np.diff(csm_times)[0])
+
     num_slots_per_codeword = int((symbols_per_codeword + len(CSM)) * 5 / 4 * M)
     num_events_per_slot: npt.NDArray[np.int_] = np.zeros((len(csm_times), num_slots_per_codeword), dtype=np.int_)
 
