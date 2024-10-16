@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.ma as ma
 import numpy.typing as npt
 
 from esawindowsystem.core.utils import flatten
@@ -40,29 +41,53 @@ def simulate_symbol_loss(
     total_number_of_photons = np.sum(num_photons_per_pulse_arr)
     absorbing_pixels = rng_gen.integers(0, num_pixels, total_number_of_photons)
 
-    for i in range(num_pixels):
-        num_photons_detected_per_pulse: npt.NDArray[np.int8] = rng_gen.binomial(
-            num_photons_per_pulse_arr,
-            detection_efficiency)
+    # not a correct name for this variable
+    photons_absorbed = np.ones(absorbing_pixels.shape[0], dtype=int)
 
-        # Whenever there was more than 0 photons detected in a pulse, add a detection event
-        num_detections[num_photons_detected_per_pulse > 0] += 1
+    j = 0
+    for i, num_photons_in_pulse in enumerate(num_photons_per_pulse_arr):
+        pixels = absorbing_pixels[j:j + num_photons_per_pulse_arr[i]]
+        photons = photons_absorbed[j:j + num_photons_per_pulse_arr[i]]
 
-        # The photon that was "absorbed", cannot be absorbed again by another pixel.
-        num_photons_per_pulse_arr[num_photons_detected_per_pulse > 0] -= 1
-        # Make sure there is always a positive amount of photons per pulse.
-        num_photons_per_pulse_arr[num_photons_per_pulse_arr < 0] = 0
+        absorbed = np.zeros(num_pixels)
+        for pi, pixel in enumerate(pixels):
+            # If pixel did not yet absorb a photon
+            if absorbed[pixel] == 0:
+                photon_absorbed = rng_gen.binomial(photons[pi], detection_efficiency)
+                if photon_absorbed == 1:
+                    absorbed[pixel] += 1
 
-    idxs_to_be_removed = np.where(num_photons_detected_per_pulse == 0)[0]
+        num_detections[i] = np.sum(absorbed)
+
+        # _, indeces = np.unique(pixels, return_index=True)
+        # mx = ma.masked_array(photons[np.argsort(pixels)], mask=1 - photons[np.argsort(pixels)])
+        # a = np.sum(mx)
+        # num_detections[i] = np.sum(rng_gen.binomial(photons[indeces], detection_efficiency))
+        j += num_photons_per_pulse_arr[i]
+
+    # for i in range(num_pixels):
+    #     num_photons_detected_per_pulse: npt.NDArray[np.int8] = rng_gen.binomial(
+    #         num_photons_per_pulse_arr,
+    #         detection_efficiency)
+
+    #     # Whenever there was more than 0 photons detected in a pulse, add a detection event
+    #     num_detections[num_photons_detected_per_pulse > 0] += 1
+
+    #     # The photon that was "absorbed", cannot be absorbed again by another pixel.
+    #     num_photons_per_pulse_arr[num_photons_detected_per_pulse > 0] -= 1
+    #     # Make sure there is always a positive amount of photons per pulse.
+    #     num_photons_per_pulse_arr[num_photons_per_pulse_arr < 0] = 0
+
+    idxs_to_be_removed = np.where(num_detections == 0)[0]
     print(f'Number of lost symbols: {len(idxs_to_be_removed):.0f}')
     print(f'Percentage lost: {len(idxs_to_be_removed)/peaks.shape[0]*100}')
 
-    plt.figure()
-    plt.hist(num_detections, bins=[0, 1, 2, 3, 4])
-    plt.show()
+    # plt.figure()
+    # plt.hist(num_detections, bins=[0, 1, 2, 3, 4, 5, 6, 7])
+    # plt.show()
 
-    plt.figure()
-    plt.close()
+    # plt.figure()
+    # plt.close()
 
     # Use the num detections array to make sure there is a timestamp for each detection event.
     # When `num_detections` has a 0 element, it is removed from the `peaks` array
@@ -110,6 +135,7 @@ def simulate_darkcounts_timestamps(
 def get_simulated_message_peak_locations(
         msg_peaks: npt.NDArray[np.int_],
         time_series: npt.NDArray[np.float64],
+        slot_length: float,
         simulate_noise_peaks: bool,
         simulate_lost_symbols: bool,
         simulate_darkcounts: bool,
@@ -137,7 +163,8 @@ def get_simulated_message_peak_locations(
 
     timestamps = time_series[peaks]
     if simulate_darkcounts:
-        darkcounts_timestamps = simulate_darkcounts_timestamps(darkcounts_fraction, peaks, rng_seed)
+        darkcounts_timestamps = simulate_darkcounts_timestamps(
+            darkcounts_fraction, peaks, time_series, slot_length, rng_seed)
         timestamps = np.sort(np.hstack((timestamps, darkcounts_timestamps)))
 
     # timestamps = np.hstack((timestamps, rng.random(size=15) * timestamps[0]))
