@@ -4,7 +4,7 @@ from fractions import Fraction
 import numpy as np
 import numpy.typing as npt
 
-from esawindowsystem.core.encoder_functions import (accumulate, append_CRC,
+from esawindowsystem.core.encoder_functions import (accumulate, append_CRC, get_CRC,
                                                     bit_interleave,
                                                     channel_interleave,
                                                     convolve, get_csm,
@@ -14,19 +14,20 @@ from esawindowsystem.core.encoder_functions import (accumulate, append_CRC,
 from esawindowsystem.core.utils import ppm_symbols_to_bit_array
 
 
-def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction, **kwargs) -> npt.NDArray[np.int_]:
+def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction, include_crc: bool = False, **kwargs) -> npt.NDArray[np.int_]:
     """This preprocessing function slices the bit stream in information blocks and attaches the CRC. """
     # Slice into information blocks of 5038 bits (code rate 1/3) and append 2 termination bits.
     # CRC attachment is still to be implemented
     bit_stream = prepend_asm(bit_stream)
-    information_blocks = slicer(bit_stream, code_rate, include_crc=False, len_CRC=32, num_termination_bits=2)
+    information_blocks = slicer(bit_stream, code_rate, include_crc=include_crc, len_CRC=32, num_termination_bits=2)
     with open('sent_bit_sequence_no_csm', 'wb') as f:
         pickle.dump(information_blocks.flatten(), f)
 
     if kwargs.get('use_randomizer', False):
         information_blocks = randomize(information_blocks)
 
-    # information_blocks = append_CRC(information_blocks)
+    if include_crc:
+        information_blocks = append_CRC(information_blocks)
     information_blocks = zero_terminate(information_blocks)
 
     return information_blocks

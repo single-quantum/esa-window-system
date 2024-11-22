@@ -98,7 +98,7 @@ def get_CRC(arr: BitArray) -> BitArray:
 
     # Initialize the CRC shift register
     seed: list[int] = [1] * CRC_size
-    sr = CRC(seed, [3, 14, 18, 29])
+    sr = CRC(seed, [0, 3, 14, 18, 29])
 
     for j in range(arr.shape[0] - CRC_size):
         sr.next(arr[j] ^ sr.state[-1])

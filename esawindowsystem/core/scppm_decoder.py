@@ -135,7 +135,7 @@ def decode(
         predicted_msg: npt.NDArray[np.int_] = predict(tr, encoded_sequence, Es=Es)
     else:
         predicted_msg, _, _ = predict_iteratively(deinterleaved_slot_mapped_sequence, M,
-                                                  CODE_RATE, max_num_iterations=2, **kwargs)
+                                                  CODE_RATE, max_num_iterations=3, **kwargs)
     information_block_sizes = {
         Fraction(1, 3): 5040,
         Fraction(1, 2): 7560,
@@ -143,7 +143,11 @@ def decode(
     }
 
     num_bits = information_block_sizes[CODE_RATE]
-    information_blocks: npt.NDArray[np.int_] = predicted_msg.reshape((-1, num_bits))[:, :-2].flatten()
+    include_CRC = False
+    if include_CRC:
+        information_blocks: npt.NDArray[np.int_] = predicted_msg.reshape((-1, num_bits))[:, :-34].flatten()
+    else:
+        information_blocks: npt.NDArray[np.int_] = predicted_msg.reshape((-1, num_bits))[:, :-2].flatten()
 
     # information_blocks = predicted_msg.reshape((-1, 5040)).flatten()
     # Derandomize
@@ -167,7 +171,7 @@ def decode(
         plt.figure()
         plt.close()
 
-    where_asms = np.where(asm_corr >= 17.5)[0]
+    where_asms = np.where(asm_corr >= 18.0)[0]
 
     if where_asms.shape[0] == 0:
         raise DecoderError('ASM not found in message')

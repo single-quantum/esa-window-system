@@ -580,7 +580,7 @@ def get_edge_input_array(trellis: Trellis) -> npt.NDArray[np.int8]:
     return edge_inputs
 
 
-def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 20,
+def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 10,
                         ns: float = 3, nb: float = 0.1, ber_stop_threshold: float = 1E-7, **kwargs):
     # Initialize outer trellis edges
     memory_size_outer = 2
@@ -716,15 +716,27 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
 
             u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
 
+            received_parity_bits = u_hat[-34:-2]
+            expected_parity_bits = get_CRC(np.array(u_hat[:-2]))
+
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
 
             ber: float = 1
             sent_bits_codeword: BitArray
+
+            include_CRC = False
+
             if sent_bit_sequence is not None:
-                sent_bits_codeword = sent_bit_sequence[
-                    i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)
-                ]
+                if include_CRC:
+                    sent_bits_codeword = sent_bit_sequence[
+                        i * num_bits_per_slice - 34 * i:(i + 1) * num_bits_per_slice - 34 * (i + 1)
+                    ]
+                else:
+                    sent_bits_codeword = sent_bit_sequence[
+                        i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)
+                    ]
+
                 ber = np.sum(
                     [abs(x - y) for x, y in zip(u_hat, sent_bits_codeword)]
                 ) / num_bits_per_slice
@@ -736,7 +748,7 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
 
             decoded_message_array[iteration, i, :] = u_hat
 
-            if ber < ber_stop_threshold:
+            if np.all(received_parity_bits == expected_parity_bits):
                 break
 
         decoded_message.append(u_hat)
