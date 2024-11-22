@@ -30,7 +30,7 @@ def get_time_events_from_tt_file(time_events_filename: str | Path, num_channels:
     time_events_filename2 = str(time_events_filename).replace(os.sep, '/')
     print(time_events_filename2)
     print(str(time_events_filename))
-    print('c:/Users/SQ/Documents/Dev/esa-window-system/experimental results/15-12-2023/32 ppm/41 dBm (15)/herbig-haro-211-small_10-sps_32-PPM_2-3-code-rate_14-45-55_1702647955.1.ttbin')
+
     fr = TimeTagger.FileReader(time_events_filename2)
 
     if num_events := kwargs.get('num_events'):
@@ -78,7 +78,7 @@ def get_time_events_from_tt_file(time_events_filename: str | Path, num_channels:
 
 
 def load_timetagger_data(use_latest_tt_file: bool, GET_TIME_EVENTS_PER_SECOND: bool,
-                         time_tagger_files_dir: str, time_tagger_channels):
+                         time_tagger_files_dir: str, time_tagger_channels, calibrate_time_tags: bool = False):
     time_tagger_files_path: Path = Path(__file__).parent.absolute() / time_tagger_files_dir
     tt_files = time_tagger_files_path.rglob('*.ttbin')
 
@@ -86,7 +86,7 @@ def load_timetagger_data(use_latest_tt_file: bool, GET_TIME_EVENTS_PER_SECOND: b
 
     # You can choose to manually put in the time tagger filename below, or use the last added file to the directory.
     if not use_latest_tt_file:
-        metadata_filename = 'timetags_metadata_1702647955'
+        metadata_filename = 'timetags_metadata_1730297682'
         metadata_id = metadata_filename.split('_')[-1]
         metadata_filepath = time_tagger_files_dir / Path(metadata_filename)
         time_tagger_files = list(filter(lambda f: metadata_id in f.name, tt_files))
@@ -96,13 +96,16 @@ def load_timetagger_data(use_latest_tt_file: bool, GET_TIME_EVENTS_PER_SECOND: b
     else:
         files: list[Path] = [x for x in tt_files if x.is_file()]
         files = sorted(files, key=lambda x: x.lstat().st_mtime)
+        if not files:
+            raise IndexError("Time tagger directory empty. Make sure path is correct. \n" +
+                             f"Current path: {time_tagger_files_path}")
         time_tagger_filename = os.path.join(time_tagger_files_dir, (re.split(r'\.\d{1}', files[-1].stem)[0] + '.ttbin'))
         print(time_tagger_filename)
         time_tagger_file_epoch = time_tagger_filename.split('_')[-1].rstrip('.ttbin')
 
         # Get metadata files
         files_list = time_tagger_files_path.rglob('*')
-        metadata_files = [f for f in files_list if not f.suffix]
+        metadata_files = [f for f in files_list if 'metadata' in f.stem]
         metadata_filepath = list(filter(lambda f: time_tagger_file_epoch in f.name, metadata_files))[0]
 
     if not metadata_filepath.exists():
@@ -116,9 +119,42 @@ def load_timetagger_data(use_latest_tt_file: bool, GET_TIME_EVENTS_PER_SECOND: b
     # Remove duplicate timing events
     time_events = np.unique(time_events)
 
+    if calibrate_time_tags:
+        for i in range(len(time_events_per_channel[1])):
+            time_events_per_channel[1][i] += 46
+        for i in range(len(time_events_per_channel[2])):
+            time_events_per_channel[2][i] += 96
+        for i in range(len(time_events_per_channel[3])):
+            time_events_per_channel[3][i] += 58
+
     if GET_TIME_EVENTS_PER_SECOND:
         time_events = np.sort(np.concatenate(
             tuple(np.array(time_events_per_channel[i]) for i in time_tagger_channels)) * 1E-12)
+
+    # if calibrate_time_tags:
+    #     for channel in [1, 2, 3]:
+    #         hist = []
+    #         limit = 15000
+    #         for t_start in time_events_per_channel[0][:30000]:
+    #             for t_stop in time_events_per_channel[channel][:30000]:
+    #                 if t_start > t_stop:
+    #                     continue
+    #                 dt = t_stop - t_start
+    #                 if dt > limit:
+    #                     break
+    #                 if dt == 0:
+    #                     continue
+    #                 hist.append(dt)
+    #         hist = np.array(hist)
+
+    #         plt.figure()
+    #         bin_values, bin_times, _ = plt.hist(hist, bins=300)
+    #         plt.show()
+
+    #         max_bin_index = np.argmax(bin_values)
+    #         time_shift = bin_times[max_bin_index]
+
+    #         print(f'Relative time shift (channel = {channel}): ', time_shift)
 
     return time_events, metadata
 
@@ -135,6 +171,10 @@ def analyze_data(time_events, metadata):
     IMG_SHAPE = metadata.get('IMG_SHAPE')
     sent_bits = metadata.get('sent_bit_sequence')
     sent_bits_no_csm = metadata.get('sent_bit_sequence_no_csm')
+    sent_symbols = metadata.get('sent_symbols')
+
+    if sent_symbols is None:
+        sent_symbols = map_PPM_symbols(list(sent_bits), int(np.log2(M)))
     num_slots_per_symbol = int(5 / 4 * M)
 
     # time_events_samples = (time_events - time_events[0]) * (8.82091E9 / num_samples_per_slot) + 0.5
@@ -146,11 +186,11 @@ def analyze_data(time_events, metadata):
         M,
         slot_length,
         symbol_length,
+        sent_symbols,
         csm_correlation_threshold=CORRELATION_THRESHOLD,
         **{
             'num_samples_per_slot': num_samples_per_slot,
-            'debug_mode': DEBUG_MODE,
-            'message_idx': MESSAGE_IDX
+            'debug_mode': DEMODULATOR_DEBUG_MODE,
         }
     )
 
@@ -180,6 +220,7 @@ def analyze_data(time_events, metadata):
             'num_events_per_slot': events_per_slot,
             'use_randomizer': USE_RANDOMIZER,
             'sent_bit_sequence_no_csm': sent_bits_no_csm,
+            'debug_mode': DECODER_DEBUG_MODE,
             'sent_bit_sequence': sent_bits
         })
 
@@ -198,7 +239,8 @@ def analyze_data(time_events, metadata):
 
         if GREYSCALE:
             sent_img_array = map_PPM_symbols(sent_message, 8)
-            img_arr = sent_img_array[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+            img_arr = map_PPM_symbols(information_blocks, 8)
+            img_arr = img_arr[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
             CMAP = 'Greys'
         else:
             img_arr = information_blocks.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
@@ -257,36 +299,29 @@ def load_output_data(path, name='output_data'):
 
 
 if __name__ == '__main__':
-    DEBUG_MODE = False
+    DECODER_DEBUG_MODE = True
+    DEMODULATOR_DEBUG_MODE = True
     use_latest_tt_file: bool = True
     GET_TIME_EVENTS_PER_SECOND = True
-    ANALYZE_DATA = False
+    ANALYZE_DATA = True
 
     time_tagger_channels = [
-        [0, 1, 2, 3],
-        [0, 1, 2],
-        [0, 1],
+        [0, 1, 2, 3]
     ]
-    # time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/15-12-2023/16 ppm/46 dBm (20)/'
-    time_tagger_files_dir: str = 'C:/Users/hvlot/OneDrive - Single Quantum/Documents/Dev/esa-window-system/experimental results/24-11-2023/Interleaved detector/10 samples per slot - 16 ppm/'
-    # time_tagger_files_dir: str = 'time tagger files/'
-
+    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\C824-02\\16 ppm\\1 ns slots'
+    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\C824-02\\16 ppm\\500 ps slots'
+    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\24-10-2024\\Non-Bridged detectors\\C824-08\\21 db attenuation'
+    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\time tagger files\\before 01-11-2024'
+    time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\time tagger files'
     img_arrs = []
+
     for i, channels in enumerate(time_tagger_channels):
         time_events, metadata = load_timetagger_data(
-            use_latest_tt_file, GET_TIME_EVENTS_PER_SECOND, time_tagger_files_dir, channels)
+            use_latest_tt_file, GET_TIME_EVENTS_PER_SECOND, time_tagger_files_dir, channels, calibrate_time_tags=True)
 
         if ANALYZE_DATA:
-            data_for_analysis, img_arr = analyze_data(time_events, metadata)
+            data_for_analysis, img_arr = analyze_data(time_events[20000:170000], metadata)
             img_arrs.append(img_arr)
-
-    if ANALYZE_DATA:
-        with open('decoded_image_arrays_46dbm', 'wb') as f:
-            pickle.dump(img_arrs, f)
-        decoded_imgs = img_arrs
-    else:
-        with open('decoded_image_arrays_46dbm', 'rb') as f:
-            decoded_imgs = pickle.load(f)
 
     IMG_SHAPE = metadata.get('IMG_SHAPE')
     PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')
@@ -295,28 +330,29 @@ if __name__ == '__main__':
     sent_img_array = map_PPM_symbols(sent_message, 8)
     original_img_arr = sent_img_array[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
 
-    fig, axs = plt.subplots(1, len(decoded_imgs)+1)
-    axs[0].imshow(original_img_arr, cmap='Greys')
-    axs[0].tick_params(
-        which='both',      # both major and minor ticks are affected
-        bottom=False,      # ticks along the bottom edge are off
-        top=False,         # ticks along the top edge are off
-        left=False,
-        labelbottom=False,
-        labelleft=False
-    )  # labels along the bottom edge are off
-    for i, img_arr in enumerate(decoded_imgs):
-        axs[i+1].imshow(img_arr, cmap='Greys')
-        axs[i+1].tick_params(
-            which='both',      # both major and minor ticks are affected
-            bottom=False,      # ticks along the bottom edge are off
-            top=False,         # ticks along the top edge are off
-            left=False,
-            labelbottom=False,
-            labelleft=False
-        )  # labels along the bottom edge are off
-
-    plt.show()
+    if ANALYZE_DATA:
+        fig, axs = plt.subplots(1, 2)
+        axs[0].imshow(original_img_arr, cmap='Greys')
+        axs[1].imshow(img_arr[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE))
+        plt.show()
+    # axs[0].tick_params(
+    #     which='both',      # both major and minor ticks are affected
+    #     bottom=False,      # ticks along the bottom edge are off
+    #     top=False,         # ticks along the top edge are off
+    #     left=False,
+    #     labelbottom=False,
+    #     labelleft=False
+    # )  # labels along the bottom edge are off
+    # for i, img_arr in enumerate(decoded_imgs):
+    #     axs[i+1].imshow(img_arr, cmap='Greys')
+    #     axs[i+1].tick_params(
+    #         which='both',      # both major and minor ticks are affected
+    #         bottom=False,      # ticks along the bottom edge are off
+    #         top=False,         # ticks along the top edge are off
+    #         left=False,
+    #         labelbottom=False,
+    #         labelleft=False
+    #     )  # labels along the bottom edge are off
 
     print('done')
     # save_data(data_for_analysis, time_tagger_files_dir)

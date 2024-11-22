@@ -22,7 +22,7 @@ def simulate_symbol_loss(
         peaks: npt.NDArray,
         num_photons_per_pulse: int,
         detection_efficiency: float,
-        num_pixels: int = 4,
+        num_pixels: int = 1,
         rng_gen=np.random.default_rng) -> npt.NDArray:
     """ Simulate the loss of symbols, based on the number of photons per pulse and detection efficiency.
 
@@ -65,13 +65,7 @@ def simulate_symbol_loss(
     print(f'Number of lost symbols: {len(idxs_to_be_removed):.0f}')
     print(f'Percentage lost: {len(idxs_to_be_removed)/peaks.shape[0]*100}')
 
-    # plt.figure()
-    # plt.hist(num_detections, bins=[0, 1, 2, 3, 4, 5, 6, 7])
-    # plt.show()
-
-    # plt.figure()
-    # plt.close()
-
+    num_detections[:4] = 1
     # Use the num detections array to make sure there is a timestamp for each detection event.
     # When `num_detections` has a 0 element, it is removed from the `peaks` array
     peaks = np.repeat(peaks, num_detections)
@@ -126,6 +120,7 @@ def get_simulated_message_peak_locations(
         simulate_jitter: bool,
         num_photons_per_pulse: int,
         detection_efficiency: float,
+        num_pixels: int,
         detector_jitter: float,
         rng=np.random.default_rng(),
         rng_seed: int = 777):
@@ -133,16 +128,16 @@ def get_simulated_message_peak_locations(
     # Simulate noise peaks before start and after end of message
     peaks: npt.NDArray[np.int_]
 
-    if simulate_noise_peaks:
-        noise_peaks: npt.NDArray[np.int_] = np.sort(rng.integers(0, msg_peaks[0], 15))
-        noise_peaks[0] += 1
-        noise_peaks_end = np.sort(rng.integers(msg_peaks[-1], len(time_series), 15))
-        peaks = np.hstack((noise_peaks, msg_peaks, noise_peaks_end))
+    if simulate_lost_symbols:
+        peaks = simulate_symbol_loss(msg_peaks, num_photons_per_pulse, detection_efficiency, num_pixels, rng_gen=rng)
     else:
         peaks = msg_peaks
 
-    if simulate_lost_symbols:
-        peaks = simulate_symbol_loss(peaks, num_photons_per_pulse, detection_efficiency, rng_gen=rng)
+    if simulate_noise_peaks:
+        noise_peaks: npt.NDArray[np.int_] = np.sort(rng.integers(0, msg_peaks[0], 1))
+        # noise_peaks = np.array([53])
+        noise_peaks_end = np.sort(rng.integers(peaks[-1], len(time_series), 15))
+        peaks = np.hstack((noise_peaks, peaks, noise_peaks_end))
 
     timestamps = time_series[peaks]
     if simulate_darkcounts:

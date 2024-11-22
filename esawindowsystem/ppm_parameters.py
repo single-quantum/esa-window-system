@@ -6,13 +6,13 @@ from PIL import Image
 
 from esawindowsystem.core.encoder_functions import get_csm
 
-num_samples_per_slot: int = 10          # Number of DAC samples in one slot
-M: int = 16                             # each m = 4 bits are mapped from 0 to M = 16
+num_samples_per_slot: int = 40          # Number of DAC samples in one slot
+M: int = 8                             # each m = 4 bits are mapped from 0 to M = 16
 CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
-IMG_FILE_PATH = "esawindowsystem/sample_payloads/pillars-of-creation-ultra-tiny.png"
-# IMG_FILE_PATH = "esawindowsystem/sample_payloads/JWST_2022-07-27_Jupiter_tiny.png"
+# IMG_FILE_PATH = "esawindowsystem/sample_payloads/pillars-of-creation-ultra-tiny.png"
+IMG_FILE_PATH = "esawindowsystem/sample_payloads/JWST_Jupiter_tiny.png"
 img = Image.open(IMG_FILE_PATH)
 IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
 GREYSCALE: bool = True
@@ -22,7 +22,7 @@ USE_RANDOMIZER = True
 # To calculate where the codewords are, a correlation is made with the CSM. The threshold,
 # as percentage of the maximum correlation of the received sequence, 'decides' whether a peak
 # belongs to the start of a codeword or not
-CORRELATION_THRESHOLD: float = 0.50
+CORRELATION_THRESHOLD: float = 0.65
 DEBUG_MODE: bool = False
 
 # Usually we record multiple copies of the same message. You can use this to select a particular copy of the message,
