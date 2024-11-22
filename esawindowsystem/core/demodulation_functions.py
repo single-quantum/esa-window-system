@@ -1,6 +1,7 @@
 import copy
 from math import ceil
 from typing import Any
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +12,7 @@ from esawindowsystem.core.encoder_functions import get_csm, slot_map
 from esawindowsystem.core.numba_utils import get_num_events_numba
 from esawindowsystem.core.parse_ppm_symbols import parse_ppm_symbols
 from esawindowsystem.core.utils import flatten, moving_average
+from scipy.stats import norm
 
 
 def get_num_events(
@@ -38,14 +40,32 @@ def make_time_series(time_stamps: npt.NDArray[np.float64],
     """Digitize/discretize the array of time_stamps, so that it becomes a time series of zeros and ones. """
     # Naively assume the fist timestamp is a PPM symbol.
     time_vec: npt.NDArray[np.float64] = np.arange(
-        time_stamps[0], time_stamps[-1] + 2 * slot_length, slot_length, dtype=float)
+        time_stamps[0], time_stamps[-1] + 50 * slot_length, slot_length, dtype=float)
 
     # The time series vector is a vector of ones and zeros with a one if there is a pulse in that slot
     time_series: npt.NDArray[np.int_] = np.zeros(len(time_vec) - 1, dtype=np.int_)
+    deviation_from_slot_centre = np.zeros(len(time_stamps), dtype=np.float64)
 
     m: int = 0
     n: int = 0
 
+    while m < len(time_stamps):
+        if time_vec[n] <= time_stamps[m] < time_vec[n + 1]:
+            deviation_from_slot_centre[m] = (time_vec[n+1]-0.5*slot_length) - time_stamps[m]
+            m += 1
+        else:
+            n += 1
+
+    # # TODO: Make sure the mean is appropriate here. -> Write test to verify.
+    time_stamps += np.mean(deviation_from_slot_centre)
+
+    # It can happen that due to this time shift, the first time stamp starts too early, in that case, skip it.
+    if time_stamps[0] < time_vec[0]:
+        m: int = 1
+    else:
+        m: int = 0
+
+    n: int = 0
     while m < len(time_stamps):
         if time_vec[n] <= time_stamps[m] < time_vec[n + 1]:
             time_series[n] += 1
@@ -113,9 +133,9 @@ def get_csm_correlation(
         **kwargs: tuple[str, Any]) -> npt.NDArray[np.int_]:
     """Discretize timestamps and return correlation of that vector with discretized CSM. """
     # + 0.5 slot length because pulse times should be in the middle of a slot.
-    csm_time_stamps = np.array([slot_length * CSM[i] + i * symbol_length for i in range(len(CSM))]) + 0.5 * slot_length
+    csm_time_stamps = np.array([slot_length * CSM[i] + i * symbol_length for i in range(len(CSM))]) + 0.0 * slot_length
 
-    A, _ = make_time_series(time_stamps, slot_length)
+    A, time_vec = make_time_series(time_stamps, slot_length)
     B, _ = make_time_series(csm_time_stamps, slot_length)
 
     corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
@@ -201,6 +221,7 @@ def find_and_parse_codewords(
         slot_length: float,
         symbol_length: float,
         M: int,
+        sent_symbols: list[float] | None = None,
         **kwargs: tuple[str, Any]):
     """Using the CSM times, find and parse (demodulate) PPM codewords from the given PPM pulse timestamps. """
     len_codeword: int = symbols_per_codeword + len(CSM)
@@ -212,6 +233,8 @@ def find_and_parse_codewords(
 
     codeword_idx = 0
 
+    symbol_slot_centre_distances_list = []
+
     for i in range(len(csm_times) - 1):
         start: float = csm_times[i]
         stop: float = csm_times[i + 1]
@@ -219,7 +242,7 @@ def find_and_parse_codewords(
         fraction_lost: float = (stop - start) / (symbol_length * len_codeword) - 1
         num_codewords_lost = round(fraction_lost)
 
-        symbols, num_darkcounts = parse_ppm_symbols(
+        symbols, num_darkcounts, symbol_slot_centre_distances = parse_ppm_symbols(
             pulse_timestamps[pulse_timestamps > csm_times[i]],
             csm_times[i],
             csm_times[i + 1],
@@ -227,10 +250,12 @@ def find_and_parse_codewords(
             symbol_length,
             M,
             num_codewords_lost,
+            sent_symbols,
             num_darkcounts,
             **{**kwargs, **{'codeword_idx': codeword_idx}}
         )
 
+        symbol_slot_centre_distances_list.append(symbol_slot_centre_distances)
         # if num_codewords_lost >= 1:
         #     symbols = np.hstack((symbols, np.zeros(int(num_codewords_lost)*len_codeword)))
 
@@ -239,7 +264,7 @@ def find_and_parse_codewords(
         codeword_idx += 1 + num_codewords_lost
 
     # Take the last CSM and parse until the end of the message.
-    symbols, num_darkcounts = parse_ppm_symbols(
+    symbols, num_darkcounts, symbol_slot_centre_distances = parse_ppm_symbols(
         pulse_timestamps[pulse_timestamps > csm_times[-1]],
         csm_times[-1],
         csm_times[-1] + (symbols_per_codeword + len(CSM)) * symbol_length,
@@ -247,13 +272,58 @@ def find_and_parse_codewords(
         symbol_length,
         M,
         num_codewords_lost,
+        sent_symbols,
         num_darkcounts,
         **{**kwargs, **{'codeword_idx': codeword_idx}}
     )
+
+    symbol_slot_centre_distances_list.append(symbol_slot_centre_distances)
     msg_symbols.append(np.round(np.array(symbols)).astype(int))
 
     print(f'Estimated number of darkcounts in message frame: {num_darkcounts}')
     print()
+
+    # if kwargs.get('debug_mode'):
+    symbol_slot_centre_distances = flatten(symbol_slot_centre_distances_list)
+
+    xmin = -0.5*slot_length
+    xmax = 0.5*slot_length
+
+    mean_fit, std_fit = norm.fit(symbol_slot_centre_distances)
+    x_fit = np.linspace(xmin, xmax, 300)
+    y_fit = norm.pdf(x_fit, mean_fit, std_fit)
+    hist_bins, hist_times = np.histogram(symbol_slot_centre_distances, bins=300)
+    y_max = np.max(hist_bins)
+    half_max = 0.5*y_max
+    where_half_max_bins = np.where(hist_bins >= half_max)[0]
+    fwhm = hist_times[where_half_max_bins[-1]] - hist_times[where_half_max_bins[0]]
+    fwhm_ps = fwhm*1E12
+
+    print()
+    print('System level jitter (ps)', fwhm_ps)
+
+    if kwargs.get('debug_mode'):
+        plt.figure()
+        # Without density = True, the histogram and fit do not plot in the same figure
+        plt.hist(symbol_slot_centre_distances, bins=300, density=True)
+        plt.title(f'{M} ppm, {slot_length*1E9:.3f} ns slots')
+        plt.plot(x_fit, y_fit)
+        plt.text(0, 0.4*np.max(y_fit), f'STD: {std_fit*1E12:.1f} ps', fontsize=14, horizontalalignment='center')
+        # plt.yticks(ticks=np.linspace(0, np.max(y_fit), 5), labels=np.linspace(0, y_max, 5))
+        plt.xticks(ticks=np.linspace(xmin, xmax, 3), labels=np.round(np.linspace(xmin, xmax, 3)*1E12))
+        plt.ylabel('Ocurrences')
+        plt.xlabel('Time (ps)')
+        plt.show()
+
+        plt.figure()
+        plt.close()
+
+    # with open("C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\C824-02\\16 ppm\\8 ns slots\\DAC_SNSPD_correlation_calibration_message_16_ppm_80sps_660ps_pulse_width_square", "rb") as f:
+    #     file_data = pickle.load(f)
+    #     plt.figure()
+    #     plt.plot(file_data['bin_times'], file_data['correlation_data'])
+    #     plt.show()
+
     return msg_symbols
 
 
@@ -270,23 +340,32 @@ def get_num_events_per_slot(
     # shall be M/4 guard slots for each PPM symbol.
 
     symbol_length = 5 / 4 * M * slot_length
-    codeword_length = symbol_length * symbols_per_codeword
+    codeword_length = symbol_length * (symbols_per_codeword + len(CSM))
     # TODO: test if this works when the second CSM is lost.
 
-    i = 0
+    i: int = 0
+    num_attempts: int = 0
+    initial_num_csm_times: int = len(csm_times)
+
     while i < (len(csm_times) - 1):
+        if num_attempts > 2 * initial_num_csm_times:
+            # Realistically, if this process needs to be repeated more times than
+            # there were CSMs to begin with, it's not going to work.
+            break
         lost_codewords: list[int] = []
         expected_next_csm_time = csm_times[i] + codeword_length
-        found_next_csm = expected_next_csm_time * 0.99 < csm_times[i + 1] < expected_next_csm_time * 1.01
+        found_next_csm = (expected_next_csm_time - 0.01 *
+                          codeword_length) < csm_times[i + 1] < (expected_next_csm_time + 0.01*codeword_length)
         if not found_next_csm:
             lost_codewords.append(i + 1)
 
             csm_times = np.insert(
                 csm_times,
                 lost_codewords,
-                csm_times[np.array(lost_codewords) - 1] + np.diff(csm_times)[0])
+                csm_times[np.array(lost_codewords) - 1] + codeword_length)
 
             i = 0
+            num_attempts += 1
 
         i += 1
 
@@ -321,6 +400,7 @@ def demodulate(
     M: int,
     slot_length: float,
     symbol_length: float,
+    sent_symbols: list[float] | None = None,
     csm_correlation_threshold: float = 0.6,
     **kwargs: dict[str, Any]
 ) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_]]:
@@ -334,6 +414,7 @@ def demodulate(
 
     CSM: npt.NDArray[np.int_] = get_csm(M)
     symbols_per_codeword = int(15120 / np.log2(M))
+
     num_slots_per_symbol = int(5 / 4 * M)
 
     csm_correlation = get_csm_correlation(pulse_timestamps, slot_length, CSM,
@@ -348,6 +429,11 @@ def demodulate(
     events_per_slot: npt.NDArray[np.int_] = get_num_events_per_slot(csm_times, msg_pulse_timestamps,
                                                                     CSM, symbols_per_codeword, slot_length, M)
 
+    # Assuming 50% efficiency
+    print()
+    print('Estimated number of photons per pulse:', np.mean(events_per_slot[events_per_slot > 0])/0.5)
+    print()
+
     num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
         pulse_timestamps <= msg_end_time))[0].shape[0]
 
@@ -356,7 +442,7 @@ def demodulate(
     print()
 
     msg_symbols = find_and_parse_codewords(csm_times, pulse_timestamps, CSM,
-                                           symbols_per_codeword, slot_length, symbol_length, M, **kwargs)
+                                           symbols_per_codeword, slot_length, symbol_length, M, sent_symbols, **kwargs)
 
     print('Number of demodulated symbols: ', len(flatten(msg_symbols)))
 

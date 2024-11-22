@@ -7,6 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from esawindowsystem.core.encoder_functions import get_csm
+from scipy.stats import norm
 
 
 def plot_symbol_times(
@@ -158,9 +159,11 @@ def parse_ppm_symbols(
         symbol_length: float,
         M: int,
         num_codewords_lost: int,
+        sent_symbols: list[float] | None = None,
         num_darkcounts: int = 0,
-        **kwargs: dict[str, Any]) -> tuple[list[float], int]:
+        **kwargs: dict[str, Any]) -> tuple[list[float], int, dict[str, Any]]:
 
+    debug_data: dict[str, Any] = {}
     symbols: list[float] = []
 
     # There should always be this amount of PPM symbols in a codeword.
@@ -170,6 +173,7 @@ def parse_ppm_symbols(
 
     message_pulse_times = pulse_times[(pulse_times >= codeword_start_time) & (pulse_times < stop_time)]
 
+    distances_to_slot_centre = []
     for i in range(num_symbol_frames):
         symbol_frame_pulses, symbol_start, _ = find_pulses_within_symbol_frame(
             i, symbol_length, message_pulse_times, codeword_start_time)
@@ -190,6 +194,9 @@ def parse_ppm_symbols(
             # Symbols cannot be in guard slots
             if round(symbol) >= M:
                 continue
+
+            # if kwargs.get('debug_mode'):
+            distances_to_slot_centre.append(pulse-symbol_start-0.5*slot_length-round(symbol)*slot_length)
 
             # If the symbol is too far off the bin center, it is most likely a darkcount
             # Uncomment to enforce the CCSDS timing requirement. It is commented
@@ -219,12 +226,13 @@ def parse_ppm_symbols(
         symbols.append(best_symbol)
 
     codeword_idx: int = kwargs.get('codeword_idx', 0)
-    with open('sent_symbols', 'rb') as f:
-        sent_symbols = pickle.load(f)
+    if sent_symbols is None:
+        with open('sent_symbols', 'rb') as f:
+            sent_symbols = pickle.load(f)
 
     # Received more symbols than were sent.
     if codeword_idx * num_symbol_frames >= len(sent_symbols):
-        return symbols, num_darkcounts
+        return symbols, num_darkcounts, distances_to_slot_centre
 
     # Default amount of symbol frames
     num_symbol_frames = int(15120 / np.log2(M) + len(CSM))
@@ -232,10 +240,10 @@ def parse_ppm_symbols(
     if kwargs.get('debug_mode'):
         if len(symbols) > num_symbol_frames:
             plot_symbol_times(pulse_times, symbol_length, slot_length,
-                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=num_symbol_frames + 4000, **kwargs)
+                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=num_symbol_frames + 5, **kwargs)
         else:
             plot_symbol_times(pulse_times, symbol_length, slot_length,
-                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=6, **kwargs)
+                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=30, num_symbols=7, **kwargs)
 
     num_symbol_errors = np.nonzero(
         np.round(np.array(symbols)) -
@@ -244,4 +252,24 @@ def parse_ppm_symbols(
     symbol_error_ratio = num_symbol_errors / num_symbol_frames
     print(f'Codeword: {codeword_idx+1} \t symbol error ratio: {symbol_error_ratio:.3f}')
 
-    return symbols, num_darkcounts
+    if kwargs.get('debug_mode'):
+        xmin = -0.5*slot_length
+        xmax = 0.5*slot_length
+
+        mean_fit, std_fit = norm.fit(distances_to_slot_centre)
+        x_fit = np.linspace(xmin, xmax, 100)
+        y_fit = norm.pdf(x_fit, mean_fit, std_fit)
+        y_max = np.max(np.histogram(distances_to_slot_centre, bins=30)[0])
+
+        # plt.figure()
+        # # Without density = True, the histogram and fit do not plot in the same figure
+        # plt.hist(distances_to_slot_centre, bins=30, density=True)
+        # plt.plot(x_fit, y_fit)
+        # plt.text(0, 0.4*np.max(y_fit), f'STD: {std_fit*1E12:.1f} ps', fontsize=14, horizontalalignment='center')
+        # plt.yticks(ticks=np.linspace(0, np.max(y_fit), 5), labels=np.linspace(0, y_max, 5))
+        # plt.xticks(ticks=np.linspace(xmin, xmax, 3), labels=np.round(np.linspace(xmin, xmax, 3)*1E12))
+        # plt.ylabel('Ocurrences')
+        # plt.xlabel('Time (ps)')
+        # plt.show()
+
+    return symbols, num_darkcounts, distances_to_slot_centre
