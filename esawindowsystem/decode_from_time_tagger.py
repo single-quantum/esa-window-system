@@ -2,18 +2,20 @@ import os
 import pickle
 import re
 from pathlib import Path
+from fractions import Fraction
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import TimeTagger
+import matplotlib as mpl
 
 from esawindowsystem.core.BCJR_decoder_functions import ppm_symbols_to_bit_array
 from esawindowsystem.core.data_converter import payload_to_bit_sequence
 from esawindowsystem.core.demodulation_functions import demodulate
-from esawindowsystem.core.encoder_functions import map_PPM_symbols
+from esawindowsystem.core.encoder_functions import map_PPM_symbols, get_asm_bit_arr
 from esawindowsystem.core.scppm_decoder import decode
-from esawindowsystem.core.utils import flatten
+from esawindowsystem.core.utils import flatten, calculate_num_photons
 from esawindowsystem.ppm_parameters import (CORRELATION_THRESHOLD, DEBUG_MODE, MESSAGE_IDX,
                                             USE_INNER_ENCODER, USE_RANDOMIZER)
 
@@ -181,7 +183,7 @@ def analyze_data(time_events, metadata):
 
     print(f'Number of events: {len(time_events)}')
 
-    slot_mapped_message, events_per_slot = demodulate(
+    slot_mapped_message, events_per_slot, estimated_num_photons_per_pulse = demodulate(
         time_events,
         M,
         slot_length,
@@ -212,7 +214,23 @@ def analyze_data(time_events, metadata):
     BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)]) / len(sent_bits)
     print('BER before decoding', BER_before_decoding)
 
-    information_blocks, BER_before_decoding, _ = decode(  # Problem, this resets the value for BER_before_decoding!
+    sent_img_array: npt.NDArray[np.int_] = np.array([])
+    img_arr: npt.NDArray[np.int_] = np.array([])
+    CMAP = ''
+
+    sent_message: npt.NDArray = np.array([])
+
+    if PAYLOAD_TYPE == 'image':
+        # compare to original image
+        sent_message = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
+
+        if GREYSCALE:
+            sent_img_array = map_PPM_symbols(sent_message, 8)
+            CMAP = 'Greys'
+        else:
+            CMAP = 'binary'
+
+    information_blocks, BER_before_decoding, where_asms = decode(  # Problem, this resets the value for BER_before_decoding!
         slot_mapped_message, M, CODE_RATE,
         use_inner_encoder=USE_INNER_ENCODER,
         **{
@@ -227,25 +245,6 @@ def analyze_data(time_events, metadata):
     print('BER before decoding', BER_before_decoding)
     BER_before_decoding = np.sum([abs(x - y) for x, y in zip(received_bits, sent_bits)]) / len(sent_bits)
 
-    sent_img_array: npt.NDArray[np.int_] = np.array([])
-    img_arr: npt.NDArray[np.int_] = np.array([])
-    CMAP = ''
-
-    sent_message: npt.NDArray = np.array([])
-
-    if PAYLOAD_TYPE == 'image':
-        # compare to original image
-        sent_message = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
-
-        if GREYSCALE:
-            sent_img_array = map_PPM_symbols(sent_message, 8)
-            img_arr = map_PPM_symbols(information_blocks, 8)
-            img_arr = img_arr[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
-            CMAP = 'Greys'
-        else:
-            img_arr = information_blocks.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
-            CMAP = 'binary'
-
     # In the case of a greyscale image, each pixel has a value from 0 to 255.
     # This would be the same as saying that each pixel is a symbol, which should be mapped to an 8 bit sequence.
     # if GREYSCALE:
@@ -253,14 +252,45 @@ def analyze_data(time_events, metadata):
     # else:
     #     sent_message = sent_img_array.flatten()
 
-    if len(information_blocks) < len(sent_message):
-        BER_after_decoding = np.sum(np.abs(information_blocks -
-                                    sent_message[:len(information_blocks)])) / len(information_blocks)
-    else:
-        BER_after_decoding = np.sum(
-            np.abs(information_blocks[:len(sent_message)] - sent_message)) / len(sent_message)
+    transfer_frames = []
+    BER_per_transfer_frame = []
+    for asm_idx in where_asms:
 
-    print(f'BER after decoding: {BER_after_decoding}. ')
+        information_block_sizes = {
+            Fraction(1, 3): 5040,
+            Fraction(1, 2): 7560,
+            Fraction(2, 3): 10080
+        }
+
+        num_bits = information_block_sizes[CODE_RATE]
+        ASM_arr = get_asm_bit_arr()
+
+        transfer_frame = information_blocks[asm_idx + ASM_arr.shape[0]:(asm_idx + ASM_arr.shape[0] + num_bits * 8)]
+        transfer_frames.append(transfer_frame)
+
+        if len(transfer_frame) < len(sent_message):
+            BER_after_decoding = np.sum(np.abs(transfer_frame -
+                                        sent_message[:len(transfer_frame)])) / len(transfer_frame)
+        else:
+            BER_after_decoding = np.sum(
+                np.abs(transfer_frame[:len(sent_message)] - sent_message)) / len(sent_message)
+
+        BER_per_transfer_frame.append(BER_after_decoding)
+
+    best_message_idx: int = np.argmin(BER_per_transfer_frame)
+    best_message = transfer_frames[best_message_idx]
+
+    if GREYSCALE:
+        img_arr = map_PPM_symbols(best_message, 8)
+        img_arr = img_arr[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+    else:
+        img_arr = best_message.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+
+    median_BER = np.median(BER_per_transfer_frame)
+    min_BER = BER_per_transfer_frame[best_message_idx]
+
+    print(f'Best BER after decoding: {min_BER:.3e}. ')
+    print(f'Median BER after decoding: {median_BER:.3e}')
 
     if DEBUG_MODE and PAYLOAD_TYPE == 'image':
         fig, axs = plt.subplots(1, 2)
@@ -278,6 +308,10 @@ def analyze_data(time_events, metadata):
     data_for_analysis = {}
     data_for_analysis['BER before decoding'] = BER_before_decoding
     data_for_analysis['BER after decoding'] = BER_after_decoding
+    data_for_analysis['estimated_num_photons_per_pulse'] = estimated_num_photons_per_pulse
+    data_for_analysis['median_BER'] = median_BER
+    data_for_analysis['min_BER'] = min_BER
+    data_for_analysis['BER_per_transfer_frame'] = BER_per_transfer_frame
 
     print('Analysis done')
     return data_for_analysis, img_arr
@@ -308,33 +342,138 @@ if __name__ == '__main__':
     time_tagger_channels = [
         [0, 1, 2, 3]
     ]
-    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\C824-02\\16 ppm\\1 ns slots'
-    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\C824-02\\16 ppm\\500 ps slots'
-    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\24-10-2024\\Non-Bridged detectors\\C824-08\\21 db attenuation'
-    # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\time tagger files\\before 01-11-2024'
-    time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\time tagger files'
-    img_arrs = []
 
-    for i, channels in enumerate(time_tagger_channels):
-        time_events, metadata = load_timetagger_data(
-            use_latest_tt_file, GET_TIME_EVENTS_PER_SECOND, time_tagger_files_dir, channels, calibrate_time_tags=True)
+    detector = "C824-01"
+    M = 16
+    slot_length = 1
 
-        if ANALYZE_DATA:
-            data_for_analysis, img_arr = analyze_data(time_events[20000:170000], metadata)
-            img_arrs.append(img_arr)
+    bit_error_rates = []
+    bit_error_rates_per_transfer_frame = []
+    estimated_num_photons_per_pulse = []
+    num_photons_per_pulse = []
 
-    IMG_SHAPE = metadata.get('IMG_SHAPE')
-    PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')
-    IMG_FILE_PATH = metadata.get('IMG_FILE_PATH')
-    sent_message = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
-    sent_img_array = map_PPM_symbols(sent_message, 8)
-    original_img_arr = sent_img_array[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+    # C824-02, 8 ppm, 2 ns slots
+    # attenuation_levels = [22, 22.5, 23, 23.5]
+    # measured_powers = [2.53E-9, 2.26E-9, 2.01E-9, 1.78E-9]
+    # attenuation_levels = [23.5]
+    # measured_powers = [1.78E-9]
 
-    if ANALYZE_DATA:
-        fig, axs = plt.subplots(1, 2)
-        axs[0].imshow(original_img_arr, cmap='Greys')
-        axs[1].imshow(img_arr[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE))
-        plt.show()
+    # C824-01, 8 ppm, 2 ns slots
+    # attenuation_levels: list[float] = [18, 18.5, 19, 19.5, 20]
+    # measured_powers = [7.47E-9, 6.70E-9, 6.00E-9, 5.30E-9, 4.70E-9]
+    # attenuation_levels: list[float] = [19, 19.5, 20]
+    # measured_powers = [6.00E-9, 5.30E-9, 4.70E-9]
+
+    # C824-02, 16 ppm, 500 ps slots
+    # measured_powers = [7.09, 6.22, 5.46]
+    # attenuation_levels = [19, 19.5, 20]
+
+    # C824-02, 16 ppm, 1 ns slots
+    # measured_powers: list[float] = [6.25, 5.56, 4.94, 4.40, 3.91, 3.48]
+    # attenuation_levels: list[float] = [21.5, 22, 22.5, 23, 23.5, 24]
+
+    # C824-02, 16 ppm, 2 ns slots
+    # measured_powers: list[float] = []
+    # attenuation_levels: list[float] = []
+
+    # C824-01, 16 ppm, 500 ps slots
+    # measured_powers: list[float] = [27.3, 24.23, 21.52, 19.20, 17.05]
+    # attenuation_levels: list[float] = [14, 14.5, 15, 15.5, 16]
+
+    # C824-01, 16 ppm, 1 ns slots
+    measured_powers: list[float] = [14.47, 12.90, 11.48, 10.22, 9.02]
+    attenuation_levels: list[float] = [18, 18.5, 19, 19.5, 20]
+    # measured_powers: list[float] = [11.48, 10.22, 9.02]
+    # attenuation_levels: list[float] = [19, 19.5, 20]
+
+    # C824-01, 16 ppm, 2 ns slots
+    # measured_powers: list[float] = []
+    # attenuation_levels: list[float] = []
+
+    num_pulses_per_second = 44.1E6
+    attenuation_levels_str = [str(i).replace('.', '_') for i in attenuation_levels]
+
+    for att_idx, attenuation in enumerate(attenuation_levels_str):
+        # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\C824-02\\16 ppm\\1 ns slots'
+        # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\C824-02\\16 ppm\\500 ps slots'
+        # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\24-10-2024\\Non-Bridged detectors\\C824-08\\21 db attenuation'
+        # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\time tagger files\\before 01-11-2024'
+        time_tagger_files_dir: str = f'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\{detector}\\{M} ppm\\{slot_length} ns slots\\{
+            attenuation} db attenuation'
+        # time_tagger_files_dir: str = 'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\time tagger files'
+        img_arrs = []
+
+        for i, channels in enumerate(time_tagger_channels):
+            time_events, metadata = load_timetagger_data(
+                use_latest_tt_file, GET_TIME_EVENTS_PER_SECOND, time_tagger_files_dir, channels, calibrate_time_tags=True)
+
+            # num_photons_per_pulse.append(calculate_num_photons(
+            #     measured_powers[att_idx], num_pulses_per_second, detector_efficiency=0.21))
+
+            if ANALYZE_DATA:
+                data_for_analysis, img_arr = analyze_data(
+                    time_events[:200000], metadata)
+                img_arrs.append(img_arr)
+
+                estimated_num_photons_per_pulse = data_for_analysis['estimated_num_photons_per_pulse']
+                BER_after_decoding = data_for_analysis['min_BER']
+                bit_error_rates_per_transfer_frame.append(data_for_analysis['BER_per_transfer_frame'])
+
+        IMG_SHAPE = metadata.get('IMG_SHAPE')
+        PAYLOAD_TYPE = metadata.get('PAYLOAD_TYPE')
+        IMG_FILE_PATH = metadata.get('IMG_FILE_PATH')
+        sent_message = payload_to_bit_sequence(PAYLOAD_TYPE, filepath=IMG_FILE_PATH)
+        sent_img_array = map_PPM_symbols(sent_message, 8)
+        original_img_arr = sent_img_array[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+
+        # if ANALYZE_DATA:
+        #     difference_mask = np.where(original_img_arr != img_arr)
+        #     highlighted_image = img_arr.copy()
+        #     highlighted_image[difference_mask] = -1
+
+        #     custom_cmap = mpl.colormaps['Greys']
+        #     custom_cmap.set_under(color='r')
+        #     CMAP = 'Greys'
+
+        #     label_font_size = 14
+        #     fig, axs = plt.subplots(1, 2, figsize=(5, 4))
+        #     plt.suptitle('SCPPM message comparison', fontsize=18)
+        #     axs[0].imshow(original_img_arr, cmap=CMAP)
+        #     axs[0].set_xlabel('Pixel number (x)', fontsize=label_font_size)
+        #     axs[0].set_ylabel('Pixel number (y)', fontsize=label_font_size)
+        #     axs[0].tick_params(axis='both', which='major', labelsize=label_font_size)
+        #     axs[0].set_title('Original image', fontsize=16)
+
+        #     axs[1].imshow(highlighted_image, cmap=custom_cmap, vmin=0)
+        #     axs[1].set_xlabel('Pixel number (x)', fontsize=label_font_size)
+        #     axs[1].set_ylabel('Pixel number (y)', fontsize=label_font_size)
+        #     axs[1].tick_params(axis='both', which='major', labelsize=label_font_size)
+
+        #     axs[1].set_title('Decoded image', fontsize=16)
+        #     plt.show()
+        # fig, axs = plt.subplots(1, 2)
+        # axs[0].imshow(original_img_arr, cmap='Greys')
+        # axs[1].imshow(img_arr[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE))
+        # plt.show()
+
+        num_photons_per_pulse.append(estimated_num_photons_per_pulse)
+        bit_error_rates.append(BER_after_decoding)
+
+        with open(f'C:\\Users\\hvlot\\OneDrive - Single Quantum\\Documents\\Dev\\esa-window-system\\experimental results\\ESA Voyage 2050\\Time tagger files\\{detector}\\{M} ppm\\{slot_length} ns slots\\bit error rates', 'wb') as f:
+            pickle.dump(
+                {
+                    'bit_error_rates_per_transfer_frame': bit_error_rates_per_transfer_frame,
+                    'bit_error_rates': bit_error_rates,
+                    'num_photons_per_pulse': num_photons_per_pulse,
+                    'attenuation_levels': attenuation_levels
+                }, f)
+
+    plt.figure()
+    plt.semilogy(num_photons_per_pulse, bit_error_rates, marker='x')
+    plt.xlabel('Attenuation (dB)')
+    plt.ylabel('Bit Error Rate (-)')
+    plt.show()
+
     # axs[0].tick_params(
     #     which='both',      # both major and minor ticks are affected
     #     bottom=False,      # ticks along the bottom edge are off
