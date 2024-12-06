@@ -40,9 +40,11 @@ tagger = TimeTagger.createTimeTagger(resolution=TimeTagger.Resolution.Standard)
 serial = tagger.getSerial()
 print(f'Connected to time tagger {serial}')
 
+time_tagger_trigger_level = 0.500
+
 for i in channels:
     tagger.setDeadtime(i, 100)
-    tagger.setTriggerLevel(i, 0.50)
+    tagger.setTriggerLevel(i, time_tagger_trigger_level)
 
 # Channel 5 is the DAC output reference.
 channels.append(5)
@@ -131,7 +133,8 @@ with open(f'time tagger files/timetags_metadata_{timestamp_epoch}', 'wb') as f:
         'sent_bit_sequence': sent_bits,
         'sent_bit_sequence_no_csm': sent_bits_no_csm,
         'dac_snspd_correlation_histogram': dac_snspd_correlation_histogram,
-        'dac_snspd_correlation_bin_times': dac_snspd_correlation_bin_times
+        'dac_snspd_correlation_bin_times': dac_snspd_correlation_bin_times,
+        'time_tagger_trigger_level': time_tagger_trigger_level
     }
 
     pickle.dump(metadata, f)
