@@ -3,6 +3,7 @@ import pickle
 import re
 from datetime import datetime
 from pathlib import Path
+from fractions import Fraction
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -17,7 +18,7 @@ from scipy.signal import find_peaks
 from esawindowsystem.core.BCJR_decoder_functions import \
     ppm_symbols_to_bit_array
 from esawindowsystem.core.demodulation_functions import demodulate
-from esawindowsystem.core.encoder_functions import map_PPM_symbols
+from esawindowsystem.core.encoder_functions import map_PPM_symbols, get_asm_bit_arr
 from esawindowsystem.core.scppm_decoder import DecoderError, decode
 from esawindowsystem.core.trellis import Trellis
 from esawindowsystem.core.utils import flatten
@@ -112,7 +113,7 @@ def run_simulation_loop(
                 print('Signal: ', num_symbols_received, 'Noise: ', num_darkcounts, 'SNR: ', SNR)
 
         try:
-            slot_mapped_message, num_events_per_slot = demodulate(
+            slot_mapped_message, num_events_per_slot, _ = demodulate(
                 detection_events_timestamps, M, slot_length, symbol_length, csm_correlation_threshold=csm_correlation_threshold, **{'debug_mode': demodulator_debug_mode})
         except ValueError as e:
             irrecoverable += 1
@@ -141,6 +142,18 @@ def run_simulation_loop(
                     'sent_bit_sequence_no_csm': sent_bits_no_csm
                 })
 
+            information_block_sizes = {
+                Fraction(1, 3): 5040,
+                Fraction(1, 2): 7560,
+                Fraction(2, 3): 10080
+            }
+
+            num_bits = information_block_sizes[CODE_RATE]
+            ASM_arr = get_asm_bit_arr()
+
+            information_blocks = information_blocks[where_asms[0] +
+                                                    ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits * 8)]
+
         except DecoderError as e:
             print(e)
             print(f'Something went wrong. Seed: {SEED} (z={z})')
@@ -148,25 +161,6 @@ def run_simulation_loop(
             continue
 
         BERS_before.append(BER_before_decoding)
-
-        if GREYSCALE:
-            try:
-                pixel_values = map_PPM_symbols(information_blocks, 8)
-                img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
-                CMAP = 'Greys'
-                MODE = "L"
-                IMG_MODE = 'L'
-            except ValueError as e:
-                print(e)
-                print(f'Malformed information blocks. Seed: {SEED} (z={z})')
-                irrecoverable += 1
-                continue
-
-        else:
-            img_arr = information_blocks.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
-            CMAP = 'binary'
-            MODE = "1"
-            IMG_MODE = '1'
 
         # compare to original image
         file = Path.cwd() / IMG_FILE_PATH
@@ -197,9 +191,28 @@ def run_simulation_loop(
 
         BERS_after.append(BER_after_decoding)
 
+        if GREYSCALE:
+            try:
+                pixel_values = map_PPM_symbols(information_blocks, 8)
+                img_arr = pixel_values[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+                CMAP = 'Greys'
+                MODE = "L"
+                IMG_MODE = 'L'
+            except ValueError as e:
+                print(e)
+                print(f'Malformed information blocks. Seed: {SEED} (z={z})')
+                irrecoverable += 1
+                continue
+
+        else:
+            img_arr = information_blocks.flatten()[:IMG_SHAPE[0] * IMG_SHAPE[1]].reshape(IMG_SHAPE)
+            CMAP = 'binary'
+            MODE = "1"
+            IMG_MODE = '1'
+
         difference_mask = np.where(sent_img_array != img_arr)
         highlighted_image = img_arr.copy()
-        # highlighted_image[difference_mask] = -1
+        highlighted_image[difference_mask] = -1
 
         custom_cmap = mpl.colormaps['Greys']
         custom_cmap.set_under(color='r')

@@ -142,7 +142,7 @@ def test_demodulate_happy_path(pulse_timestamps_with_csm: tuple[npt.NDArray[np.f
     pulse_timestamps, ppm_params = pulse_timestamps_with_csm
     M, symbol_length, slot_length, num_symbols, CSM = ppm_params.values()
 
-    slot_mapped_sequence, _ = demodulate(pulse_timestamps, M, slot_length, symbol_length)
+    slot_mapped_sequence, _, _ = demodulate(pulse_timestamps, M, slot_length, symbol_length)
     # The demodulate function demodulates all timestamps, including the CSM.
     # The decoder is responsible for stripping off the CSM.
     assert slot_mapped_sequence.shape[0] == num_symbols + len(CSM)
