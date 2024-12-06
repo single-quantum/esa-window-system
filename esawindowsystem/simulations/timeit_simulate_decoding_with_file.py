@@ -223,7 +223,7 @@ if use_test_file:
 '''
 
 execution_code = '''
-slot_mapped_message, _ = demodulate(
+slot_mapped_message, _, _ = demodulate(
     peak_locations[:200000], M, slot_length, symbol_length, csm_correlation_threshold=0.75, **{'debug_mode': False})
 
 

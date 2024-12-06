@@ -28,7 +28,6 @@ from esawindowsystem.ppm_parameters import (CODE_RATE, GREYSCALE,
                                             symbol_length)
 
 
-
 import TimeTagger
 import numpy.typing as npt
 from time import time
@@ -130,23 +129,17 @@ while stream.isRunning():
 timestamps_array = flatten(timestamps_array)
 
 
-
 TimeTagger.freeTimeTagger(tagger)
 
 
-
-
-
-
-
-slot_mapped_message, _ = demodulate(
+slot_mapped_message, _, _ = demodulate(
     peak_locations[:200000], M, slot_length, symbol_length, csm_correlation_threshold=0.75, **{'debug_mode': False})
 
 
 information_blocks: npt.NDArray[np.int_] = np.array([])
 
 
-information_blocks, BER_before_decoding = decode(
+information_blocks, BER_before_decoding, _ = decode(
     slot_mapped_message, M, CODE_RATE, CHANNEL_INTERLEAVE=True, BIT_INTERLEAVE=True, use_inner_encoder=True,
     **{
         'use_cached_trellis': False,

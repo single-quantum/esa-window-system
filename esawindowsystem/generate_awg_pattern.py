@@ -23,8 +23,7 @@ from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE,
                                             symbols_per_codeword)
 
 
-def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
-    ADD_ASM: bool = True
+def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian', ADD_ASM: bool = True):
 
     msg_PPM_symbols: npt.NDArray[np.int_] = np.array([])
     num_PPM_symbols: int
@@ -44,14 +43,14 @@ def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
             len_codeword: int = num_symbols_per_slice // m
             num_codewords: int = msg_PPM_symbols.shape[0] // len_codeword
 
-            if ADD_ASM:
-                ppm_mapped_message_with_csm = np.zeros(len(msg_PPM_symbols) + len(CSM) * num_codewords, dtype=int)
-                for i in range(num_codewords):
-                    prepended_codeword = np.hstack((CSM, msg_PPM_symbols[i * len_codeword:(i + 1) * len_codeword]))
-                    ppm_mapped_message_with_csm[i * len(prepended_codeword):(i + 1) *
-                                                len(prepended_codeword)] = prepended_codeword
+            # if ADD_ASM:
+            #     ppm_mapped_message_with_csm = np.zeros(len(msg_PPM_symbols) + len(CSM) * num_codewords, dtype=int)
+            #     for i in range(num_codewords):
+            #         prepended_codeword = np.hstack((CSM, msg_PPM_symbols[i * len_codeword:(i + 1) * len_codeword]))
+            #         ppm_mapped_message_with_csm[i * len(prepended_codeword):(i + 1) *
+            #                                     len(prepended_codeword)] = prepended_codeword
 
-                msg_PPM_symbols = ppm_mapped_message_with_csm
+            #     msg_PPM_symbols = ppm_mapped_message_with_csm
 
             if len(msg_PPM_symbols) % 2 != 0:
                 msg_PPM_symbols = np.append(msg_PPM_symbols, 0)
@@ -123,11 +122,14 @@ def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
             idx = i * num_samples_per_symbol + ppm_symbol_position * \
                 num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
 
+            if idx < 0:
+                idx = 0
+
             pulse_amplitude = 30000
             match pulse_shape:
                 case 'gaussian':
                     x = np.arange(idx, idx + pulse_width) + 1
-                    c = 2
+                    c = 3.5
                     y = pulse_amplitude * np.exp(-((x - idx - pulse_width // 2) / c)**2)
                     pulse[idx:idx + pulse_width] = y
                 case _:
@@ -145,10 +147,10 @@ def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
                 num_samples_per_slot + num_samples_per_slot // 2 - pulse_width // 2
             pulse[idx:idx + pulse_width] = 15000
 
-    gap_vector = np.array([0] * num_samples_per_symbol * len(CSM))
-    for i in np.arange(0, len(gap_vector), len(gap_vector) / 4, dtype=int):
-        gap_vector[i] = 30000
-    pulse = np.hstack((gap_vector, pulse))
+    # gap_vector = np.array([0] * num_samples_per_symbol * len(CSM))
+    # for i in np.arange(0, len(gap_vector), len(gap_vector) / 4, dtype=int):
+    #     gap_vector[i] = 30000
+    # pulse = np.hstack((gap_vector, pulse))
 
     # Convert to pandas dataframe for easy write to CSV
     df = pd.DataFrame(pulse)
@@ -160,19 +162,20 @@ def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
     cr = str(CODE_RATE).replace('/', '-')
 
     base_dir: Path = Path('esawindowsystem/ppm_sample_messages/')
+    file_prefix: str = '_'.join(Path(IMG_FILE_PATH).stem.split('_')[:2])
 
     match PAYLOAD_TYPE:
         case 'image' if GREYSCALE:
-            filepath = base_dir / Path(f'ppm_message_SQ_tiny_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
-                                       f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv')
+            filepath = base_dir / Path(f'ppm_message_{file_prefix}_greyscale_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
+                                       f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate_{pulse_shape}.csv')
         case 'image' if not GREYSCALE:
-            filepath = base_dir / Path(f'ppm_message_SQ_tiny_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
-                                       f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate.csv')
+            filepath = base_dir / Path(f'ppm_message_{file_prefix}_{IMG_SHAPE[0]}x{IMG_SHAPE[1]}_pixels_' +
+                                       f'{M}-PPM_{num_samples_per_slot}_{pulse_width}_{interleave_code}_{cr}-code-rate_{pulse_shape}.csv')
         case 'string':
             filepath = base_dir / Path('ppm_message_Hello_World_no_ASM.csv')
         case 'calibration':
             filepath = base_dir / Path(f'ppm_calibration_message_{len(msg_PPM_symbols)}_' +
-                                       f'symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM.csv')
+                                       f'symbols_{num_samples_per_slot}_samples_per_slot_{sent_symbol}_CCSDS_ASM_{pulse_shape}.csv')
         case _:
             raise ValueError("Payload type not recognized. Should be one of ['image', 'string', 'calibration']")
 
@@ -183,4 +186,4 @@ def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian'):
 
 if __name__ == '__main__':
     print('Generating AWG pattern file. ')
-    generate_awg_pattern()
+    generate_awg_pattern(pulse_width=6, pulse_shape='square')

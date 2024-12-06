@@ -580,7 +580,7 @@ def get_edge_input_array(trellis: Trellis) -> npt.NDArray[np.int8]:
     return edge_inputs
 
 
-def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 20,
+def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code_rate: Fraction, max_num_iterations: int = 10,
                         ns: float = 3, nb: float = 0.1, ber_stop_threshold: float = 1E-7, **kwargs):
     # Initialize outer trellis edges
     memory_size_outer = 2
@@ -633,9 +633,9 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
                 new_remapped_indices[i] = idx
 
         # reshaped_num_events = reshaped_num_events[new_remapped_indices]
-        num_zeros_interleaver = 2 * B_interleaver * N_interleaver * (N_interleaver - 1)
+        num_zeros_interleaver = B_interleaver * N_interleaver * (N_interleaver - 1)
         # reshaped_num_events = num_events_per_slot.reshape(num_slices, num_symbols_per_slice+len(CSM), int(5/4*M))[:, len(CSM):, :M]
-        channel_likelihoods = reshaped_num_events[:-num_zeros_interleaver].astype(int)
+        channel_likelihoods = reshaped_num_events.astype(int)
 
     else:
         channel_likelihoods = poisson_noise(
@@ -668,12 +668,12 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
     outer_trellis_edge_to_states[-2, 2, :] = -99
     outer_trellis_edge_to_states[-2, 3, :] = -99
 
-    # inner_trellis = Trellis(memory_size, num_output_bits, num_symbols_per_slice, inner_edges, num_input_bits)
-    # inner_trellis.set_edges(inner_edges, zero_terminated=False)
+    inner_trellis = Trellis(memory_size, num_output_bits, num_symbols_per_slice, inner_edges, num_input_bits)
+    inner_trellis.set_edges(inner_edges, zero_terminated=False)
 
-    # outer_trellis = Trellis(memory_size_outer, num_output_bits_outer,
-    #                         num_bits_per_slice, outer_edges, num_input_bits_outer)
-    # outer_trellis.set_edges(outer_edges)
+    outer_trellis = Trellis(memory_size_outer, num_output_bits_outer,
+                            num_bits_per_slice, outer_edges, num_input_bits_outer)
+    outer_trellis.set_edges(outer_edges)
 
     outer_code_edge_outputs: npt.NDArray[np.int8] = get_edge_output_array(outer_trellis)
     inner_code_edge_inputs: npt.NDArray[np.int8] = get_edge_input_array(inner_trellis)
@@ -716,15 +716,27 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
 
             u_hat = [0 if llr > 0 else 1 for llr in LLRs_u]
 
+            received_parity_bits = u_hat[-34:-2]
+            expected_parity_bits = get_CRC(np.array(u_hat[:-2]))
+
             # Derandomize
             u_hat = randomize(np.array(u_hat, dtype=int))
 
             ber: float = 1
             sent_bits_codeword: BitArray
+
+            include_CRC = False
+
             if sent_bit_sequence is not None:
-                sent_bits_codeword = sent_bit_sequence[
-                    i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)
-                ]
+                if include_CRC:
+                    sent_bits_codeword = sent_bit_sequence[
+                        i * num_bits_per_slice - 34 * i:(i + 1) * num_bits_per_slice - 34 * (i + 1)
+                    ]
+                else:
+                    sent_bits_codeword = sent_bit_sequence[
+                        i * num_bits_per_slice - 2 * i:(i + 1) * num_bits_per_slice - 2 * (i + 1)
+                    ]
+
                 ber = np.sum(
                     [abs(x - y) for x, y in zip(u_hat, sent_bits_codeword)]
                 ) / num_bits_per_slice
@@ -736,7 +748,7 @@ def predict_iteratively(slot_mapped_sequence: npt.NDArray[np.int_], M: int, code
 
             decoded_message_array[iteration, i, :] = u_hat
 
-            if ber < ber_stop_threshold:
+            if np.all(received_parity_bits == expected_parity_bits):
                 break
 
         decoded_message.append(u_hat)
