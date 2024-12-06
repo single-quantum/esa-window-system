@@ -1,5 +1,5 @@
 import copy
-from math import ceil
+from math import floor, ceil
 from typing import Any
 import pickle
 
@@ -139,20 +139,6 @@ def get_csm_correlation(
     B, _ = make_time_series(csm_time_stamps, slot_length)
 
     corr: npt.NDArray[np.int_] = np.correlate(A, B, mode='valid')
-    if kwargs.get('debug_mode'):
-        correlation_threshold: int = int(np.max(corr) * csm_correlation_threshold)
-        plt.figure()
-        plt.plot(corr, label='CSM correlation')
-        plt.axhline(correlation_threshold, color='r', linestyle='--', label='Correlation threshold')
-        plt.xlabel('Shift (slots)', fontsize=14)
-        plt.ylabel('Correlation (-)', fontsize=14)
-        plt.title('Message correlation with the CSM', fontsize=16)
-
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
-
-        plt.legend(loc='lower left')
-        plt.show()
 
     return corr
 
@@ -185,18 +171,67 @@ def find_csm_times(
     """Find the where the Codeword Synchronization Markers (CSMs) are in the sequence of `time_stamps`. """
 
     correlation_threshold: int = int(np.max(csm_correlation) * csm_correlation_threshold)
+    expected_number_of_codewords = (time_stamps[-1] - time_stamps[0]) / \
+        (slot_length*num_slots_per_symbol*symbols_per_codeword)
 
     # where_corr finds the time shifts where the correlation is high enough to be a CSM.
     # Maximum correlation is 16 for 8-PPM
-    where_corr: npt.NDArray[np.int_]
-    where_corr = find_peaks(
+    where_corr: npt.NDArray[np.int_] = np.array([])
+
+    correlation_threshold = max(csm_correlation)
+
+    highest_correlation_peak = find_peaks(
         csm_correlation,
         height=correlation_threshold,
         distance=symbols_per_codeword * num_slots_per_symbol)[0]
 
+    while where_corr.shape[0] < floor(0.90*expected_number_of_codewords):
+        where_corr = find_peaks(
+            csm_correlation,
+            height=correlation_threshold,
+            threshold=correlation_threshold,
+            distance=symbols_per_codeword * num_slots_per_symbol)[0]
+
+        correlation_threshold -= 1
+
+        if correlation_threshold < 1:
+            break
+
+    num_slots_per_codeword = (symbols_per_codeword+len(CSM))*num_slots_per_symbol
+    # We know how many slots a codeword should have, and by looking at the distances between the correlation peaks, we can check whether they make sense or not.
+    codeword_slot_lengths_remainder = np.round(
+        np.diff(where_corr)/num_slots_per_codeword) - np.diff(where_corr)/num_slots_per_codeword
+
+    # What is usually the case is that the while loop above lowered the correlation threshold so much that it becomes too low and non-csm markers are detected as a csm marker.
+    # To mitigate this, we go once more, but now the correlation threshold is increased, to make sure we get rid of the non-csm 'markers'.
+    num_attempts = 0
+    while not np.all(codeword_slot_lengths_remainder <= 0.1):
+        correlation_threshold += 1
+
+        where_corr = find_peaks(
+            csm_correlation,
+            height=correlation_threshold,
+            threshold=correlation_threshold,
+            distance=symbols_per_codeword * num_slots_per_symbol)[0]
+
+        codeword_slot_lengths_remainder = np.round(
+            np.diff(where_corr)/num_slots_per_codeword) - np.diff(where_corr)/num_slots_per_codeword
+        num_attempts += 1
+        if num_attempts > 5:
+            break
+
+    if highest_correlation_peak[0] not in where_corr:
+        raise ValueError('Maximum correlation peak not present in csm time array. ')
+
+    # where_corr = find_peaks(
+    #     csm_correlation,
+    #     height=correlation_threshold,
+    #     distance=symbols_per_codeword * num_slots_per_symbol)[0]
+
     # There is an edge case that if the CSM appears right at the start of the timestamps,
     # that find_peaks cannot find it, even if the correlation is high enough.
     # In that case, try a simple threshold check.
+
     if where_corr.shape[0] == 0:
         where_corr = np.where(csm_correlation >= correlation_threshold)[0]
 
@@ -209,6 +244,20 @@ def find_csm_times(
     time_shifts: npt.NDArray = determine_CSM_time_shift(csm_times, time_stamps, slot_length, CSM, num_slots_per_symbol)
     print(f'Time shift per codeword (slot lengths): {np.array(time_shifts) / slot_length}')
     csm_times += time_shifts - 0.5 * slot_length
+
+    if kwargs.get('debug_mode'):
+        plt.figure()
+        plt.plot(csm_correlation, label='CSM correlation')
+        plt.axhline(correlation_threshold, color='r', linestyle='--', label='Correlation threshold')
+        plt.xlabel('Shift (slots)', fontsize=14)
+        plt.ylabel('Correlation (-)', fontsize=14)
+        plt.title('Message correlation with the CSM', fontsize=16)
+
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+
+        plt.legend(loc='lower left')
+        plt.show()
 
     return csm_times
 
@@ -403,7 +452,7 @@ def demodulate(
     sent_symbols: list[float] | None = None,
     csm_correlation_threshold: float = 0.6,
     **kwargs: dict[str, Any]
-) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_]]:
+) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_], float]:
     """Demodulate the PPM pulse time stamps (convert the time stamps to PPM symbols).
 
     First, the Codeword Synchronisation Marker (CSM) is derived from the timestamps, then
@@ -430,8 +479,10 @@ def demodulate(
                                                                     CSM, symbols_per_codeword, slot_length, M)
 
     # Assuming 50% efficiency
+    estimated_photons_per_pulse = np.mean(events_per_slot[events_per_slot > 0])
+
     print()
-    print('Estimated number of photons per pulse:', np.mean(events_per_slot[events_per_slot > 0])/0.5)
+    print('Estimated number of photons per pulse:', estimated_photons_per_pulse)
     print()
 
     num_detection_events: int = np.where((pulse_timestamps >= csm_times[0]) & (
@@ -448,4 +499,4 @@ def demodulate(
 
     slot_mapped_message = slot_map(flatten(msg_symbols), M)
 
-    return slot_mapped_message, events_per_slot
+    return slot_mapped_message, events_per_slot, estimated_photons_per_pulse
