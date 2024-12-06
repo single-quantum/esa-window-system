@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+from scipy.constants import h, c
 import itertools
 import pickle
 from copy import deepcopy
@@ -44,10 +46,18 @@ def print_ppm_parameters():
     print(tabulate(var_names_and_values, headers=["Variable", "Value"]))
 
 
-def save_figure(plt, name, dir):
-    now = datetime.now()
-    date_str = now.strftime("%d-%m-%Y")
-    p = Path('simulation results') / Path(date_str)
+def save_figure(plt, name: str, dir: str):
+    """Save figure as `name` to directory `dir`. 
+
+    :param plt: Description
+    :type plt: matplotlib.pyplot 
+    :param name: Filename
+    :type name: str 
+    :param dir: Subdirectory path
+    :type dir: str """
+    now: datetime = datetime.now()
+    date_str: str = now.strftime("%d-%m-%Y")
+    p: Path = Path('simulation results') / Path(date_str)
     if not p.exists():
         Path.mkdir(p)
         Path.mkdir(p / Path(dir))
@@ -72,6 +82,11 @@ def bpsk_encoding(input_sequence: list[int] | BitArray) -> BitArray:
 
 
 def tobits(input_string: str) -> list[int]:
+    """Docstring for tobits
+
+    :param input_string: A string to be converted to byte representation
+    :type input_string: str """
+
     result: list[int] = []
     for char in input_string:
         bits = bin(ord(char))[2:]
@@ -220,3 +235,25 @@ def ppm_symbols_to_bit_array(received_symbols: npt.ArrayLike, m: int = 4) -> npt
     received_sequence: npt.NDArray[np.int_] = bits_array[:, -m:].reshape(-1)
 
     return received_sequence
+
+
+def calculate_num_photons(measured_power: float, num_pulses_per_second: float, lmbda: float = 1550E-9, detector_efficiency: float = 0.5):
+    # Measured power on the reference in Watts
+    attenuation_to_output = 21  # Attenuation between reference and output in dB
+
+    photon_energy = h*c/lmbda   # Photon energy in Joule
+
+    output_power = measured_power*10**(-attenuation_to_output/10)*detector_efficiency
+    print('output power', f'{output_power:.3e} W')
+
+    num_photons_per_second = output_power/photon_energy
+
+    print('Number of photons per second', f'{num_photons_per_second:.3e}')
+
+    num_photons_per_pulse = num_photons_per_second / num_pulses_per_second
+
+    print('Number of photons per pulse', num_photons_per_pulse)
+    num_photons_per_pulse_avg_power = output_power*lmbda/(h*c*num_pulses_per_second)
+    print('Number of photons per pulse (avg power based)', num_photons_per_pulse_avg_power)
+
+    return num_photons_per_pulse
