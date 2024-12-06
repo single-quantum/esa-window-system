@@ -166,18 +166,25 @@ def decode(
     if kwargs.get('debug_mode'):
         plt.figure()
         plt.plot(asm_corr)
+        plt.title('Received bits / ASM correlation')
+        plt.xlabel('Received bit index (-)')
+        plt.ylabel('Correlation (-)')
         plt.show()
 
         plt.figure()
         plt.close()
 
-    where_asms = np.where(asm_corr >= 18.0)[0]
+    where_asms = np.where(asm_corr >= 18.5)[0]
 
     if where_asms.shape[0] == 0:
-        raise DecoderError('ASM not found in message')
+        return [], None, []
+        # raise DecoderError('ASM not found in message')
 
     # TODO: Make transfer frame size a setting.
-    information_blocks = information_blocks[where_asms[0] +
-                                            ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits * 8)]
+    # information_blocks = information_blocks[where_asms[0] +
+    #                                         ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits * 8)]
 
     return information_blocks, BER_before_decoding, where_asms
+
+
+# Make plot
