@@ -1,7 +1,0 @@
-This is a small guide on how we perform the measurements, which serves as a check list to make sure we did everything correctly.
-
-1. Connect DAC and AWG to your computer
-2. Setup DAC through DAC38RF8xEVM software. Use Antonio's config file, located in the folder `config_files`, named ``
-3. TURN ON THE WAVEFORM GENERATOR and connect to LMK CLKIN port (external DAC clock). The frequency should be 80.02833 MHz. 
-4. Connect amplifier to output of AWG (15dB should be enough)
-5. Turn on amplifier(s) (Two if the signal combiner box is used)
