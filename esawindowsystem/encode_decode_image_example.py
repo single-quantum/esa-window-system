@@ -1,10 +1,11 @@
 from fractions import Fraction
+import pathlib
 
 import matplotlib.pyplot as plt
 from PIL import Image
 
 from esawindowsystem.core.data_converter import payload_to_bit_sequence
-from esawindowsystem.core.encoder_functions import map_PPM_symbols
+from esawindowsystem.core.encoder_functions import map_PPM_symbols, get_asm_bit_arr
 from esawindowsystem.core.scppm_decoder import decode
 from esawindowsystem.core.scppm_encoder import encoder
 
@@ -20,7 +21,9 @@ from esawindowsystem.core.scppm_encoder import encoder
 M: int = 8
 code_rate: Fraction = Fraction(2, 3)
 payload_type = 'image'
-payload_file_path = 'sample_payloads/pillars-of-creation-tiny.png'
+
+parent_dir = pathlib.Path(__file__).parent.resolve()
+payload_file_path = pathlib.Path(parent_dir) / 'sample_payloads/JWST_Jupiter_tiny.png'
 
 IMG_SIZE: tuple[int, ...] = tuple((0, 0))
 
@@ -59,7 +62,7 @@ slot_mapped_sequence, _, _ = encoder(
         'use_randomizer': True
     })
 
-decoded_message, _, _ = decode(
+decoded_message, _, where_asms = decode(
     slot_mapped_sequence,
     M,
     code_rate,
@@ -70,10 +73,22 @@ decoded_message, _, _ = decode(
     }
 )
 
+information_block_sizes = {
+    Fraction(1, 3): 5040,
+    Fraction(1, 2): 7560,
+    Fraction(2, 3): 10080
+}
+
+num_bits = information_block_sizes[code_rate]
+ASM_arr = get_asm_bit_arr()
+decoded_message = decoded_message[where_asms[0] +
+                                  ASM_arr.shape[0]:(where_asms[0] + ASM_arr.shape[0] + num_bits * 8)]
+
 if payload_type == 'image':
     # Although `map_PPM_symbols` was meant to map bits to PPM symbols, it can conveniently also be used
     # to map bit values to 1-byte greyscale values.
-    pixel_values = map_PPM_symbols(decoded_message[0], 8)
+
+    pixel_values = map_PPM_symbols(decoded_message, 8)
     img_arr = pixel_values[:IMG_SIZE[0] * IMG_SIZE[1]].reshape((IMG_SIZE[1], IMG_SIZE[0]))
 
     plt.figure()

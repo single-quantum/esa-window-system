@@ -3,6 +3,7 @@ from fractions import Fraction
 import numpy.typing as npt
 from numpy import int_, log2
 from PIL import Image
+import pathlib
 
 from esawindowsystem.core.encoder_functions import get_csm
 
@@ -12,7 +13,8 @@ CODE_RATE = Fraction(2, 3)
 
 PAYLOAD_TYPE: str = 'image'
 # IMG_FILE_PATH = "esawindowsystem/sample_payloads/pillars-of-creation-ultra-tiny.png"
-IMG_FILE_PATH = "esawindowsystem/sample_payloads/JWST_Jupiter_tiny.png"
+parent_dir = pathlib.Path(__file__).parent.resolve()
+IMG_FILE_PATH = pathlib.Path(parent_dir) / 'sample_payloads/JWST_Jupiter_tiny.png'
 img = Image.open(IMG_FILE_PATH)
 IMG_SHAPE: tuple[int, int] = (img.size[1], img.size[0])
 GREYSCALE: bool = True
