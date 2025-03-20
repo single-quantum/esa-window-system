@@ -36,7 +36,7 @@ if payload_type == 'image':
 user_settings = {
     'B_interleaver': 2520,
     'N_interleaver': 2,
-    'reference_file_path': 'pillars_greyscale_16_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
+    'reference_file_path': parent_dir / 'tmp' / 'pillars_greyscale_16_samples_per_slot_8-PPM_interleaved_sent_bit_sequence'
 }
 
 # 1. Convert payload to bit sequence

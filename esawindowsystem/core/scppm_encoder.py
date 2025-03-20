@@ -1,5 +1,6 @@
 import pickle
 from fractions import Fraction
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
@@ -13,6 +14,9 @@ from esawindowsystem.core.encoder_functions import (accumulate, append_CRC, get_
                                                     slot_map, zero_terminate, prepend_asm)
 from esawindowsystem.core.utils import ppm_symbols_to_bit_array
 
+# Get root directory
+PARENT_DIR = Path(__file__).parent.parent.resolve()
+
 
 def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction, include_crc: bool = False, **kwargs) -> npt.NDArray[np.int_]:
     """This preprocessing function slices the bit stream in information blocks and attaches the CRC. """
@@ -20,7 +24,7 @@ def preprocess_bit_stream(bit_stream: npt.NDArray[np.int_], code_rate: Fraction,
     # CRC attachment is still to be implemented
     bit_stream = prepend_asm(bit_stream)
     information_blocks = slicer(bit_stream, code_rate, include_crc=include_crc, len_CRC=32, num_termination_bits=2)
-    with open('sent_bit_sequence_no_csm', 'wb') as f:
+    with open(PARENT_DIR / 'tmp' / 'sent_bit_sequence_no_csm', 'wb') as f:
         pickle.dump(information_blocks.flatten(), f)
 
     if kwargs.get('use_randomizer', False):
@@ -76,9 +80,10 @@ def SCPPM_encoder(
         reference_file_prefix: str = kwargs.get('reference_file_prefix', 'sample_payload')
         num_samples_per_slot: int | None = kwargs.get('num_samples_per_slot')
 
-        filename: str = f'{reference_file_prefix}_{num_samples_per_slot}_samples_per_slot_{M}' +\
-            '-PPM_interleaved_sent_bit_sequence'
-        with open(filename, 'wb') as f:
+        filename: Path = Path('sent_bit_sequence')
+
+        filepath: Path = PARENT_DIR / Path('tmp') / filename
+        with open(filepath, 'wb') as f:
             pickle.dump(encoded_message, f)
 
     # Map the encoded message bit stream to PPM symbols
@@ -157,7 +162,7 @@ def encoder(
         PPM_symbols, M, B_interleaver, N_interleaver
     )
 
-    with open('sent_bit_sequence', 'wb') as f:
+    with open(PARENT_DIR / 'tmp' / 'sent_bit_sequence_post_processed', 'wb') as f:
         sent_ppm_symbols = np.nonzero(slot_mapped_sequence)[1]
         sent_bit_sequence = ppm_symbols_to_bit_array(sent_ppm_symbols, int(np.log2(M)))
         pickle.dump(sent_bit_sequence, f)

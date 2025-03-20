@@ -1,6 +1,7 @@
 import pickle
 from fractions import Fraction
 from typing import Any
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,6 +22,10 @@ from esawindowsystem.core.utils import (bpsk_encoding,
 
 class DecoderError(Exception):
     pass
+
+
+# Get root directory
+PARENT_DIR = Path(__file__).parent.parent.resolve()
 
 
 def decode(
@@ -75,7 +80,8 @@ def decode(
     BER_before_decoding: float | None = None
     # Get the BER before decoding
     if reference_file_path := user_settings.get('reference_file_path'):
-        BER_before_decoding = get_BER_before_decoding(reference_file_path, convoluted_bit_sequence)
+        sent_bit_sequence_filepath = PARENT_DIR / 'tmp' / 'sent_bit_sequence'
+        BER_before_decoding = get_BER_before_decoding(sent_bit_sequence_filepath, convoluted_bit_sequence)
 
         print(f'BER before decoding: {BER_before_decoding}')
 
