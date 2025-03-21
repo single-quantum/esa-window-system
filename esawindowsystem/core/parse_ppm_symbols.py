@@ -1,6 +1,7 @@
 import pickle
 from copy import deepcopy
 from typing import Any
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +9,8 @@ import numpy.typing as npt
 
 from esawindowsystem.core.encoder_functions import get_csm
 from scipy.stats import norm
+
+ROOT_DIR = Path(__file__).parent.parent.resolve()
 
 
 def plot_symbol_times(
@@ -24,7 +27,7 @@ def plot_symbol_times(
     """Used for debugging, this function plots the PPM symbol locations in time.
 
     It compares the received symbols with the expected / sent symbols. """
-    with open('sent_symbols', 'rb') as f:
+    with open(ROOT_DIR / 'tmp' / 'sent_symbols', 'rb') as f:
         sent_symbols = pickle.load(f)
 
     codeword_idx = kwargs.get('codeword_idx', 0)
@@ -35,8 +38,13 @@ def plot_symbol_times(
     num_slots = round((te - t0) / slot_length)
     num_samples = 10 * num_slots
 
-    symbol_start_times = np.arange(t0, te, symbol_length)
-    slot_start_times = np.arange(t0, te, slot_length)
+    num_slots_per_symbol = round(symbol_length / slot_length)
+    num_guard_slots = int(num_slots_per_symbol / 5)
+
+    # Add one more symbol start time, to make sure the plot ends with a red line.
+    # Also add `num_guard_slots`, to make sure the guard slots are plotted
+    symbol_start_times = np.linspace(t0, te, num_symbols+1)
+    slot_start_times = np.linspace(t0, te, num_slots+1)
     plot_time_vector = np.arange(t0, te, (te - t0) / num_samples)
 
     y_received = np.zeros(plot_time_vector.shape[0])
@@ -68,14 +76,11 @@ def plot_symbol_times(
     demodulated_symbol_times = [demodulated_symbols[i] * slot_length +
                                 (i - start_symbol_index) * symbol_length for i in range(start_symbol_index, start_symbol_index + num_symbols)]
 
-    num_slots_per_symbol = round(symbol_length / slot_length)
-    num_guard_slots = int(num_slots_per_symbol / 5)
-
     fig, axs = plt.subplots(2, 1)
 
     axs[0].plot(plot_time_vector - t0, y_received)
     axs[0].set_title(
-        f'Received symbols (codeword = {codeword_idx+1}, symbols {start_symbol_index+1}-{start_symbol_index+num_symbols+1})', fontsize=16)
+        f'Received symbols (codeword = {codeword_idx+1}, symbols {start_symbol_index+1}-{start_symbol_index+num_symbols})', fontsize=16)
     for t in symbol_start_times:
         axs[0].axvline(t - t0, color='red', linewidth=1)
     for i, t in enumerate(slot_start_times[:-num_guard_slots]):
@@ -86,7 +91,7 @@ def plot_symbol_times(
             continue
         axs[0].axvline(t - t0, color='gold', linewidth=1, linestyle='--')
     for i, t in enumerate(demodulated_symbol_times):
-        axs[0].text(t + 0.35 * slot_length, 1.01 * y_received.max(),
+        axs[0].text(t + 0.35 * slot_length, 0.90 * y_received.max(),
                     str(int(demodulated_symbols[i + start_symbol_index])), fontsize=14)
     axs[0].set_xticks(symbol_start_times - t0)
     axs[0].tick_params(axis='both', which='major', labelsize=14)
@@ -103,14 +108,17 @@ def plot_symbol_times(
                            num_guard_slots] - t0, alpha=0.4, color='grey')
         if i % num_slots_per_symbol == 0:
             continue
+
         axs[1].axvline(t - t0, color='gold', linewidth=1, linestyle='--')
+
     for i, t in enumerate(sent_symbol_times[:num_symbols]):
-        axs[1].text(t - start_symbol_index * symbol_length, 1.01 * y_sent.max(),
+        axs[1].text(t - start_symbol_index * symbol_length, 0.90 * y_sent.max(),
                     str(int(sent_symbols[i + start_symbol_index])), fontsize=14)
     axs[1].set_xticks(symbol_start_times - t0)
     axs[1].tick_params(axis='both', which='major', labelsize=14)
     axs[1].set_ylabel('Amplitude (a.u.)', fontsize=14)
     axs[1].set_xlabel('Time (s)', fontsize=14)
+    plt.tight_layout()
     plt.show()
 
 
@@ -227,7 +235,7 @@ def parse_ppm_symbols(
 
     codeword_idx: int = kwargs.get('codeword_idx', 0)
     if sent_symbols is None:
-        with open('sent_symbols', 'rb') as f:
+        with open(ROOT_DIR / 'tmp' / 'sent_symbols', 'rb') as f:
             sent_symbols = pickle.load(f)
 
     # Received more symbols than were sent.
@@ -243,7 +251,7 @@ def parse_ppm_symbols(
                               codeword_start_time, symbols, num_symbol_frames, start_symbol_index=num_symbol_frames + 5, **kwargs)
         else:
             plot_symbol_times(pulse_times, symbol_length, slot_length,
-                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=30, num_symbols=7, **kwargs)
+                              codeword_start_time, symbols, num_symbol_frames, start_symbol_index=0, num_symbols=2, **kwargs)
 
     num_symbol_errors = np.nonzero(
         np.round(np.array(symbols)) -
