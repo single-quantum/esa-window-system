@@ -22,6 +22,8 @@ from esawindowsystem.ppm_parameters import (BIT_INTERLEAVE, CHANNEL_INTERLEAVE,
                                             sample_size_awg, slot_length,
                                             symbols_per_codeword)
 
+PARENT_DIR = Path(__file__).parent.resolve()
+
 
 def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian', ADD_ASM: bool = True):
 
@@ -92,7 +94,7 @@ def generate_awg_pattern(pulse_width: int = 10, pulse_shape: str = 'gaussian', A
 
     sent_symbols = np.nonzero(slot_mapped_sequence)[1]
 
-    with open('sent_symbols', 'wb') as f:
+    with open(PARENT_DIR / 'tmp' / 'sent_symbols', 'wb') as f:
         pickle.dump(sent_symbols, f)
 
     if PAYLOAD_TYPE == 'image':
